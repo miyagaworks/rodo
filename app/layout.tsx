@@ -23,7 +23,7 @@ export default function RootLayout({
       <body>
         <OfflineProvider>{children}</OfflineProvider>
         <Script
-          src="https://static.bizdeli.net/bizdeli.umd.js?apikey=5cb7f2bb-c8dd-471e-a314-0adb11dbf867"
+          src={`https://static.bizdeli.net/bizdeli.umd.js?apikey=${process.env.NEXT_PUBLIC_BIZDELI_API_KEY}`}
           strategy="afterInteractive"
         />
       </body>
