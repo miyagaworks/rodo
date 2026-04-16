@@ -43,11 +43,25 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, account }) {
       if (user) {
-        token.tenantId = (user as any).tenantId
-        token.role = (user as any).role
-        token.userId = user.id
+        if (account?.provider === 'google') {
+          // Google OAuth の user オブジェクトには tenantId/role が含まれないためDBから取得
+          const dbUser = await prisma.user.findUnique({
+            where: { email: user.email! },
+            select: { id: true, tenantId: true, role: true },
+          })
+          if (!dbUser) {
+            throw new Error('User not found in database')
+          }
+          token.tenantId = dbUser.tenantId
+          token.role = dbUser.role
+          token.userId = dbUser.id
+        } else {
+          token.tenantId = (user as any).tenantId
+          token.role = (user as any).role
+          token.userId = user.id
+        }
       }
       return token
     },
