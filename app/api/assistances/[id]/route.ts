@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/prisma'
+import { updateAssistanceSchema } from '@/lib/validations'
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
@@ -9,21 +10,32 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   }
 
   const { id } = await params
-  const body = await req.json()
-  const { name, displayAbbreviation, insuranceCompanies } = body
+  const raw = await req.json()
+  const parsed = updateAssistanceSchema.safeParse(raw)
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: 'Validation failed', details: parsed.error.flatten() },
+      { status: 400 }
+    )
+  }
+  const body = parsed.data
+
+  const companies: string[] = Array.isArray(body.insuranceCompanies)
+    ? body.insuranceCompanies.filter((v): v is string => v.trim() !== '')
+    : []
 
   const assistance = await prisma.$transaction(async (tx) => {
     await tx.insuranceCompany.deleteMany({
-      where: { assistanceId: id },
+      where: { assistanceId: id, tenantId: session.user.tenantId },
     })
 
     return tx.assistance.update({
       where: { id, tenantId: session.user.tenantId },
       data: {
-        name,
-        displayAbbreviation,
+        name: body.name,
+        displayAbbreviation: body.displayAbbreviation,
         insuranceCompanies: {
-          create: (insuranceCompanies as string[]).map((companyName, i) => ({
+          create: companies.map((companyName, i) => ({
             tenantId: session.user.tenantId,
             name: companyName,
             sortOrder: i,

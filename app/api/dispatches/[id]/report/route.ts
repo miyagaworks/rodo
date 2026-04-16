@@ -1,37 +1,10 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod/v4'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/prisma'
+import { upsertReportSchema } from '@/lib/validations'
 
-type ReportBody = {
-  departureOdo?: number | null
-  recoveryDistance?: number | null
-  transportDistance?: number | null
-  returnDistance?: number | null
-  completionOdo?: number | null
-  recoveryHighway?: number | null
-  transportHighway?: number | null
-  returnHighway?: number | null
-  totalHighway?: number | null
-  departurePlaceName?: string | null
-  arrivalPlaceName?: string | null
-  transportPlaceName?: string | null
-  transportShopName?: string | null
-  transportPhone?: string | null
-  transportAddress?: string | null
-  transportContact?: string | null
-  transportMemo?: string | null
-  primaryCompletionItems?: Record<string, boolean> | null
-  primaryCompletionNote?: string | null
-  secondaryCompletionItems?: Record<string, boolean> | null
-  secondaryCompletionNote?: string | null
-  primaryAmount?: number | null
-  secondaryAmount?: number | null
-  totalConfirmedAmount?: number | null
-  billingContactMemo?: string | null
-  storageType?: string | null
-  storageRequired?: boolean | null
-  isDraft?: boolean
-}
+type ReportBody = z.infer<typeof upsertReportSchema>
 
 function buildReportData(body: ReportBody) {
   const data: Record<string, unknown> = {}
@@ -96,7 +69,15 @@ export async function POST(
   const dispatch = await verifyDispatch(id, session.user.tenantId)
   if (!dispatch) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  const body: ReportBody = await req.json()
+  const raw = await req.json()
+  const parsed = upsertReportSchema.safeParse(raw)
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: 'Validation failed', details: parsed.error.flatten() },
+      { status: 400 }
+    )
+  }
+  const body: ReportBody = parsed.data
   const data = buildReportData(body)
 
   try {
@@ -123,7 +104,15 @@ export async function PATCH(
   const dispatch = await verifyDispatch(id, session.user.tenantId)
   if (!dispatch) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  const body: ReportBody = await req.json()
+  const raw = await req.json()
+  const parsed = upsertReportSchema.safeParse(raw)
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: 'Validation failed', details: parsed.error.flatten() },
+      { status: 400 }
+    )
+  }
+  const body: ReportBody = parsed.data
   const data = buildReportData(body)
 
   try {

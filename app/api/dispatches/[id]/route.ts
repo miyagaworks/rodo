@@ -2,6 +2,21 @@ import { NextResponse } from 'next/server'
 import { Prisma } from '@prisma/client'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/prisma'
+import { updateDispatchSchema } from '@/lib/validations'
+
+/** 許可されたステータス遷移マップ */
+const VALID_STATUS_TRANSITIONS: Record<string, string[]> = {
+  STANDBY:      ['DISPATCHED'],
+  DISPATCHED:   ['ONSITE', 'STANDBY'],
+  ONSITE:       ['TRANSPORTING', 'COMPLETED', 'DISPATCHED'],
+  TRANSPORTING: ['COMPLETED', 'STORED', 'ONSITE'],
+  COMPLETED:    ['RETURNED', 'TRANSPORTING', 'ONSITE'],
+  STORED:       ['RETURNED', 'TRANSPORTING'],
+  RETURNED:     ['COMPLETED', 'STORED'],
+  CANCELLED:    ['STANDBY'],
+}
+
+const VALID_STATUSES = new Set(Object.keys(VALID_STATUS_TRANSITIONS))
 
 export async function PATCH(
   req: Request,
@@ -11,7 +26,40 @@ export async function PATCH(
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { id } = await params
-  const body = await req.json()
+  const raw = await req.json()
+  const parsed = updateDispatchSchema
+    .refine(obj => Object.keys(obj).length > 0, 'Empty body')
+    .safeParse(raw)
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: 'Validation failed', details: parsed.error.flatten() },
+      { status: 400 }
+    )
+  }
+  const body = parsed.data
+
+  // ステータス遷移バリデーション
+  if (body.status !== undefined) {
+    if (!VALID_STATUSES.has(body.status)) {
+      return NextResponse.json({ error: `Invalid status: ${body.status}` }, { status: 400 })
+    }
+
+    const current = await prisma.dispatch.findUnique({
+      where: { id, tenantId: session.user.tenantId },
+      select: { status: true },
+    })
+    if (!current) {
+      return NextResponse.json({ error: 'Dispatch not found' }, { status: 404 })
+    }
+
+    const allowedTransitions = VALID_STATUS_TRANSITIONS[current.status] ?? []
+    if (!allowedTransitions.includes(body.status)) {
+      return NextResponse.json(
+        { error: `Invalid status transition: ${current.status} → ${body.status}` },
+        { status: 400 },
+      )
+    }
+  }
 
   // 更新可能フィールドを明示的にフィルタリング
   const allowed: Record<string, unknown> = {}
@@ -51,6 +99,17 @@ export async function PATCH(
   if (body.insuranceCompanyId !== undefined) allowed.insuranceCompanyId = body.insuranceCompanyId
   if (body.isDraft !== undefined) allowed.isDraft = body.isDraft
   if (body.vehicleNumber !== undefined) allowed.vehicleNumber = body.vehicleNumber
+
+  // insuranceCompanyId のテナント検証
+  if (body.insuranceCompanyId) {
+    const ic = await prisma.insuranceCompany.findFirst({
+      where: { id: body.insuranceCompanyId, tenantId: session.user.tenantId },
+      select: { id: true },
+    })
+    if (!ic) {
+      return NextResponse.json({ error: 'Insurance company not found' }, { status: 404 })
+    }
+  }
 
   try {
     const dispatch = await prisma.dispatch.update({

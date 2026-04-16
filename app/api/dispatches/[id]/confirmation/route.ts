@@ -1,33 +1,18 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod/v4'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/prisma'
+import { upsertConfirmationSchema } from '@/lib/validations'
 
-type ConfirmationBody = {
-  workDate?: string
-  preApprovalChecks?: boolean[]
-  customerSignature?: string | null
-  customerName?: string | null
-  customerDate?: string | null
-  vehicleType?: string | null
-  registrationNumber?: string | null
-  workContent?: string | null
-  shopCompanyName?: string | null
-  shopContactName?: string | null
-  shopSignature?: string | null
-  postApprovalCheck?: boolean
-  postApprovalSignature?: string | null
-  postApprovalName?: string | null
-  batteryDetails?: Record<string, unknown> | null
-  notes?: string | null
-}
+type ConfirmationBody = z.infer<typeof upsertConfirmationSchema>
 
 function buildData(body: ConfirmationBody) {
   const data: Record<string, unknown> = {}
-  if (body.workDate !== undefined) data.workDate = new Date(body.workDate)
+  if (body.workDate !== undefined) data.workDate = body.workDate ? new Date(body.workDate) : null
   if (body.preApprovalChecks !== undefined) data.preApprovalChecks = body.preApprovalChecks
   if (body.customerSignature !== undefined) data.customerSignature = body.customerSignature
   if (body.customerName !== undefined) data.customerName = body.customerName
-  if (body.customerDate !== undefined) data.customerDate = body.customerDate ? new Date(body.customerDate) : null
+  if (body.customerDate !== undefined) data.customerDate = body.customerDate != null ? new Date(body.customerDate) : null
   if (body.vehicleType !== undefined) data.vehicleType = body.vehicleType
   if (body.registrationNumber !== undefined) data.registrationNumber = body.registrationNumber
   if (body.workContent !== undefined) data.workContent = body.workContent
@@ -72,7 +57,15 @@ export async function POST(
   const dispatch = await verifyDispatch(id, session.user.tenantId)
   if (!dispatch) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  const body: ConfirmationBody = await req.json()
+  const raw = await req.json()
+  const parsed = upsertConfirmationSchema.safeParse(raw)
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: 'Validation failed', details: parsed.error.flatten() },
+      { status: 400 }
+    )
+  }
+  const body: ConfirmationBody = parsed.data
   const data = buildData(body)
 
   try {
@@ -99,7 +92,15 @@ export async function PATCH(
   const dispatch = await verifyDispatch(id, session.user.tenantId)
   if (!dispatch) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  const body: ConfirmationBody = await req.json()
+  const raw = await req.json()
+  const parsed = upsertConfirmationSchema.safeParse(raw)
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: 'Validation failed', details: parsed.error.flatten() },
+      { status: 400 }
+    )
+  }
+  const body: ConfirmationBody = parsed.data
   const data = buildData(body)
 
   try {
