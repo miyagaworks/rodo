@@ -7,6 +7,21 @@ export async function POST() {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   try {
+    // 未終了の休憩が既に存在しないか確認
+    const activeBreak = await prisma.breakRecord.findFirst({
+      where: {
+        userId: session.user.userId,
+        tenantId: session.user.tenantId,
+        endTime: null,
+      },
+    })
+    if (activeBreak) {
+      return NextResponse.json(
+        { error: 'Active break already exists', breakRecordId: activeBreak.id },
+        { status: 409 },
+      )
+    }
+
     const breakRecord = await prisma.breakRecord.create({
       data: {
         userId: session.user.userId,
