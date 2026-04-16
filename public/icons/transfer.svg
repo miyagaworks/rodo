@@ -1,0 +1,14 @@
+<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- 左の人 -->
+  <circle cx="12" cy="10" r="5" fill="white"/>
+  <path d="M4 34 C4 24 8 20 12 20 C16 20 20 24 20 34" fill="white"/>
+  <!-- 右の人 -->
+  <circle cx="36" cy="10" r="5" fill="white"/>
+  <path d="M28 34 C28 24 32 20 36 20 C40 20 44 24 44 34" fill="white"/>
+  <!-- 矢印（左→右） -->
+  <path d="M18 39 L30 39" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M26 35 L30 39 L26 43" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- 矢印（右→左） -->
+  <path d="M30 44 L18 44" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M22 40 L18 44 L22 48" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

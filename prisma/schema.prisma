@@ -1,0 +1,350 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Tenant {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users              User[]
+  assistances        Assistance[]
+  insuranceCompanies InsuranceCompany[]
+  dispatches         Dispatch[]
+  breakRecords       BreakRecord[]
+}
+
+model User {
+  id           String  @id @default(cuid())
+  tenantId     String
+  email        String  @unique
+  name         String
+  role         Role    @default(MEMBER)
+  passwordHash String?
+  image        String?
+
+  vehicleNumber           String?
+  monthlySalary           Int?
+  overtimeRate            Int?
+  transportationAllowance Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  dispatches   Dispatch[]
+  breakRecords BreakRecord[]
+
+  @@index([tenantId])
+}
+
+enum Role {
+  ADMIN
+  MEMBER
+}
+
+model Assistance {
+  id                  String  @id @default(cuid())
+  tenantId            String
+  name                String
+  displayAbbreviation String
+  logoUrl             String?
+  sortOrder           Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant             Tenant             @relation(fields: [tenantId], references: [id])
+  insuranceCompanies InsuranceCompany[]
+  dispatches         Dispatch[]
+
+  @@index([tenantId])
+}
+
+model InsuranceCompany {
+  id           String @id @default(cuid())
+  tenantId     String
+  assistanceId String
+  name         String
+  sortOrder    Int    @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant     Tenant     @relation(fields: [tenantId], references: [id])
+  assistance Assistance @relation(fields: [assistanceId], references: [id])
+  dispatches Dispatch[]
+
+  @@index([tenantId])
+  @@index([assistanceId])
+}
+
+model Dispatch {
+  id             String         @id @default(cuid())
+  tenantId       String
+  dispatchNumber String
+  userId         String
+  assistanceId   String
+  type           DispatchType
+  status         DispatchStatus @default(STANDBY)
+
+  vehicleNumber String?
+
+  departureOdo  Int?
+  completionOdo Int?
+
+  dispatchTime   DateTime?
+  arrivalTime    DateTime?
+  completionTime DateTime?
+  returnTime     DateTime?
+
+  dispatchGpsLat Float?
+  dispatchGpsLng Float?
+  arrivalGpsLat  Float?
+  arrivalGpsLng  Float?
+
+  address          String?
+  highwayName      String?
+  highwayDirection HighwayDirection?
+  kiloPost         Float?
+  customerName     String?
+  vehicleName      String?
+
+  plateRegion String?
+  plateClass  String?
+  plateKana   String?
+  plateNumber String?
+
+  situationType   SituationType?
+  situationDetail String?
+
+  workStartTime DateTime?
+  workEndTime   DateTime?
+  workDuration  Int?
+
+  canDrive     Boolean?
+  deliveryType DeliveryType?
+
+  memo String?
+
+  isHighway       Boolean          @default(false)
+  weather         String?
+  trafficControl  Boolean?
+  parkingLocation ParkingLocation?
+  areaIcName      String?
+
+  insuranceCompanyId String?
+
+  transportStartTime DateTime?
+
+  parentDispatchId     String?
+  isSecondaryTransport Boolean @default(false)
+
+  isDraft Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant           Tenant            @relation(fields: [tenantId], references: [id])
+  user             User              @relation(fields: [userId], references: [id])
+  assistance       Assistance        @relation(fields: [assistanceId], references: [id])
+  insuranceCompany InsuranceCompany? @relation(fields: [insuranceCompanyId], references: [id])
+  parentDispatch   Dispatch?         @relation("SecondaryTransport", fields: [parentDispatchId], references: [id])
+  childDispatches  Dispatch[]        @relation("SecondaryTransport")
+
+  etcRecords       DispatchEtc[]
+  photos           DispatchPhoto[]
+  report           Report?
+  workConfirmation WorkConfirmation?
+  breakRecords     BreakRecord[]
+
+  @@unique([tenantId, dispatchNumber])
+  @@index([tenantId])
+  @@index([userId])
+  @@index([assistanceId])
+  @@index([status])
+  @@index([isDraft])
+}
+
+enum DispatchType {
+  ONSITE
+  TRANSPORT
+}
+
+enum DispatchStatus {
+  STANDBY
+  DISPATCHED
+  ONSITE
+  WORKING
+  TRANSPORTING
+  COMPLETED
+  STORED
+  RETURNED
+  CANCELLED
+}
+
+enum HighwayDirection {
+  UP
+  DOWN
+}
+
+enum SituationType {
+  ACCIDENT
+  BREAKDOWN
+}
+
+enum DeliveryType {
+  DIRECT
+  STORAGE
+}
+
+enum ParkingLocation {
+  EMERGENCY_PARKING
+  SHOULDER
+  DRIVING_LANE
+}
+
+model DispatchEtc {
+  id          String           @id @default(cuid())
+  dispatchId  String
+  phase       EtcPhase
+  highwayName String
+  direction   HighwayDirection
+  amount      Int
+
+  createdAt DateTime @default(now())
+
+  dispatch Dispatch @relation(fields: [dispatchId], references: [id], onDelete: Cascade)
+
+  @@index([dispatchId])
+}
+
+enum EtcPhase {
+  DISPATCH_TO_ARRIVAL
+  COMPLETION_TO_RETURN
+}
+
+model DispatchPhoto {
+  id         String @id @default(cuid())
+  dispatchId String
+  photoUrl   String
+  sortOrder  Int    @default(0)
+
+  createdAt DateTime @default(now())
+
+  dispatch Dispatch @relation(fields: [dispatchId], references: [id], onDelete: Cascade)
+
+  @@index([dispatchId])
+}
+
+model Report {
+  id         String @id @default(cuid())
+  dispatchId String @unique
+
+  departureOdo      Int?
+  recoveryDistance  Float?
+  transportDistance Float?
+  returnDistance    Float?
+  completionOdo     Int?
+
+  recoveryHighway Int?
+  transportHighway Int?
+  returnHighway   Int?
+  totalHighway    Int?
+
+  departurePlaceName String?
+  arrivalPlaceName   String?
+  transportPlaceName String?
+
+  transportShopName String?
+  transportPhone    String?
+  transportAddress  String?
+  transportContact  String?
+  transportMemo     String?
+
+  primaryCompletionItems Json?
+  primaryCompletionNote  String?
+
+  secondaryCompletionItems Json?
+  secondaryCompletionNote  String?
+
+  primaryAmount   Int?
+  secondaryAmount Int?
+
+  storageType     String?
+  storageRequired Boolean?
+
+  totalConfirmedAmount Int?
+
+  billingContactMemo String?
+
+  isDraft Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  dispatch Dispatch @relation(fields: [dispatchId], references: [id], onDelete: Cascade)
+}
+
+model WorkConfirmation {
+  id         String @id @default(cuid())
+  dispatchId String @unique
+
+  workDate DateTime @default(now())
+
+  preApprovalChecks  Json?
+  customerSignature  String?
+  customerName       String?
+  customerDate       DateTime?
+
+  vehicleType        String?
+  registrationNumber String?
+
+  workContent String?
+
+  shopCompanyName String?
+  shopContactName String?
+  shopSignature   String?
+
+  postApprovalCheck     Boolean @default(false)
+  postApprovalSignature String?
+  postApprovalName      String?
+
+  batteryDetails Json?
+
+  notes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  dispatch Dispatch @relation(fields: [dispatchId], references: [id], onDelete: Cascade)
+}
+
+model BreakRecord {
+  id       String @id @default(cuid())
+  userId   String
+  tenantId String
+
+  startTime         DateTime
+  endTime           DateTime?
+  pauseTime         DateTime?
+  resumeTime        DateTime?
+  totalBreakMinutes Int?
+
+  dispatchId String?
+
+  createdAt DateTime @default(now())
+
+  user     User      @relation(fields: [userId], references: [id])
+  tenant   Tenant    @relation(fields: [tenantId], references: [id])
+  dispatch Dispatch? @relation(fields: [dispatchId], references: [id])
+
+  @@index([userId])
+  @@index([tenantId])
+}
