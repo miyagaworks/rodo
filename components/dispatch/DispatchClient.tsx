@@ -37,6 +37,11 @@ interface SerializedDispatch {
   arrivalGpsLng: number | null
   transportStartTime: string | null
   deliveryType: 'DIRECT' | 'STORAGE' | null
+  transferStatus: string | null
+  transferredFromId: string | null
+  transferredToUserName: string | null
+  transferredToDispatchNumber: string | null
+  transferredFromUserName: string | null
 }
 
 interface DispatchClientProps {
@@ -341,6 +346,32 @@ export default function DispatchClient({
   const [clockTarget, setClockTarget] = useState<
     'dispatch' | 'arrival' | 'transportStart' | 'completion' | 'return' | null
   >(null)
+
+  // ── 振替状態 ──
+  const [transferPending, setTransferPending] = useState(
+    initialDispatch?.transferStatus === 'PENDING'
+  )
+  const [transferCompleted, setTransferCompleted] = useState(false)
+  const isTransferred = initialDispatch?.status === 'TRANSFERRED'
+  const isTransferredIn = !!initialDispatch?.transferredFromId
+
+  // 振替完了ポーリング（30秒間隔、PENDING 時のみ）
+  useEffect(() => {
+    if (!transferPending || !dispatchId) return
+    const poll = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/dispatches/${dispatchId}`)
+        if (!res.ok) return
+        const data = await res.json()
+        if (data.status === 'TRANSFERRED') {
+          setTransferCompleted(true)
+          clearInterval(poll)
+          setTimeout(() => router.push('/'), 3000)
+        }
+      } catch { /* ignore */ }
+    }, 30000)
+    return () => clearInterval(poll)
+  }, [transferPending, dispatchId, router])
 
   // ── 写真（Phase 10） ──
   const { photoCount, fileInputRef, openCamera, handleFileChange } = usePhotoCapture(dispatchId)
@@ -804,7 +835,7 @@ export default function DispatchClient({
     // 現場対応
     if (step === 0) return { iconSrc: '/icons/stand-by.svg', label: '待機中', color: '#2FBF71' }
     if (step === 1) return { iconSrc: '/icons/dispatch.svg', label: '出動中', color: '#D3170A' }
-    if (step === 2) return { iconSrc: '/icons/work.svg', label: '作業中', color: '#F1A900' }
+    if (step === 2) return { iconSrc: '/icons/work.svg', label: '作業中', color: '#ea7600' }
     return { iconSrc: '/icons/transportation.svg', label: '搬送中', color: '#71A9F7' }
   })()
 
@@ -816,7 +847,7 @@ export default function DispatchClient({
   // ── Render ──
 
   return (
-    <div className="h-dvh flex flex-col" style={{ backgroundColor: '#C6D8FF' }}>
+    <div className="h-dvh flex flex-col" style={{ backgroundColor: mode === 'onsite' ? '#FFF3E0' : '#C6D8FF' }}>
       {/* ─── Header ─── */}
       <header
         className="px-4 py-3 flex items-center gap-3 flex-shrink-0"
@@ -833,7 +864,7 @@ export default function DispatchClient({
 
       {/* ─── Status bar (固定) ─── */}
       {showStatusBar && (
-        <div className="flex-shrink-0 px-4 pt-4 pb-1" style={{ backgroundColor: '#C6D8FF' }}>
+        <div className="flex-shrink-0 px-4 pt-4 pb-1" style={{ backgroundColor: mode === 'onsite' ? '#FFF3E0' : '#C6D8FF' }}>
           <div className="flex items-center justify-between bg-white rounded-lg px-4 py-2 shadow-md">
             <div className="flex items-center gap-2">
               <img src={statusConfig.iconSrc} alt="" className="w-6 h-6 object-contain" />
@@ -848,17 +879,69 @@ export default function DispatchClient({
         </div>
       )}
 
+      {/* ─── TRANSFERRED 読み取り専用バナー ─── */}
+      {isTransferred && (
+        <div className="flex-shrink-0 px-4 pt-2">
+          <div className="bg-gray-500 text-white rounded-lg px-4 py-3 text-center">
+            <p className="font-bold text-lg">振替済み</p>
+            {initialDispatch?.transferredToDispatchNumber && (
+              <p className="text-sm mt-1 opacity-80">
+                振替先: {initialDispatch.transferredToDispatchNumber}（{initialDispatch.transferredToUserName}）
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ─── 振替案件ラベル ─── */}
+      {isTransferredIn && (
+        <div className="flex-shrink-0 px-4 pt-2">
+          <div className="rounded-lg px-4 py-2 text-center text-sm font-bold text-white" style={{ backgroundColor: '#2FBF71' }}>
+            振替案件{initialDispatch?.transferredFromUserName ? `（${initialDispatch.transferredFromUserName} より）` : ''}
+          </div>
+        </div>
+      )}
+
       {/* ─── Main scroll area ─── */}
       <div className="flex-1 px-4 py-3 pb-10 space-y-3 overflow-y-auto">
 
         {/* ─── Type toggle ─── */}
         <div className="flex gap-2">
           <button
-            onClick={() => { if (step === 0) setMode('onsite') }}
+            onClick={() => {
+              if (step === 0) {
+                setMode('onsite')
+              } else if (mode !== 'onsite' && dispatchId) {
+                const msg = step > 2
+                  ? '現場対応に切り替えますか？ステータスが現着後に戻り、完了時刻・帰社時刻等はリセットされます。'
+                  : '現場対応に切り替えますか？既存のデータは保持されます。'
+                if (window.confirm(msg)) {
+                  offlineFetch(`/api/dispatches/${dispatchId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ type: 'onsite' }),
+                    offlineActionType: 'dispatch_update',
+                    offlineDispatchId: dispatchId,
+                  }).then((res) => {
+                    if (res.ok) {
+                      setMode('onsite')
+                      if (step > 2) {
+                        setStep(2)
+                        setTransportStartTime(null)
+                        setCompletionTime(null)
+                        setReturnTime(null)
+                        setCompletionOdo('')
+                        setIsStoredDispatch(false)
+                      }
+                    }
+                  }).catch(console.error)
+                }
+              }
+            }}
             className="flex-1 py-3 rounded-lg font-bold text-base text-white"
             style={{
-              backgroundColor: mode === 'onsite' ? '#1C2948' : '#71A9F7',
-              opacity: mode === 'transport' && step > 0 ? 0.4 : 1,
+              backgroundColor: mode === 'onsite' ? '#ea7600' : '#71A9F7',
+              opacity: 1,
               letterSpacing: '0.1em',
               paddingLeft: '0.1em',
             }}
@@ -866,11 +949,40 @@ export default function DispatchClient({
             現場対応
           </button>
           <button
-            onClick={() => { if (step === 0) setMode('transport') }}
+            onClick={() => {
+              if (step === 0) {
+                setMode('transport')
+              } else if (mode !== 'transport' && dispatchId) {
+                const msg = step > 2
+                  ? '搬送に切り替えますか？ステータスが現着後に戻り、完了時刻・帰社時刻等はリセットされます。'
+                  : '搬送に切り替えますか？既存のデータは保持されます。'
+                if (window.confirm(msg)) {
+                  offlineFetch(`/api/dispatches/${dispatchId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ type: 'transport' }),
+                    offlineActionType: 'dispatch_update',
+                    offlineDispatchId: dispatchId,
+                  }).then((res) => {
+                    if (res.ok) {
+                      setMode('transport')
+                      if (step > 2) {
+                        setStep(2)
+                        setTransportStartTime(null)
+                        setCompletionTime(null)
+                        setReturnTime(null)
+                        setCompletionOdo('')
+                        setIsStoredDispatch(false)
+                      }
+                    }
+                  }).catch(console.error)
+                }
+              }
+            }}
             className="flex-1 py-3 rounded-lg font-bold text-base text-white"
             style={{
               backgroundColor: mode === 'transport' ? '#1C2948' : '#71A9F7',
-              opacity: mode === 'onsite' && step > 0 ? 0.4 : 1,
+              opacity: 1,
               letterSpacing: '0.25em',
               paddingLeft: '0.25em',
             }}
@@ -929,24 +1041,76 @@ export default function DispatchClient({
         </div>
 
         {/* ─── 振替ボタン（現着後に表示・共通） ─── */}
-        <button
-          disabled
-          className="w-full h-[72px] flex items-center justify-center gap-4 rounded-xl font-bold text-3xl opacity-35"
-          style={{ backgroundColor: '#2FBF71', cursor: 'not-allowed' }}
-        >
-          <MdPeopleAlt className="w-12 h-12 text-white scale-x-[-1]" />
-          <span className="text-white" style={{ letterSpacing: '0.25em', paddingLeft: '0.25em' }}>振替</span>
-        </button>
+        {transferPending ? (
+          /* 振替待ち中 */
+          transferCompleted ? (
+            <div
+              className="w-full h-[72px] flex items-center justify-center gap-4 rounded-xl font-bold text-3xl"
+              style={{ backgroundColor: '#2FBF71' }}
+            >
+              <MdPeopleAlt className="w-12 h-12 text-white scale-x-[-1]" />
+              <span className="text-white">振替が完了しました</span>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <div
+                className="w-full h-[72px] flex items-center justify-center gap-4 rounded-xl font-bold text-3xl"
+                style={{ backgroundColor: '#2FBF71' }}
+              >
+                <MdPeopleAlt className="w-12 h-12 text-white scale-x-[-1]" />
+                <span className="text-white">振替待ち中...</span>
+              </div>
+              <button
+                onClick={async () => {
+                  if (!dispatchId) return
+                  try {
+                    const res = await offlineFetch(`/api/dispatches/${dispatchId}/transfer/cancel`, {
+                      method: 'POST',
+                      offlineActionType: 'transfer_cancel',
+                      offlineDispatchId: dispatchId,
+                    })
+                    if (res.ok) setTransferPending(false)
+                  } catch (e) { console.error(e) }
+                }}
+                className="w-full py-3 rounded-lg font-bold text-lg text-center bg-white border-2 border-red-300 active:bg-red-50"
+                style={{ color: '#D3170A' }}
+              >
+                振替キャンセル
+              </button>
+            </div>
+          )
+        ) : (
+          <button
+            disabled={step < 2 || isTransferred}
+            onClick={async () => {
+              if (!dispatchId || step < 2) return
+              if (!window.confirm('この案件を他の隊員に振り替えますか？')) return
+              try {
+                const res = await offlineFetch(`/api/dispatches/${dispatchId}/transfer`, {
+                  method: 'POST',
+                  offlineActionType: 'transfer_request',
+                  offlineDispatchId: dispatchId,
+                })
+                if (res.ok) setTransferPending(true)
+              } catch (e) { console.error(e) }
+            }}
+            className={`w-full h-[72px] flex items-center justify-center gap-4 rounded-xl font-bold text-3xl transition-opacity ${step < 2 || isTransferred ? 'opacity-35' : 'active:brightness-90'}`}
+            style={{ backgroundColor: '#2FBF71', cursor: step < 2 || isTransferred ? 'not-allowed' : 'pointer' }}
+          >
+            <MdPeopleAlt className="w-12 h-12 text-white scale-x-[-1]" />
+            <span className="text-white" style={{ letterSpacing: '0.25em', paddingLeft: '0.25em' }}>振替</span>
+          </button>
+        )}
 
         {/* ─── 作業確認書（Phase 6） ─── */}
         <button
-          disabled={step < 2}
-          onClick={() => { if (step >= 2) router.push(`/dispatch/${dispatchId}/confirmation`) }}
+          disabled={step < 2 || isTransferred}
+          onClick={() => { if (step >= 2 && !isTransferred) router.push(`/dispatch/${dispatchId}/confirmation`) }}
           className="w-full h-[72px] flex items-center justify-center gap-4 rounded-xl font-bold text-3xl active:brightness-90 transition-all"
           style={{
             backgroundColor: '#71A9F7',
-            opacity: step < 2 ? 0.35 : 1,
-            cursor: step < 2 ? 'not-allowed' : 'pointer',
+            opacity: step < 2 || isTransferred ? 0.35 : 1,
+            cursor: step < 2 || isTransferred ? 'not-allowed' : 'pointer',
           }}
         >
           <img src="/icons/confirmation.svg" alt="" className="w-10 h-10 object-contain" />
@@ -955,13 +1119,13 @@ export default function DispatchClient({
 
         {/* ─── 写真（Phase 10） ─── */}
         <button
-          disabled={step < 2}
-          onClick={openCamera}
+          disabled={step < 2 || isTransferred}
+          onClick={() => { if (!isTransferred) openCamera() }}
           className="w-full h-[72px] flex items-center justify-center gap-4 rounded-xl font-bold text-3xl active:brightness-90 transition-all"
           style={{
             backgroundColor: '#71A9F7',
-            opacity: step < 2 ? 0.35 : 1,
-            cursor: step < 2 ? 'not-allowed' : 'pointer',
+            opacity: step < 2 || isTransferred ? 0.35 : 1,
+            cursor: step < 2 || isTransferred ? 'not-allowed' : 'pointer',
           }}
         >
           <IoMdCamera className="w-12 h-12 text-white" />
