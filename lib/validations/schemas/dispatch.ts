@@ -29,6 +29,7 @@ const dispatchStatus = z.enum([
   'STORED',
   'RETURNED',
   'CANCELLED',
+  'TRANSFERRED',
 ])
 
 const highwayDirection = z.enum(['UP', 'DOWN'])
@@ -38,6 +39,7 @@ const parkingLocation = z.enum(['EMERGENCY_PARKING', 'SHOULDER', 'DRIVING_LANE']
 
 export const updateDispatchSchema = z.object({
   status: dispatchStatus.optional(),
+  type: z.enum(['onsite', 'transport']).optional(),
 
   // タイムスタンプ
   arrivalTime: dateString,

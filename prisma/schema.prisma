@@ -146,6 +146,16 @@ model Dispatch {
   parentDispatchId     String?
   isSecondaryTransport Boolean @default(false)
 
+  // 振替関連
+  transferStatus      TransferStatus?
+  transferRequestedAt DateTime?
+  transferredFromId   String?         @unique
+  transferredToId     String?         @unique
+
+  // type変更履歴
+  originalType  DispatchType?
+  typeChangedAt DateTime?
+
   isDraft Boolean @default(false)
 
   createdAt DateTime @default(now())
@@ -157,6 +167,8 @@ model Dispatch {
   insuranceCompany InsuranceCompany? @relation(fields: [insuranceCompanyId], references: [id])
   parentDispatch   Dispatch?         @relation("SecondaryTransport", fields: [parentDispatchId], references: [id])
   childDispatches  Dispatch[]        @relation("SecondaryTransport")
+  transferredFrom  Dispatch?         @relation("Transfer", fields: [transferredFromId], references: [id])
+  transferredTo    Dispatch?         @relation("Transfer")
 
   etcRecords       DispatchEtc[]
   photos           DispatchPhoto[]
@@ -186,6 +198,13 @@ enum DispatchStatus {
   COMPLETED
   STORED
   RETURNED
+  CANCELLED
+  TRANSFERRED
+}
+
+enum TransferStatus {
+  PENDING
+  ACCEPTED
   CANCELLED
 }
 
