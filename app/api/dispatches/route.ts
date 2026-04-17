@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/prisma'
 import { createDispatchSchema } from '@/lib/validations'
+import type { Prisma } from '@prisma/client'
 
 export async function GET(req: Request) {
   const session = await auth()
@@ -10,8 +11,11 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
   const status = searchParams.get('status')
 
-  const where: Record<string, unknown> = {
+  const isTransferQuery = status === 'transfer'
+
+  const where: Prisma.DispatchWhereInput = {
     tenantId: session.user.tenantId,
+    ...(session.user.role !== 'ADMIN' && !isTransferQuery && { userId: session.user.userId }),
   }
 
   if (status === 'draft') {
@@ -22,14 +26,12 @@ export async function GET(req: Request) {
     where.status = { in: ['COMPLETED', 'RETURNED'] }
     where.report = { isDraft: false }
   } else if (status === 'transfer') {
-    // 振替はPhase 5ではまだ未実装
-    where.status = 'TRANSFER'
+    where.transferStatus = 'PENDING'
   }
 
   try {
     const dispatches = await prisma.dispatch.findMany({
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      where: where as any,
+      where,
       orderBy: { updatedAt: 'desc' },
       select: {
         id: true,
@@ -42,6 +44,14 @@ export async function GET(req: Request) {
         plateClass: true,
         plateKana: true,
         plateNumber: true,
+        // 振替クエリ時に追加フィールドを返す
+        ...(isTransferQuery && {
+          userId: true,
+          transferStatus: true,
+          transferRequestedAt: true,
+          user: { select: { name: true } },
+          assistance: { select: { name: true, displayAbbreviation: true } },
+        }),
       },
     })
     return NextResponse.json(dispatches)

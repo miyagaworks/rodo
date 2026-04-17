@@ -4,16 +4,54 @@ import { auth } from '@/auth'
 import { prisma } from '@/lib/prisma'
 import { updateDispatchSchema } from '@/lib/validations'
 
+export async function GET(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await auth()
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { id } = await params
+
+  const dispatch = await prisma.dispatch.findUnique({
+    where: { id, tenantId: session.user.tenantId },
+    include: {
+      user: { select: { name: true } },
+      assistance: { select: { name: true } },
+      transferredTo: {
+        select: {
+          id: true,
+          dispatchNumber: true,
+          user: { select: { name: true } },
+        },
+      },
+      transferredFrom: {
+        select: {
+          id: true,
+          dispatchNumber: true,
+          user: { select: { name: true } },
+        },
+      },
+    },
+  })
+  if (!dispatch) {
+    return NextResponse.json({ error: 'Dispatch not found' }, { status: 404 })
+  }
+
+  return NextResponse.json(dispatch)
+}
+
 /** 許可されたステータス遷移マップ */
 const VALID_STATUS_TRANSITIONS: Record<string, string[]> = {
   STANDBY:      ['DISPATCHED'],
   DISPATCHED:   ['ONSITE', 'STANDBY'],
-  ONSITE:       ['TRANSPORTING', 'COMPLETED', 'DISPATCHED'],
+  ONSITE:       ['TRANSPORTING', 'COMPLETED', 'DISPATCHED', 'TRANSFERRED'],
   TRANSPORTING: ['COMPLETED', 'STORED', 'ONSITE'],
   COMPLETED:    ['RETURNED', 'TRANSPORTING', 'ONSITE'],
   STORED:       ['RETURNED', 'TRANSPORTING'],
   RETURNED:     ['COMPLETED', 'STORED'],
   CANCELLED:    ['STANDBY'],
+  TRANSFERRED:  [],
 }
 
 const VALID_STATUSES = new Set(Object.keys(VALID_STATUS_TRANSITIONS))
@@ -61,6 +99,17 @@ export async function PATCH(
     }
   }
 
+  // type 変更バリデーション（全ステータスで許可）
+  if (body.type !== undefined) {
+    const current = await prisma.dispatch.findUnique({
+      where: { id, tenantId: session.user.tenantId },
+      select: { status: true, type: true, originalType: true },
+    })
+    if (!current) {
+      return NextResponse.json({ error: 'Dispatch not found' }, { status: 404 })
+    }
+  }
+
   // 更新可能フィールドを明示的にフィルタリング
   const allowed: Record<string, unknown> = {}
 
@@ -99,6 +148,36 @@ export async function PATCH(
   if (body.insuranceCompanyId !== undefined) allowed.insuranceCompanyId = body.insuranceCompanyId
   if (body.isDraft !== undefined) allowed.isDraft = body.isDraft
   if (body.vehicleNumber !== undefined) allowed.vehicleNumber = body.vehicleNumber
+
+  // type 変更時: DB enum 形式に変換し、originalType / typeChangedAt を自動記録
+  if (body.type !== undefined) {
+    const dbType = body.type === 'onsite' ? 'ONSITE' : 'TRANSPORT'
+    allowed.type = dbType
+    // まだ originalType が記録されていない場合のみセット（上の current クエリで取得済み）
+    const currentForType = await prisma.dispatch.findUnique({
+      where: { id, tenantId: session.user.tenantId },
+      select: { originalType: true, type: true, status: true },
+    })
+    if (currentForType && !currentForType.originalType) {
+      allowed.originalType = currentForType.type
+    }
+    allowed.typeChangedAt = new Date()
+
+    // ONSITE 以降のステータスの場合、ONSITE に戻しデータをクリア
+    const AFTER_ONSITE_STATUSES = ['TRANSPORTING', 'COMPLETED', 'STORED', 'RETURNED']
+    if (currentForType && AFTER_ONSITE_STATUSES.includes(currentForType.status)) {
+      allowed.status = 'ONSITE'
+      allowed.transportStartTime = null
+      allowed.completionTime = null
+      allowed.returnTime = null
+      allowed.workStartTime = null
+      allowed.workEndTime = null
+      allowed.workDuration = null
+      allowed.completionOdo = null
+      allowed.canDrive = null
+      allowed.deliveryType = null
+    }
+  }
 
   // insuranceCompanyId のテナント検証
   if (body.insuranceCompanyId) {
