@@ -25,6 +25,13 @@ vi.mock('next/navigation', () => ({
   }),
 }))
 
+vi.mock('next-auth/react', () => ({
+  useSession: () => ({
+    data: { user: { userId: 'test-user-id', tenantId: 'test-tenant', role: 'MEMBER' } },
+    status: 'authenticated',
+  }),
+}))
+
 // ReportOnsiteClient は多くの依存があるため、
 // ペイロード構築関数のロジックを直接テストする
 
@@ -112,10 +119,10 @@ describe('不具合: ProcessingBar が Dispatch.isDraft のみ参照する', () 
   it('Dispatch.isDraft=false かつ Report.isDraft=true の場合、処理バーに表示されない', async () => {
     // APIは Dispatch.isDraft でフィルタリングするため、
     // Report.isDraft=true でも Dispatch.isDraft=false なら返らない
-    fetchSpy.mockResolvedValueOnce({
+    fetchSpy.mockImplementation(async () => ({
       ok: true,
-      json: async () => [], // Dispatch.isDraft=false なので空
-    } as Response)
+      json: async () => [],
+    }) as Response)
 
     const ProcessingBar = (await import('@/components/ProcessingBar')).default
     render(<ProcessingBar />)

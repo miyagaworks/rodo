@@ -4,7 +4,7 @@ import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
 
 export interface PendingAction {
   id: string
-  type: 'dispatch_create' | 'dispatch_update' | 'report_save' | 'report_complete' | 'confirmation_save'
+  type: 'dispatch_create' | 'dispatch_update' | 'report_save' | 'report_complete' | 'confirmation_save' | 'transfer_request' | 'transfer_cancel'
   dispatchId: string | null
   timestamp: number
   gps: { lat: number; lng: number } | null
