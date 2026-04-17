@@ -99,7 +99,7 @@ export async function PATCH(
     }
   }
 
-  // type 変更バリデーション（全ステータスで許可）
+  // type 変更バリデーション（全ステータスで許可、TRANSFERRED除外）
   if (body.type !== undefined) {
     const current = await prisma.dispatch.findUnique({
       where: { id, tenantId: session.user.tenantId },
@@ -107,6 +107,12 @@ export async function PATCH(
     })
     if (!current) {
       return NextResponse.json({ error: 'Dispatch not found' }, { status: 404 })
+    }
+    if (current.status === 'TRANSFERRED') {
+      return NextResponse.json(
+        { error: '振替済みの出動はタイプ変更できません' },
+        { status: 400 },
+      )
     }
   }
 

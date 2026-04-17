@@ -60,30 +60,36 @@ export async function POST(
         throw new Error('OPTIMISTIC_LOCK_FAILED')
       }
 
+      // 振替番号の重複チェック（-T, -T2, -T3...）
+      let transferNumber = `${dispatch.dispatchNumber}-T`
+      let suffix = 1
+      while (await tx.dispatch.findFirst({
+        where: { tenantId: session.user.tenantId, dispatchNumber: transferNumber },
+      })) {
+        suffix++
+        transferNumber = `${dispatch.dispatchNumber}-T${suffix}`
+      }
+
       // 新 Dispatch を作成（振替先）
       const newDispatch = await tx.dispatch.create({
         data: {
           tenantId: session.user.tenantId,
           userId: session.user.userId,
           assistanceId: dispatch.assistanceId,
-          dispatchNumber: `${dispatch.dispatchNumber}-T`,
+          dispatchNumber: transferNumber,
           type: dispatch.type,
           status: 'ONSITE',
           vehicleNumber: acceptUser?.vehicleNumber ?? null,
           transferredFromId: dispatch.id,
-          // 時刻・GPS
+          // 時刻・GPS（現着までのデータのみ引き継ぎ）
           dispatchTime: dispatch.dispatchTime,
           arrivalTime: dispatch.arrivalTime,
-          completionTime: dispatch.completionTime,
-          returnTime: dispatch.returnTime,
-          transportStartTime: dispatch.transportStartTime,
           dispatchGpsLat: dispatch.dispatchGpsLat,
           dispatchGpsLng: dispatch.dispatchGpsLng,
           arrivalGpsLat: dispatch.arrivalGpsLat,
           arrivalGpsLng: dispatch.arrivalGpsLng,
-          // ODO
+          // ODO（出発時のみ引き継ぎ）
           departureOdo: dispatch.departureOdo,
-          completionOdo: dispatch.completionOdo,
           // 案件情報
           customerName: dispatch.customerName,
           vehicleName: dispatch.vehicleName,
@@ -93,8 +99,6 @@ export async function POST(
           plateNumber: dispatch.plateNumber,
           situationType: dispatch.situationType,
           situationDetail: dispatch.situationDetail,
-          canDrive: dispatch.canDrive,
-          deliveryType: dispatch.deliveryType,
           address: dispatch.address,
           isHighway: dispatch.isHighway,
           highwayName: dispatch.highwayName,
@@ -106,10 +110,6 @@ export async function POST(
           parkingLocation: dispatch.parkingLocation,
           insuranceCompanyId: dispatch.insuranceCompanyId,
           memo: dispatch.memo,
-          // 作業時間
-          workStartTime: dispatch.workStartTime,
-          workEndTime: dispatch.workEndTime,
-          workDuration: dispatch.workDuration,
           // type変更履歴
           originalType: dispatch.originalType,
           typeChangedAt: dispatch.typeChangedAt,
