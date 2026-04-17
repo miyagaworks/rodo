@@ -19,11 +19,20 @@ vi.mock('next/navigation', () => ({
   }),
 }))
 
-/** 3つのfetch呼び出し（draft, stored, completed）をモックする */
+// next-auth/react モック
+vi.mock('next-auth/react', () => ({
+  useSession: () => ({
+    data: { user: { userId: 'test-user-id', tenantId: 'test-tenant', role: 'MEMBER' } },
+    status: 'authenticated',
+  }),
+}))
+
+/** 4つのfetch呼び出し（draft, stored, completed, transfer）をモックする */
 function mockThreeFetches(
   drafts: unknown[] = [],
   stored: unknown[] = [],
   completed: unknown[] = [],
+  transfers: unknown[] = [],
 ) {
   return vi.spyOn(global, 'fetch').mockImplementation(async (input) => {
     const url = typeof input === 'string' ? input : (input as Request).url
@@ -35,6 +44,9 @@ function mockThreeFetches(
     }
     if (url.includes('status=completed')) {
       return { ok: true, json: async () => completed } as Response
+    }
+    if (url.includes('status=transfer')) {
+      return { ok: true, json: async () => transfers } as Response
     }
     return { ok: true, json: async () => [] } as Response
   })
@@ -68,7 +80,7 @@ describe('ProcessingBar', () => {
     const { container } = render(<ProcessingBar />)
 
     await waitFor(() => {
-      expect(fetchSpy).toHaveBeenCalledTimes(3)
+      expect(fetchSpy).toHaveBeenCalledTimes(4)
     })
 
     // 空のバーは min-h-[44px] で表示される
@@ -236,9 +248,10 @@ describe('ProcessingBar', () => {
     expect(completedBtn).toHaveClass('opacity-35')
   })
 
-  it('振替ボタンは常にdisabledである', async () => {
+  it('振替0件のときdisabledになる', async () => {
     fetchSpy = mockThreeFetches(
       [makeDraft('d1', '20260414001')],
+      [],
       [],
       [],
     )

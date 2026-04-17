@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronLeft, Pencil, Check } from 'lucide-react'
+import { Pencil, Check } from 'lucide-react'
 import { FaPen } from 'react-icons/fa'
 import { IoIosArrowDroprightCircle } from 'react-icons/io'
 import NumberPlateInput, { PlateValue } from './NumberPlateInput'
@@ -246,6 +246,7 @@ export default function RecordClient({ dispatch, userName }: RecordClientProps) 
   })
   const [showWorkStartPicker, setShowWorkStartPicker] = useState(false)
   const [showWorkEndPicker, setShowWorkEndPicker] = useState(false)
+  const [showBackConfirm, setShowBackConfirm] = useState(false)
 
   // ── 写真（Phase 10） ──
   const { photos, removePhoto } = usePhotoCapture(dispatch.id)
@@ -387,16 +388,16 @@ export default function RecordClient({ dispatch, userName }: RecordClientProps) 
         className="flex-shrink-0 px-4 pt-3 pb-3"
         style={{ backgroundColor: '#D7AF70' }}
       >
-        {/* 戻るボタン + タイトル + 日付 */}
+        {/* タイトル + 日付 */}
         <div className="flex items-center gap-2 mb-2">
-          <button
-            onClick={() => router.push('/')}
-            className="p-1 -ml-1 rounded-lg active:opacity-60"
-            style={{ color: '#1C2948' }}
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </button>
           <span className="font-bold text-base flex-1" style={{ color: '#1C2948' }}>出動記録</span>
+          <button
+            onClick={() => setShowBackConfirm(true)}
+            className="px-3 py-1.5 rounded-lg text-xs font-bold active:opacity-60"
+            style={{ backgroundColor: '#1C2948', color: '#FFFFFF' }}
+          >
+            出動画面に戻る
+          </button>
           <span className="text-xs" style={{ color: '#1C2948' }}>
             {formatDate(dispatch.dispatchTime)}
           </span>
@@ -581,8 +582,8 @@ export default function RecordClient({ dispatch, userName }: RecordClientProps) 
           {/* 現場対応 / 搬送 表示 */}
           <div className="mb-3">
             <span
-              className="inline-block px-3 py-1 rounded-full text-xs font-bold text-white"
-              style={{ backgroundColor: '#2FBF71' }}
+              className="inline-block px-5 py-2 rounded-full text-base font-bold text-white"
+              style={{ backgroundColor: dispatch.type === 'ONSITE' ? '#E67E22' : '#3B82F6' }}
             >
               {dispatch.type === 'ONSITE' ? '現場対応' : '搬送'}
             </span>
@@ -959,6 +960,75 @@ export default function RecordClient({ dispatch, userName }: RecordClientProps) 
           setSelectedPhoto(null)
         }}
       />
+
+      {/* ─── 出動画面に戻る確認モーダル ─── */}
+      {showBackConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+          onClick={() => setShowBackConfirm(false)}
+        >
+          <div
+            className="mx-6 w-full max-w-sm rounded-2xl p-5 space-y-4"
+            style={{ backgroundColor: '#FFFFFF' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-sm font-bold text-center" style={{ color: '#1C2948' }}>
+              保存していないデータがあります。<br />下書き保存しますか？
+            </p>
+            <div className="space-y-2">
+              <button
+                onClick={async () => {
+                  if (loading) return
+                  setLoading(true)
+                  try {
+                    const res = await offlineFetch(`/api/dispatches/${dispatch.id}`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(buildPayload(true)),
+                      offlineActionType: 'dispatch_update',
+                      offlineDispatchId: dispatch.id,
+                    })
+                    if (!res.ok) throw new Error('下書きの保存に失敗しました')
+                    await clearDraft()
+                    router.push(`/dispatch/${dispatch.id}`)
+                  } catch (e) {
+                    console.error(e)
+                    alert(e instanceof Error ? e.message : '保存に失敗しました')
+                  } finally {
+                    setLoading(false)
+                    setShowBackConfirm(false)
+                  }
+                }}
+                disabled={loading}
+                className="w-full py-3 rounded-lg font-bold text-sm text-white active:opacity-80"
+                style={{ backgroundColor: '#1C2948' }}
+              >
+                {loading ? '保存中...' : '下書き保存して戻る'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowBackConfirm(false)
+                  router.push(`/dispatch/${dispatch.id}`)
+                }}
+                disabled={loading}
+                className="w-full py-3 rounded-lg font-bold text-sm active:opacity-80 border"
+                style={{ color: '#D3170A', borderColor: '#D3170A' }}
+              >
+                保存せずに戻る
+              </button>
+              <button
+                onClick={() => setShowBackConfirm(false)}
+                disabled={loading}
+                className="w-full py-3 rounded-lg font-bold text-sm active:opacity-80"
+                style={{ color: '#6B7280' }}
+              >
+                キャンセル
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
