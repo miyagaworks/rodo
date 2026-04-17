@@ -15,6 +15,14 @@ export default async function DispatchPage({ params }: Props) {
 
   const dispatch = await prisma.dispatch.findFirst({
     where: { id, tenantId: session.user.tenantId },
+    include: {
+      transferredTo: {
+        select: { dispatchNumber: true, user: { select: { name: true } } },
+      },
+      transferredFrom: {
+        select: { user: { select: { name: true } } },
+      },
+    },
   })
 
   if (!dispatch) redirect('/')
@@ -39,6 +47,11 @@ export default async function DispatchPage({ params }: Props) {
     arrivalGpsLng: dispatch.arrivalGpsLng,
     transportStartTime: dispatch.transportStartTime?.toISOString() ?? null,
     deliveryType: dispatch.deliveryType as 'DIRECT' | 'STORAGE' | null,
+    transferStatus: dispatch.transferStatus,
+    transferredFromId: dispatch.transferredFromId,
+    transferredToUserName: dispatch.transferredTo?.user?.name ?? null,
+    transferredToDispatchNumber: dispatch.transferredTo?.dispatchNumber ?? null,
+    transferredFromUserName: dispatch.transferredFrom?.user?.name ?? null,
   }
 
   return (

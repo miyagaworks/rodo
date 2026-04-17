@@ -68,6 +68,9 @@ export async function POST(
   const { id } = await params
   const dispatch = await verifyDispatch(id, session.user.tenantId)
   if (!dispatch) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (dispatch.status === 'TRANSFERRED') {
+    return NextResponse.json({ error: 'Cannot create report for transferred dispatch' }, { status: 403 })
+  }
 
   const raw = await req.json()
   const parsed = upsertReportSchema.safeParse(raw)
@@ -103,6 +106,9 @@ export async function PATCH(
   const { id } = await params
   const dispatch = await verifyDispatch(id, session.user.tenantId)
   if (!dispatch) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (dispatch.status === 'TRANSFERRED') {
+    return NextResponse.json({ error: 'Cannot update report for transferred dispatch' }, { status: 403 })
+  }
 
   const raw = await req.json()
   const parsed = upsertReportSchema.safeParse(raw)

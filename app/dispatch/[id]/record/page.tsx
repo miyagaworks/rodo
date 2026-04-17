@@ -25,6 +25,9 @@ export default async function DispatchRecordPage({ params }: Props) {
 
   if (!dispatch) redirect('/')
 
+  // 振替済みの出動は記録編集不可 → 出動詳細へリダイレクト
+  if (dispatch.status === 'TRANSFERRED') redirect(`/dispatch/${id}`)
+
   const serialized: SerializedDispatch = {
     id: dispatch.id,
     dispatchNumber: dispatch.dispatchNumber,

@@ -30,6 +30,9 @@ export default async function DispatchReportPage({ params, searchParams }: Props
 
   if (!dispatch) redirect('/')
 
+  // 振替済みの出動は報告書作成不可 → 出動詳細へリダイレクト
+  if (dispatch.status === 'TRANSFERRED') redirect(`/dispatch/${id}`)
+
   // 出動記録の必須項目（ナンバープレート・損保会社）が未入力なら出動記録へ飛ばす
   const isRecordComplete =
     dispatch.plateRegion && dispatch.plateNumber && dispatch.insuranceCompanyId

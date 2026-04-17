@@ -20,6 +20,9 @@ export default async function ConfirmationPage({ params }: Props) {
 
   if (!dispatch) redirect('/')
 
+  // 振替済みの出動は確認書作成不可 → 出動詳細へリダイレクト
+  if (dispatch.status === 'TRANSFERRED') redirect(`/dispatch/${id}`)
+
   const confirmation = dispatch.workConfirmation
     ? {
         workDate: dispatch.workConfirmation.workDate.toISOString(),

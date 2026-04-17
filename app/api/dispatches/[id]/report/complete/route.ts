@@ -42,6 +42,9 @@ export async function POST(
     where: { id, tenantId: session.user.tenantId },
   })
   if (!dispatch) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (dispatch.status === 'TRANSFERRED') {
+    return NextResponse.json({ error: 'Cannot complete report for transferred dispatch' }, { status: 403 })
+  }
 
   const raw = await req.json()
   const parsed = completeReportSchema.safeParse(raw)
