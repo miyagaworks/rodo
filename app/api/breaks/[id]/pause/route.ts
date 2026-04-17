@@ -12,14 +12,28 @@ export async function PATCH(
   const { id } = await params
 
   try {
+    // 現在の状態を確認
+    const existing = await prisma.breakRecord.findUnique({
+      where: { id, userId: session.user.userId, tenantId: session.user.tenantId },
+    })
+    if (!existing) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    }
+    if (existing.endTime) {
+      return NextResponse.json({ error: 'Break already ended' }, { status: 409 })
+    }
+    if (existing.pauseTime) {
+      return NextResponse.json({ error: 'Break already paused' }, { status: 409 })
+    }
+
     const breakRecord = await prisma.breakRecord.update({
-      where: { id, userId: session.user.userId },
+      where: { id, userId: session.user.userId, tenantId: session.user.tenantId },
       data: { pauseTime: new Date() },
     })
 
     return NextResponse.json(breakRecord)
   } catch (e) {
     console.error('[PATCH /api/breaks/[id]/pause]', e)
-    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

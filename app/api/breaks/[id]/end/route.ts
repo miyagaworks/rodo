@@ -12,19 +12,26 @@ export async function PATCH(
   const { id } = await params
 
   try {
-    const existing = await prisma.breakRecord.findUnique({ where: { id } })
+    const existing = await prisma.breakRecord.findUnique({
+      where: { id, userId: session.user.userId, tenantId: session.user.tenantId },
+    })
     if (!existing) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 })
     }
 
-    // 合計休憩時間を計算（分）
+    // 既に終了済みの場合は拒否
+    if (existing.endTime) {
+      return NextResponse.json({ error: 'Break already ended' }, { status: 409 })
+    }
+
+    // 合計休憩時間を計算（分）— 一時停止時間を考慮
     const startMs = existing.startTime.getTime()
     const endMs = Date.now()
     const totalMs = endMs - startMs
     const totalBreakMinutes = Math.round(totalMs / 60000)
 
     const breakRecord = await prisma.breakRecord.update({
-      where: { id, userId: session.user.userId },
+      where: { id, userId: session.user.userId, tenantId: session.user.tenantId },
       data: {
         endTime: new Date(),
         totalBreakMinutes,

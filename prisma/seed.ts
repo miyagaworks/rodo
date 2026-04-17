@@ -1,9 +1,17 @@
 import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 
+// 本番環境での実行を防止
+if (process.env.NODE_ENV === 'production') {
+  console.error('❌ Seed script must not run in production')
+  process.exit(1)
+}
+
 const prisma = new PrismaClient()
 
 async function main() {
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD || 'admin1234'
+  const memberPassword = process.env.SEED_MEMBER_PASSWORD || 'member1234'
   // テナント作成
   const tenant = await prisma.tenant.upsert({
     where: { id: 'tenant-shimoda' },
@@ -15,7 +23,7 @@ async function main() {
   })
 
   // 管理者ユーザー作成
-  const adminPasswordHash = await bcrypt.hash('admin1234', 12)
+  const adminPasswordHash = await bcrypt.hash(adminPassword, 12)
   await prisma.user.upsert({
     where: { email: 'admin@shimoda.example.com' },
     update: {},
@@ -29,7 +37,7 @@ async function main() {
   })
 
   // 隊員ユーザー作成
-  const member1PasswordHash = await bcrypt.hash('member1234', 12)
+  const member1PasswordHash = await bcrypt.hash(memberPassword, 12)
   await prisma.user.upsert({
     where: { email: 'member1@shimoda.example.com' },
     update: {},
@@ -46,7 +54,7 @@ async function main() {
     },
   })
 
-  const member2PasswordHash = await bcrypt.hash('member1234', 12)
+  const member2PasswordHash = await bcrypt.hash(memberPassword, 12)
   await prisma.user.upsert({
     where: { email: 'member2@shimoda.example.com' },
     update: {},
@@ -135,8 +143,15 @@ async function main() {
   }
 
   console.log('Seed completed!')
-  console.log('Admin: admin@shimoda.example.com / admin1234')
-  console.log('Member: member1@shimoda.example.com / member1234')
+  if (!process.env.SEED_ADMIN_PASSWORD) {
+    console.log('Admin: admin@shimoda.example.com / admin1234')
+    console.log('Member: member1@shimoda.example.com / member1234')
+    console.log('⚠️  Default passwords used. Set SEED_ADMIN_PASSWORD / SEED_MEMBER_PASSWORD for custom passwords.')
+  } else {
+    console.log('Admin: admin@shimoda.example.com')
+    console.log('Member: member1@shimoda.example.com')
+    console.log('(Passwords set from environment variables)')
+  }
 }
 
 main()

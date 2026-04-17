@@ -1,0 +1,80 @@
+import { describe, it, expect, vi } from 'vitest'
+import { render, screen, fireEvent } from '@testing-library/react'
+
+// 子コンポーネントをスタブ化
+vi.mock('@/components/settings/AssistanceTab', () => ({
+  default: () => <div data-testid="assistance-tab">AssistanceTab</div>,
+}))
+vi.mock('@/components/settings/MembersTab', () => ({
+  default: () => <div data-testid="members-tab">MembersTab</div>,
+}))
+
+import SettingsClient from '@/components/SettingsClient'
+
+describe('SettingsClient', () => {
+  // ── 正常系 ──
+
+  it('ヘッダーに「設定」タイトルと戻るリンクを表示する', () => {
+    render(<SettingsClient />)
+
+    expect(screen.getByText('設定')).toBeInTheDocument()
+    const backLink = screen.getByText('← 戻る')
+    expect(backLink).toBeInTheDocument()
+    expect(backLink.closest('a')).toHaveAttribute('href', '/')
+  })
+
+  it('2つのタブトリガーを表示する', () => {
+    render(<SettingsClient />)
+
+    expect(screen.getByText('アシスタンス')).toBeInTheDocument()
+    expect(screen.getByText('隊員登録')).toBeInTheDocument()
+  })
+
+  it('デフォルトでアシスタンスタブが表示される', () => {
+    render(<SettingsClient />)
+
+    expect(screen.getByTestId('assistance-tab')).toBeInTheDocument()
+  })
+
+  it('タブトリガーが正しい role="tab" 属性を持つ', () => {
+    render(<SettingsClient />)
+
+    const tabs = screen.getAllByRole('tab')
+    expect(tabs).toHaveLength(2)
+    expect(tabs[0]).toHaveTextContent('アシスタンス')
+    expect(tabs[1]).toHaveTextContent('隊員登録')
+  })
+
+  it('デフォルトでアシスタンスタブが active、隊員登録が inactive', () => {
+    render(<SettingsClient />)
+
+    const tabs = screen.getAllByRole('tab')
+    expect(tabs[0]).toHaveAttribute('data-state', 'active')
+    expect(tabs[1]).toHaveAttribute('data-state', 'inactive')
+  })
+
+  it('tabpanel にアシスタンスタブの内容が表示される', () => {
+    render(<SettingsClient />)
+
+    const panel = screen.getByRole('tabpanel')
+    expect(panel).toHaveAttribute('data-state', 'active')
+    expect(screen.getByTestId('assistance-tab')).toBeInTheDocument()
+  })
+
+  // ── スタイル検証 ──
+
+  it('ヘッダーの背景色が正しい', () => {
+    render(<SettingsClient />)
+
+    const header = screen.getByText('設定').closest('header')!
+    expect(header).toHaveStyle({ backgroundColor: '#1C2948' })
+  })
+
+  it('ページ全体の背景色が正しい', () => {
+    const { container } = render(<SettingsClient />)
+
+    const root = container.firstElementChild as HTMLElement
+    expect(root).toHaveStyle({ backgroundColor: '#C6D8FF' })
+    expect(root).toHaveClass('min-h-screen')
+  })
+})

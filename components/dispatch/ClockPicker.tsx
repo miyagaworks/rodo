@@ -162,6 +162,7 @@ export default function ClockPicker({ value, onChange, onClose, minTime, maxTime
     }
 
     onChange(newDate)
+    onClose()
   }
 
   // ── 針の角度と長さを算出 ──

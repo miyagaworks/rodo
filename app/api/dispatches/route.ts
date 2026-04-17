@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/prisma'
+import { createDispatchSchema } from '@/lib/validations'
 
 export async function GET(req: Request) {
   const session = await auth()
@@ -46,7 +47,7 @@ export async function GET(req: Request) {
     return NextResponse.json(dispatches)
   } catch (e) {
     console.error('[GET /api/dispatches]', e)
-    return NextResponse.json([], { status: 200 })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
@@ -54,11 +55,23 @@ export async function POST(req: Request) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const body = await req.json()
-  const { assistanceId, type, departureOdo, dispatchTime, dispatchGpsLat, dispatchGpsLng, parentDispatchId, isSecondaryTransport } = body
+  const raw = await req.json()
+  const parsed = createDispatchSchema.safeParse(raw)
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: 'Validation failed', details: parsed.error.flatten() },
+      { status: 400 }
+    )
+  }
+  const { assistanceId, type, departureOdo, dispatchTime, dispatchGpsLat, dispatchGpsLng, parentDispatchId, isSecondaryTransport } = parsed.data
 
-  if (!assistanceId || !type) {
-    return NextResponse.json({ error: 'assistanceId and type are required' }, { status: 400 })
+  // assistanceId のテナント検証
+  const assistance = await prisma.assistance.findFirst({
+    where: { id: assistanceId, tenantId: session.user.tenantId },
+    select: { id: true },
+  })
+  if (!assistance) {
+    return NextResponse.json({ error: 'Assistance not found' }, { status: 404 })
   }
 
   // ログインユーザーの車両番号を取得
@@ -88,8 +101,8 @@ export async function POST(req: Request) {
     // 2次搬送の場合、親の案件情報を引き継ぐ
     let inheritedFields: Record<string, unknown> = {}
     if (isSecondaryTransport && parentDispatchId) {
-      const parent = await tx.dispatch.findUnique({
-        where: { id: parentDispatchId },
+      const parent = await tx.dispatch.findFirst({
+        where: { id: parentDispatchId, tenantId: session.user.tenantId },
       })
       if (parent) {
         // 2次搬送の出動番号: 親の番号 + サフィックス (-2, -3, ...)

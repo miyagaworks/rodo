@@ -1,5 +1,7 @@
 import type { NextConfig } from 'next'
 
+const isDev = process.env.NODE_ENV === 'development'
+
 const nextConfig: NextConfig = {
   images: {
     domains: [],
@@ -16,7 +18,7 @@ const nextConfig: NextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://static.bizdeli.net",
+              `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''} https://static.bizdeli.net`,
               "style-src 'self' 'unsafe-inline' https://static.bizdeli.net",
               "connect-src 'self' https://static.bizdeli.net https://app.bizdeli.net",
               "img-src 'self' data: blob:",

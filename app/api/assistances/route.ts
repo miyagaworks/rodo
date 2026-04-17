@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/prisma'
+import { createAssistanceSchema } from '@/lib/validations'
 
 export async function GET() {
   const session = await auth()
@@ -23,12 +24,21 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const body = await req.json()
+  const raw = await req.json()
+  const parsed = createAssistanceSchema.safeParse(raw)
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: 'Validation failed', details: parsed.error.flatten() },
+      { status: 400 }
+    )
+  }
+  const body = parsed.data
+
   const assistance = await prisma.assistance.create({
     data: {
       tenantId: session.user.tenantId,
       name: body.name,
-      displayAbbreviation: body.displayAbbreviation || '',
+      displayAbbreviation: body.displayAbbreviation,
     },
     include: { insuranceCompanies: true },
   })
