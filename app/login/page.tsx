@@ -38,7 +38,8 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-6 overflow-x-hidden" style={{ backgroundColor: '#C6D8FF' }}>
+    <div className="min-h-screen flex flex-col items-center justify-between px-6 overflow-x-hidden" style={{ backgroundColor: '#C6D8FF' }}>
+      <div />
       <div className="w-full max-w-sm">
         {/* RODOロゴ（アニメーション） */}
         <div className="flex justify-center mb-8">
@@ -125,15 +126,10 @@ export default function LoginPage() {
           </form>
         )}
 
-        {/* 新規登録リンク */}
-        <p className="text-sm text-gray-600 text-center mt-4">
-          アカウントをお持ちでない場合は{' '}
-          <a href="/register" className="font-medium underline" style={{ color: '#1A56DB' }}>
-            新規登録
-          </a>{' '}
-          してください。
-        </p>
       </div>
+      <p className="pb-4 text-xs text-gray-400">
+        <span style={{ fontSize: '1.5rem', verticalAlign: '-0.2em' }}>&copy;</span> Senrigan {new Date().getFullYear()}
+      </p>
     </div>
   )
 }
