@@ -44,7 +44,7 @@ describe('BreakScreen', () => {
 
   it('idle 状態でマウントすると startBreak API を呼ぶ', async () => {
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(JSON.stringify({ id: 'break-1' }), { status: 200 }),
+      new Response(JSON.stringify({ id: 'break-1' }), { status: 201 }),
     )
 
     renderWithStore()
@@ -70,6 +70,97 @@ describe('BreakScreen', () => {
     })
 
     expect(screen.getByText('休憩中')).toBeInTheDocument()
+    consoleSpy.mockRestore()
+  })
+
+  it('startBreak 409 応答時は GET /api/breaks/active で既存休憩を復元する', async () => {
+    // サーバー側の休憩開始から 600 秒経過しているケース
+    const serverStartMs = Date.now() - 600 * 1000
+
+    fetchSpy = vi.spyOn(globalThis, 'fetch')
+    fetchSpy.mockImplementation(
+      (async (input: RequestInfo | URL) => {
+        const url = typeof input === 'string' ? input : input.toString()
+        if (url === '/api/breaks') {
+          return new Response(
+            JSON.stringify({ error: 'Active break already exists', breakRecordId: 'break-existing' }),
+            { status: 409 },
+          )
+        }
+        if (url === '/api/breaks/active') {
+          return new Response(
+            JSON.stringify({
+              id: 'break-existing',
+              startTime: new Date(serverStartMs).toISOString(),
+              endTime: null,
+            }),
+            { status: 200 },
+          )
+        }
+        return new Response('not found', { status: 404 })
+      }) as typeof fetch,
+    )
+
+    renderWithStore()
+
+    await waitFor(() => {
+      expect(fetchSpy).toHaveBeenCalledWith('/api/breaks/active')
+    })
+
+    const state = store.get(breakStateAtom)
+    expect(state.status).toBe('breaking')
+    expect(state.breakRecordId).toBe('break-existing')
+    // 経過約600秒なので、残りは BREAK_DURATION - 600 付近
+    expect(state.remainingSeconds).toBeGreaterThan(BREAK_DURATION - 601)
+    expect(state.remainingSeconds).toBeLessThanOrEqual(BREAK_DURATION - 599)
+  })
+
+  it('startBreak 409 後 GET /api/breaks/active も失敗した場合は atom を更新しない', async () => {
+    fetchSpy = vi.spyOn(globalThis, 'fetch')
+    fetchSpy.mockImplementation(
+      (async (input: RequestInfo | URL) => {
+        const url = typeof input === 'string' ? input : input.toString()
+        if (url === '/api/breaks') {
+          return new Response(
+            JSON.stringify({ error: 'Active break already exists', breakRecordId: 'break-existing' }),
+            { status: 409 },
+          )
+        }
+        if (url === '/api/breaks/active') {
+          return new Response(JSON.stringify({ error: 'Internal' }), { status: 500 })
+        }
+        return new Response('not found', { status: 404 })
+      }) as typeof fetch,
+    )
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    renderWithStore()
+
+    await waitFor(() => {
+      expect(fetchSpy).toHaveBeenCalledWith('/api/breaks/active')
+    })
+
+    const state = store.get(breakStateAtom)
+    expect(state.status).toBe('idle')
+    expect(state.breakRecordId).toBeNull()
+    consoleSpy.mockRestore()
+  })
+
+  it('startBreak が 500 応答した場合は atom を更新せずエラーをログする', async () => {
+    fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ error: 'Internal' }), { status: 500 }),
+    )
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    renderWithStore()
+
+    await waitFor(() => {
+      expect(fetchSpy).toHaveBeenCalledWith('/api/breaks', { method: 'POST' })
+    })
+
+    const state = store.get(breakStateAtom)
+    expect(state.status).toBe('idle')
+    expect(state.breakRecordId).toBeNull()
     consoleSpy.mockRestore()
   })
 
@@ -233,6 +324,77 @@ describe('BreakScreen', () => {
     renderWithStore()
 
     expect(screen.getByText('41:05')).toBeInTheDocument()
+  })
+
+  it('Strict Mode で useEffect が二重実行されても startBreak は 1 回しか POST しない', async () => {
+    fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ id: 'break-1' }), { status: 201 }),
+    )
+
+    // Strict Mode をシミュレートするため、コンポーネントを <StrictMode> で包む。
+    // Strict Mode では dev モード時、useEffect が mount → unmount → mount と擬似的に走り、
+    // 二重の副作用実行が検知される。
+    render(
+      <React.StrictMode>
+        <Provider store={store}>
+          <BreakScreen />
+        </Provider>
+      </React.StrictMode>,
+    )
+
+    await waitFor(() => {
+      expect(fetchSpy).toHaveBeenCalled()
+    })
+
+    // 少し待って二度目の effect が走っても重複 POST が発生しないことを確認
+    await new Promise((resolve) => setTimeout(resolve, 10))
+
+    const postCalls = fetchSpy.mock.calls.filter(
+      ([input, init]) => {
+        const url = typeof input === 'string' ? input : (input as URL | Request).toString()
+        return url === '/api/breaks' && (init as RequestInit | undefined)?.method === 'POST'
+      },
+    )
+    expect(postCalls).toHaveLength(1)
+  })
+
+  it('Strict Mode で paused 再開時も resume API は 1 回しか呼ばれない', async () => {
+    store.set(breakStateAtom, {
+      status: 'paused',
+      startTime: null,
+      remainingSeconds: 1800,
+      pausedAt: Date.now(),
+      breakRecordId: 'break-paused-1',
+    })
+
+    fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('ok', { status: 200 }),
+    )
+
+    render(
+      <React.StrictMode>
+        <Provider store={store}>
+          <BreakScreen />
+        </Provider>
+      </React.StrictMode>,
+    )
+
+    await waitFor(() => {
+      expect(fetchSpy).toHaveBeenCalled()
+    })
+
+    await new Promise((resolve) => setTimeout(resolve, 10))
+
+    const resumeCalls = fetchSpy.mock.calls.filter(
+      ([input, init]) => {
+        const url = typeof input === 'string' ? input : (input as URL | Request).toString()
+        return (
+          url === '/api/breaks/break-paused-1/resume' &&
+          (init as RequestInit | undefined)?.method === 'PATCH'
+        )
+      },
+    )
+    expect(resumeCalls).toHaveLength(1)
   })
 
   it('unmount 時に cancelAnimationFrame が呼ばれる', () => {

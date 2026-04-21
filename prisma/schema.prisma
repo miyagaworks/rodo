@@ -13,6 +13,11 @@ model Tenant {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // 運営日の開始時刻（分単位、0〜1439）。出動番号の日付計算用。
+  // NOTE: 休憩制御（1 勤務あたり上限制御）では使用しないこと。
+  // 勤務区間の定義は lib/workSession.ts が担う。
+  businessDayStartMinutes Int @default(0)
+
   users              User[]
   assistances        Assistance[]
   insuranceCompanies InsuranceCompany[]

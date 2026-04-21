@@ -29,6 +29,11 @@ export {
 
 export { deleteTransportDestinationSchema } from './schemas/transport'
 
+export {
+  tenantSettingsPatchSchema,
+  type TenantSettingsPatchInput,
+} from './schemas/tenant'
+
 // Helpers
 export {
   gpsLat,

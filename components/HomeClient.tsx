@@ -44,6 +44,9 @@ export default function HomeClient({ session }: HomeClientProps) {
   const breakState = useAtomValue(breakStateAtom)
   const [assistances, setAssistances] = useState<DbAssistance[]>([])
   const [fetchError, setFetchError] = useState<string | null>(null)
+  // 休憩上限（残時間 > 0 で true）。取得前は null、フェイルクローズで false。
+  const [canStartBreak, setCanStartBreak] = useState<boolean | null>(null)
+  const [limitStatusError, setLimitStatusError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -73,6 +76,36 @@ export default function HomeClient({ session }: HomeClientProps) {
     load()
     return () => { cancelled = true }
   }, [router])
+
+  // 休憩上限状態の取得。マウント時と、休憩状態が変わったタイミング
+  // （特に breaking → idle に戻ったとき）で再取得。
+  useEffect(() => {
+    let cancelled = false
+    async function loadLimit() {
+      try {
+        setLimitStatusError(null)
+        const res = await fetch('/api/breaks/limit-status')
+        if (!res.ok) {
+          throw new Error(`API error: ${res.status}`)
+        }
+        const data = (await res.json()) as { canStartBreak?: unknown }
+        if (!cancelled) {
+          setCanStartBreak(typeof data.canStartBreak === 'boolean' ? data.canStartBreak : false)
+        }
+      } catch (err) {
+        console.error('[HomeClient] limit-status fetch failed:', err)
+        if (!cancelled) {
+          // フェイルクローズ: 勤務時間を保護するため非表示にする
+          setCanStartBreak(false)
+          setLimitStatusError(
+            err instanceof Error ? err.message : '休憩可否の取得に失敗しました',
+          )
+        }
+      }
+    }
+    loadLimit()
+    return () => { cancelled = true }
+  }, [breakState.status])
 
   // DB データ + 表示設定を合成
   const displayAssistances = assistances.map((a) => {
@@ -148,8 +181,18 @@ export default function HomeClient({ session }: HomeClientProps) {
           </div>
         )}
 
-        {/* 休憩ボタン（ポーズ中は非表示） */}
-        {breakState.status !== 'paused' && (
+        {/* 休憩上限取得エラー通知（フェイルクローズした旨を案内） */}
+        {limitStatusError && (
+          <div
+            role="status"
+            className="mb-3 p-3 rounded-lg bg-yellow-50 border border-yellow-200 text-yellow-800 text-xs"
+          >
+            休憩可否の取得に失敗しました。休憩を一時停止しています。
+          </div>
+        )}
+
+        {/* 休憩ボタン（ポーズ中 / 取得中 / 消化済みは非表示） */}
+        {breakState.status !== 'paused' && canStartBreak === true && (
           <button
             className="w-full flex items-center justify-center gap-3 py-5 rounded-xl text-white text-xl font-bold"
             style={{ backgroundColor: '#888888' }}
