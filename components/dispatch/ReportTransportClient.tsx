@@ -25,6 +25,7 @@ interface SecondaryData {
     returnTime: string | null
     departureOdo: number | null
     completionOdo: number | null
+    returnOdo: number | null
     userName: string
     vehicleNumber: string | null
   }
@@ -33,6 +34,7 @@ interface SecondaryData {
     returnDistance: number | null
     departureOdo: number | null
     completionOdo: number | null
+    returnOdo: number | null
     transportHighway: number | null
     returnHighway: number | null
   } | null
@@ -135,6 +137,9 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
   const [completionOdo, setCompletionOdo] = useState(
     (report.completionOdo ?? dispatch.completionOdo)?.toString() ?? ''
   )
+  const [returnOdo, setReturnOdo] = useState(
+    (report.returnOdo ?? dispatch.returnOdo)?.toString() ?? ''
+  )
 
   // ── 2次距離・ODO ──
   const [secondaryDepartureOdo, setSecondaryDepartureOdo] = useState(
@@ -148,6 +153,9 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
   )
   const [secondaryCompletionOdo, setSecondaryCompletionOdo] = useState(
     (secondaryData?.report?.completionOdo ?? secondaryData?.dispatch.completionOdo)?.toString() ?? ''
+  )
+  const [secondaryReturnOdo, setSecondaryReturnOdo] = useState(
+    (secondaryData?.report?.returnOdo ?? secondaryData?.dispatch.returnOdo)?.toString() ?? ''
   )
 
   // ── 高速代 ──
@@ -240,7 +248,8 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
     recoveryDistance !== '' &&
     transportDistance !== '' &&
     returnDistance !== '' &&
-    completionOdo !== ''
+    completionOdo !== '' &&
+    returnOdo !== ''
   const isPlacesComplete =
     departurePlaceName.trim() !== '' &&
     arrivalPlaceName.trim() !== '' &&
@@ -294,9 +303,7 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
     dispatchTime: dispatchTime?.toISOString() ?? null,
     arrivalTime: arrivalTime?.toISOString() ?? null,
     completionTime: completionTime?.toISOString() ?? null,
-    returnTime: isStored
-      ? (completionTime?.toISOString() ?? null) // 保管時: 帰社時間=完了時間
-      : (returnTime?.toISOString() ?? null),
+    returnTime: returnTime?.toISOString() ?? null,
     vehicleNumber: vehicleNumber || null,
     isDraft,
   })
@@ -307,6 +314,7 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
     transportDistance: transportDistance ? parseFloat(transportDistance) : null,
     returnDistance: returnDistance ? parseFloat(returnDistance) : null,
     completionOdo: completionOdo ? parseInt(completionOdo) : null,
+    returnOdo: returnOdo ? parseInt(returnOdo) : null,
     recoveryHighway: recoveryHighway ? parseInt(recoveryHighway) : null,
     transportHighway: transportHighway ? parseInt(transportHighway) : null,
     returnHighway: returnHighway ? parseInt(returnHighway) : null,
@@ -347,10 +355,10 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     dispatchTime, arrivalTime, transportStartTime, completionTime, returnTime,
-    departureOdo, recoveryDistance, transportDistance, returnDistance, completionOdo,
+    departureOdo, recoveryDistance, transportDistance, returnDistance, completionOdo, returnOdo,
     recoveryHighway, transportHighway, returnHighway,
     secondaryTransportStartTime, secondaryArrivalTime, secondaryCompletionTime, secondaryReturnTime,
-    secondaryDepartureOdo, secondaryTransportDistance, secondaryReturnDistance, secondaryCompletionOdo,
+    secondaryDepartureOdo, secondaryTransportDistance, secondaryReturnDistance, secondaryCompletionOdo, secondaryReturnOdo,
     secondaryTransportHighway, secondaryReturnHighway,
     departurePlaceName, arrivalPlaceName, transportPlaceName,
     transportShopName, transportPhone, transportAddress, transportContact, transportMemo,
@@ -575,7 +583,7 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
                     { label: '現着時間', field: 'arrival' as TimeField, value: arrivalTime },
                     { label: '搬送開始', field: 'transportStart' as TimeField, value: transportStartTime },
                     { label: '完了時間', field: 'completion' as TimeField, value: completionTime },
-                    { label: '帰社時間', field: null, value: completionTime }, // 保管時: 帰社=完了
+                    { label: '帰社時間', field: 'return' as TimeField, value: returnTime },
                   ].map(({ label, field, value }, i) => (
                     <div key={`primary-time-${i}`} className="flex items-center gap-2">
                       <RequiredDot />
@@ -681,8 +689,9 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
                     { label: '出発 ODO', key: 'departureOdo', value: departureOdo, setValue: setDepartureOdo, suffix: 'km', decimal: false },
                     { label: '回送距離', key: 'recoveryDistance', value: recoveryDistance, setValue: setRecoveryDistance, suffix: 'km', decimal: true },
                     { label: '搬送距離', key: 'transportDistance', value: transportDistance, setValue: setTransportDistance, suffix: 'km', decimal: true },
-                    { label: '帰社距離', key: 'returnDistance', value: returnDistance, setValue: setReturnDistance, suffix: 'km', decimal: true },
                     { label: '完了 ODO', key: 'completionOdo', value: completionOdo, setValue: setCompletionOdo, suffix: 'km', decimal: false },
+                    { label: '帰社距離', key: 'returnDistance', value: returnDistance, setValue: setReturnDistance, suffix: 'km', decimal: true },
+                    { label: '帰社 ODO', key: 'returnOdo', value: returnOdo, setValue: setReturnOdo, suffix: 'km', decimal: false },
                   ].map(({ label, key, value, setValue, suffix, decimal }) => (
                     <div key={key} className="flex items-center gap-2">
                       <RequiredDot />
@@ -710,10 +719,11 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
                 </div>
                 <div className="flex-1 space-y-3 pt-0.5">
                   {[
-                    { label: '出発 ODO', key: 'sec_departureOdo', value: secondaryDepartureOdo, setValue: setSecondaryDepartureOdo, suffix: 'km', decimal: false },
+                    { label: '搬開 ODO', key: 'sec_departureOdo', value: secondaryDepartureOdo, setValue: setSecondaryDepartureOdo, suffix: 'km', decimal: false },
                     { label: '搬送距離', key: 'sec_transportDistance', value: secondaryTransportDistance, setValue: setSecondaryTransportDistance, suffix: 'km', decimal: true },
-                    { label: '帰社距離', key: 'sec_returnDistance', value: secondaryReturnDistance, setValue: setSecondaryReturnDistance, suffix: 'km', decimal: true },
                     { label: '完了 ODO', key: 'sec_completionOdo', value: secondaryCompletionOdo, setValue: setSecondaryCompletionOdo, suffix: 'km', decimal: false },
+                    { label: '帰社距離', key: 'sec_returnDistance', value: secondaryReturnDistance, setValue: setSecondaryReturnDistance, suffix: 'km', decimal: true },
+                    { label: '帰社 ODO', key: 'sec_returnOdo', value: secondaryReturnOdo, setValue: setSecondaryReturnOdo, suffix: 'km', decimal: false },
                   ].map(({ label, key, value, setValue, suffix, decimal }) => (
                     <div key={key} className="flex items-center gap-2">
                       <RequiredDot />
@@ -744,8 +754,9 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
                   { label: '出発 ODO', key: 'departureOdo', value: departureOdo, setValue: setDepartureOdo, suffix: 'km', decimal: false },
                   { label: '回送距離', key: 'recoveryDistance', value: recoveryDistance, setValue: setRecoveryDistance, suffix: 'km', decimal: true },
                   { label: '搬送距離', key: 'transportDistance', value: transportDistance, setValue: setTransportDistance, suffix: 'km', decimal: true },
-                  { label: '帰社距離', key: 'returnDistance', value: returnDistance, setValue: setReturnDistance, suffix: 'km', decimal: true },
                   { label: '完了 ODO', key: 'completionOdo', value: completionOdo, setValue: setCompletionOdo, suffix: 'km', decimal: false },
+                  { label: '帰社距離', key: 'returnDistance', value: returnDistance, setValue: setReturnDistance, suffix: 'km', decimal: true },
+                  { label: '帰社 ODO', key: 'returnOdo', value: returnOdo, setValue: setReturnOdo, suffix: 'km', decimal: false },
                 ].map(({ label, key, value, setValue, suffix, decimal }) => (
                   <div key={key} className="flex items-center gap-2">
                     <RequiredDot />

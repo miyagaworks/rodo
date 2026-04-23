@@ -62,8 +62,16 @@ export function usePhotoCapture(dispatchId: string | null) {
     // inputをリセット（同じファイルを再選択可能に）
     e.target.value = ''
 
-    // 圧縮
-    const compressed = await compressImage(file)
+    // 圧縮（失敗時は元ファイルで送信を継続する。
+    // 現場撮影画像の送信失敗は業務影響が大きいため、
+    // サーバ側の 20MB 上限チェックに任せてでも送信を試みる）
+    let compressed: File
+    try {
+      compressed = await compressImage(file)
+    } catch (err) {
+      console.error('Image compression failed, falling back to original:', err)
+      compressed = file
+    }
 
     if (navigator.onLine) {
       // オンライン: サーバーにアップロード

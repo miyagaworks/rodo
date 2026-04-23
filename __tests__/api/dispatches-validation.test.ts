@@ -54,6 +54,75 @@ describe('createDispatchSchema', () => {
     })
     expect(result.success).toBe(false)
   })
+
+  // Phase B: 新 3 ODO フィールド (optional)
+  describe('Phase B ODO fields (arrivalOdo / transportStartOdo / returnOdo)', () => {
+    it('accepts arrivalOdo as non-negative integer', () => {
+      const result = createDispatchSchema.safeParse({
+        ...validComplete,
+        arrivalOdo: 0,
+      })
+      expect(result.success).toBe(true)
+    })
+
+    it('accepts transportStartOdo at upper boundary 999999', () => {
+      const result = createDispatchSchema.safeParse({
+        ...validComplete,
+        transportStartOdo: 999999,
+      })
+      expect(result.success).toBe(true)
+    })
+
+    it('accepts returnOdo as null', () => {
+      const result = createDispatchSchema.safeParse({
+        ...validComplete,
+        returnOdo: null,
+      })
+      expect(result.success).toBe(true)
+    })
+
+    it('accepts all three new ODO fields together', () => {
+      const result = createDispatchSchema.safeParse({
+        ...validComplete,
+        arrivalOdo: 12346,
+        transportStartOdo: 12347,
+        returnOdo: 12400,
+      })
+      expect(result.success).toBe(true)
+    })
+
+    it('rejects negative arrivalOdo', () => {
+      const result = createDispatchSchema.safeParse({
+        ...validComplete,
+        arrivalOdo: -1,
+      })
+      expect(result.success).toBe(false)
+    })
+
+    it('rejects decimal transportStartOdo', () => {
+      const result = createDispatchSchema.safeParse({
+        ...validComplete,
+        transportStartOdo: 1.5,
+      })
+      expect(result.success).toBe(false)
+    })
+
+    it('rejects non-numeric string returnOdo', () => {
+      const result = createDispatchSchema.safeParse({
+        ...validComplete,
+        returnOdo: 'abc',
+      })
+      expect(result.success).toBe(false)
+    })
+
+    it('accepts string-numeric arrivalOdo (auto-coerced by helper)', () => {
+      const result = createDispatchSchema.safeParse({
+        ...validComplete,
+        arrivalOdo: '12345',
+      })
+      expect(result.success).toBe(true)
+    })
+  })
 })
 
 describe('updateDispatchSchema', () => {
@@ -118,5 +187,78 @@ describe('updateDispatchSchema', () => {
 
   it('rejects invalid highwayDirection', () => {
     expect(updateDispatchSchema.safeParse({ highwayDirection: 'LEFT' }).success).toBe(false)
+  })
+
+  // Phase B: ODO フィールドの PATCH 受理 (既存バグ修正 + 新規 3 フィールド)
+  describe('Phase B ODO fields in PATCH', () => {
+    it('accepts departureOdo in PATCH (previously silently ignored - regression fix)', () => {
+      const result = updateDispatchSchema.safeParse({ departureOdo: 12345 })
+      expect(result.success).toBe(true)
+    })
+
+    it('accepts arrivalOdo in PATCH', () => {
+      const result = updateDispatchSchema.safeParse({ arrivalOdo: 12346 })
+      expect(result.success).toBe(true)
+    })
+
+    it('accepts transportStartOdo in PATCH', () => {
+      const result = updateDispatchSchema.safeParse({ transportStartOdo: 12347 })
+      expect(result.success).toBe(true)
+    })
+
+    it('accepts returnOdo in PATCH', () => {
+      const result = updateDispatchSchema.safeParse({ returnOdo: 12400 })
+      expect(result.success).toBe(true)
+    })
+
+    it('accepts all four ODO fields (incl. completionOdo) together', () => {
+      const result = updateDispatchSchema.safeParse({
+        departureOdo: 10000,
+        arrivalOdo: 10010,
+        transportStartOdo: 10020,
+        completionOdo: 10100,
+        returnOdo: 10200,
+      })
+      expect(result.success).toBe(true)
+    })
+
+    it('accepts ODO boundary values (0 and 999999)', () => {
+      expect(updateDispatchSchema.safeParse({ departureOdo: 0 }).success).toBe(true)
+      expect(updateDispatchSchema.safeParse({ departureOdo: 999999 }).success).toBe(true)
+      expect(updateDispatchSchema.safeParse({ arrivalOdo: 0 }).success).toBe(true)
+      expect(updateDispatchSchema.safeParse({ arrivalOdo: 999999 }).success).toBe(true)
+      expect(updateDispatchSchema.safeParse({ transportStartOdo: 0 }).success).toBe(true)
+      expect(updateDispatchSchema.safeParse({ transportStartOdo: 999999 }).success).toBe(true)
+      expect(updateDispatchSchema.safeParse({ returnOdo: 0 }).success).toBe(true)
+      expect(updateDispatchSchema.safeParse({ returnOdo: 999999 }).success).toBe(true)
+    })
+
+    it('rejects negative values for each ODO', () => {
+      expect(updateDispatchSchema.safeParse({ departureOdo: -1 }).success).toBe(false)
+      expect(updateDispatchSchema.safeParse({ arrivalOdo: -1 }).success).toBe(false)
+      expect(updateDispatchSchema.safeParse({ transportStartOdo: -1 }).success).toBe(false)
+      expect(updateDispatchSchema.safeParse({ returnOdo: -1 }).success).toBe(false)
+    })
+
+    it('rejects decimal values for each ODO', () => {
+      expect(updateDispatchSchema.safeParse({ departureOdo: 1.5 }).success).toBe(false)
+      expect(updateDispatchSchema.safeParse({ arrivalOdo: 1.5 }).success).toBe(false)
+      expect(updateDispatchSchema.safeParse({ transportStartOdo: 1.5 }).success).toBe(false)
+      expect(updateDispatchSchema.safeParse({ returnOdo: 1.5 }).success).toBe(false)
+    })
+
+    it('rejects non-numeric strings for each ODO', () => {
+      expect(updateDispatchSchema.safeParse({ departureOdo: 'abc' }).success).toBe(false)
+      expect(updateDispatchSchema.safeParse({ arrivalOdo: 'abc' }).success).toBe(false)
+      expect(updateDispatchSchema.safeParse({ transportStartOdo: 'abc' }).success).toBe(false)
+      expect(updateDispatchSchema.safeParse({ returnOdo: 'abc' }).success).toBe(false)
+    })
+
+    it('accepts null for each ODO (explicit reset)', () => {
+      expect(updateDispatchSchema.safeParse({ departureOdo: null }).success).toBe(true)
+      expect(updateDispatchSchema.safeParse({ arrivalOdo: null }).success).toBe(true)
+      expect(updateDispatchSchema.safeParse({ transportStartOdo: null }).success).toBe(true)
+      expect(updateDispatchSchema.safeParse({ returnOdo: null }).success).toBe(true)
+    })
   })
 })

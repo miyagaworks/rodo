@@ -128,25 +128,25 @@ export default function NumberPlateInput({ value, onChange, onClose }: Props) {
             style={{ borderColor: '#A0A8B0', backgroundColor: 'white' }}
           >
             <span
-              className="text-2xl"
+              className="text-3xl"
               style={{ color: local.region ? PLATE_GREEN : '#9CA3AF' }}
             >
               {local.region || '地名'}
             </span>
             <span
-              className="text-2xl font-bold px-1"
+              className="text-3xl font-bold px-1"
               style={{ color: local.classNum ? PLATE_GREEN : '#9CA3AF' }}
             >
               {local.classNum || '・・・'}
             </span>
             <span
-              className="text-2xl"
+              className="text-3xl"
               style={{ color: local.kana ? PLATE_GREEN : '#9CA3AF' }}
             >
               {local.kana || '・'}
             </span>
             <span
-              className="text-2xl font-bold flex items-center gap-0.5"
+              className="text-3xl font-bold flex items-center gap-0.5"
               style={{ color: local.serial ? PLATE_GREEN : '#9CA3AF' }}
             >
               {showHyphen ? (
@@ -171,7 +171,7 @@ export default function NumberPlateInput({ value, onChange, onClose }: Props) {
             <select
               value={local.region}
               onChange={(e) => update('region', e.target.value)}
-              className="flex-1 min-w-0 border-2 rounded-lg px-2 py-2.5 text-base font-bold appearance-none text-center"
+              className="flex-1 min-w-0 border-2 rounded-lg px-2 py-2.5 text-xl font-bold appearance-none text-center"
               style={{ borderColor: PLATE_GREEN, color: PLATE_GREEN, backgroundColor: 'white' }}
             >
               <option value="">地名▼</option>
@@ -193,7 +193,7 @@ export default function NumberPlateInput({ value, onChange, onClose }: Props) {
                 update('classNum', e.target.value.replace(/\D/g, '').slice(0, 4))
               }
               placeholder="330"
-              className="flex-1 min-w-0 border-2 rounded-lg px-2 py-2.5 text-center text-base font-bold"
+              className="flex-1 min-w-0 border-2 rounded-lg px-2 py-2.5 text-center text-2xl font-bold"
               style={{ borderColor: PLATE_GREEN, color: PLATE_GREEN }}
             />
 
@@ -203,7 +203,7 @@ export default function NumberPlateInput({ value, onChange, onClose }: Props) {
               value={local.kana}
               onChange={(e) => update('kana', e.target.value.slice(0, 1))}
               placeholder="あ"
-              className="w-14 border-2 rounded-lg px-2 py-2.5 text-center text-base font-bold"
+              className="w-14 border-2 rounded-lg px-2 py-2.5 text-center text-xl font-bold"
               style={{ borderColor: PLATE_GREEN, color: PLATE_GREEN }}
             />
           </div>
@@ -221,7 +221,7 @@ export default function NumberPlateInput({ value, onChange, onClose }: Props) {
               onChange={handleSerialChange}
               maxLength={4}
               placeholder="1234"
-              className="w-full rounded-lg py-4 px-3 text-center text-4xl font-black border-2"
+              className="w-full rounded-lg py-4 px-3 text-center text-5xl font-black border-2"
               style={{
                 borderColor: PLATE_GREEN,
                 color: local.serial ? PLATE_GREEN : '#9CA3AF',

@@ -6,6 +6,9 @@ const completionItems = z.record(z.string(), z.boolean()).nullable().optional()
 
 const reportFields = {
   departureOdo: odometerReading,
+  arrivalOdo: odometerReading,
+  transportStartOdo: odometerReading,
+  returnOdo: odometerReading,
   recoveryDistance: distance,
   transportDistance: distance,
   returnDistance: distance,

@@ -47,8 +47,8 @@ const VALID_STATUS_TRANSITIONS: Record<string, string[]> = {
   DISPATCHED:   ['ONSITE', 'STANDBY'],
   ONSITE:       ['TRANSPORTING', 'COMPLETED', 'DISPATCHED', 'TRANSFERRED'],
   TRANSPORTING: ['COMPLETED', 'STORED', 'ONSITE'],
-  COMPLETED:    ['RETURNED', 'TRANSPORTING', 'ONSITE'],
-  STORED:       ['RETURNED', 'TRANSPORTING'],
+  COMPLETED:    ['RETURNED', 'TRANSPORTING', 'ONSITE', 'STORED'],
+  STORED:       ['RETURNED', 'TRANSPORTING', 'COMPLETED'],
   RETURNED:     ['COMPLETED', 'STORED'],
   CANCELLED:    ['STANDBY'],
   TRANSFERRED:  [],
@@ -125,7 +125,11 @@ export async function PATCH(
   if (body.arrivalGpsLng !== undefined) allowed.arrivalGpsLng = body.arrivalGpsLng
   if (body.completionTime !== undefined) allowed.completionTime = body.completionTime ? new Date(body.completionTime) : null
   if (body.transportStartTime !== undefined) allowed.transportStartTime = body.transportStartTime ? new Date(body.transportStartTime) : null
+  if (body.departureOdo !== undefined) allowed.departureOdo = body.departureOdo
+  if (body.arrivalOdo !== undefined) allowed.arrivalOdo = body.arrivalOdo
+  if (body.transportStartOdo !== undefined) allowed.transportStartOdo = body.transportStartOdo
   if (body.completionOdo !== undefined) allowed.completionOdo = body.completionOdo
+  if (body.returnOdo !== undefined) allowed.returnOdo = body.returnOdo
   if (body.returnTime !== undefined) allowed.returnTime = body.returnTime ? new Date(body.returnTime) : null
   if (body.dispatchTime !== undefined) allowed.dispatchTime = body.dispatchTime ? new Date(body.dispatchTime) : null
   if (body.status !== undefined) allowed.status = body.status
@@ -179,9 +183,11 @@ export async function PATCH(
       allowed.workStartTime = null
       allowed.workEndTime = null
       allowed.workDuration = null
+      allowed.transportStartOdo = null
       allowed.completionOdo = null
       allowed.canDrive = null
       allowed.deliveryType = null
+      // 注: arrivalOdo / returnOdo / departureOdo は保持（ユーザー再入力負荷軽減）
     }
   }
 

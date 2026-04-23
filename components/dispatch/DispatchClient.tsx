@@ -7,6 +7,7 @@ import { IoMdCamera, IoIosArrowDroprightCircle } from 'react-icons/io'
 import { MdPeopleAlt } from 'react-icons/md'
 import { ChevronLeft } from 'lucide-react'
 import ClockPicker from './ClockPicker'
+import OdoDialInput from '@/components/common/OdoDialInput'
 import { offlineFetch } from '@/lib/offline-fetch'
 import { usePhotoCapture } from '@/hooks/usePhotoCapture'
 
@@ -26,7 +27,10 @@ interface SerializedDispatch {
   status: string
   type: string
   departureOdo: number | null
+  arrivalOdo: number | null
+  transportStartOdo: number | null
   completionOdo: number | null
+  returnOdo: number | null
   dispatchTime: string | null
   arrivalTime: string | null
   completionTime: string | null
@@ -68,44 +72,6 @@ function getInitialStep(d: SerializedDispatch | null | undefined): number {
   return 0
 }
 
-
-// -------------------------------------------------------
-// OdoInput
-// -------------------------------------------------------
-
-function OdoInput({
-  value,
-  onChange,
-  disabled,
-  label,
-}: {
-  value: string
-  onChange: (v: string) => void
-  disabled: boolean
-  label?: string
-}) {
-  return (
-    <div className={`flex items-center gap-3 px-1 transition-opacity ${disabled ? 'opacity-40' : ''}`}>
-      <img src="/icons/odo.svg" alt="" className="w-10 h-10 object-contain flex-shrink-0" />
-      <span className="font-bold text-lg flex-shrink-0" style={{ color: '#1C2948' }}>
-        {label && <span className="mr-1">{label}</span>}ODO
-      </span>
-      <div className="flex-1 bg-white rounded-lg border-2 border-gray-200 px-4 py-2.5 flex items-center">
-        <input
-          type="number"
-          inputMode="numeric"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          disabled={disabled}
-          placeholder=""
-          className="w-full text-right text-2xl font-bold outline-none bg-transparent"
-          style={{ color: disabled ? '#9CA3AF' : '#1C2948' }}
-        />
-      </div>
-      <span className="font-medium text-gray-500 flex-shrink-0 text-xl">km</span>
-    </div>
-  )
-}
 
 // -------------------------------------------------------
 // HighwayInput
@@ -213,8 +179,8 @@ function ActionButton({
         </div>
 
         {/* 右50%: 時刻（上）+ 修正・取消ボタン（底揃え） */}
-        <div className="flex-1 flex flex-col items-center justify-between px-1 py-1">
-          <span className="text-6xl font-bold" style={{ color: '#1C2948' }}>
+        <div className="flex-1 flex flex-col items-center justify-end px-1">
+          <span className="mb-1 text-6xl font-bold" style={{ color: '#1C2948' }}>
             {formatTime(time)}
           </span>
           <div className="flex gap-2 w-full">
@@ -274,14 +240,9 @@ function ActionButton({
 // -------------------------------------------------------
 
 function getGPS(): Promise<{ lat: number; lng: number } | null> {
-  return new Promise((resolve) => {
-    if (typeof navigator === 'undefined' || !navigator.geolocation) return resolve(null)
-    navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => resolve(null),
-      { timeout: 5000 }
-    )
-  })
+  // GPS 自動取得は廃止（ODO メーター手動記録に変更）。
+  // 関数シグネチャは維持し、常に null を返す no-op 実装。
+  return Promise.resolve(null)
 }
 
 // -------------------------------------------------------
@@ -303,12 +264,22 @@ export default function DispatchClient({
   const [dispatchNumber, setDispatchNumber] = useState<string | null>(
     initialDispatch?.dispatchNumber ?? null
   )
-  const [departureOdo, setDepartureOdo] = useState(
-    initialDispatch?.departureOdo?.toString() ?? ''
+  const [departureOdo, setDepartureOdo] = useState<number | null>(
+    initialDispatch?.departureOdo ?? null
   )
-  const [completionOdo, setCompletionOdo] = useState(
-    initialDispatch?.completionOdo?.toString() ?? ''
+  const [arrivalOdo, setArrivalOdo] = useState<number | null>(
+    initialDispatch?.arrivalOdo ?? null
   )
+  const [transportStartOdo, setTransportStartOdo] = useState<number | null>(
+    initialDispatch?.transportStartOdo ?? null
+  )
+  const [completionOdo, setCompletionOdo] = useState<number | null>(
+    initialDispatch?.completionOdo ?? null
+  )
+  const [returnOdo, setReturnOdo] = useState<number | null>(
+    initialDispatch?.returnOdo ?? null
+  )
+  const [lastReturnOdo, setLastReturnOdo] = useState<number | null>(null)
   const [dispatchTime, setDispatchTime] = useState<TimeRecord | null>(
     initialDispatch?.dispatchTime
       ? {
@@ -354,6 +325,24 @@ export default function DispatchClient({
   const [transferCompleted, setTransferCompleted] = useState(false)
   const isTransferred = initialDispatch?.status === 'TRANSFERRED'
   const isTransferredIn = !!initialDispatch?.transferredFromId
+
+  // ── 前回帰社 ODO 取得（出発 ODO の placeholder 初期値） ──
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch('/api/dispatches/last-return-odo')
+        if (!res.ok) return
+        const data = (await res.json()) as { lastReturnOdo: number | null }
+        if (!cancelled) setLastReturnOdo(data.lastReturnOdo ?? null)
+      } catch {
+        /* ignore */
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   // 振替完了ポーリング（30秒間隔、PENDING 時のみ）
   useEffect(() => {
@@ -406,6 +395,31 @@ export default function DispatchClient({
     }
   }, [step, mode])
 
+  // ── ODO placeholder chain ──
+  // 各 ODO の value が null のとき、前段 ODO の値をそのまま薄く表示する推奨値
+  // 前段も null の場合はその段の placeholder を参照（連鎖）
+  const departurePlaceholder: number =
+    departureOdo ?? (lastReturnOdo !== null ? lastReturnOdo : 0)
+  const arrivalPlaceholder: number =
+    arrivalOdo ?? departurePlaceholder
+  const transportStartPlaceholder: number =
+    transportStartOdo ?? arrivalPlaceholder
+  const completionPlaceholder: number = mode === 'transport'
+    ? (completionOdo ?? transportStartPlaceholder)
+    : (completionOdo ?? arrivalPlaceholder)
+  const returnPlaceholder: number =
+    returnOdo ?? completionPlaceholder
+
+  // ── 単調増加違反の判定（前 ODO より小さい値で入力されているか） ──
+  const isViolation = (prev: number | null, curr: number | null) =>
+    prev !== null && curr !== null && curr < prev
+  const arrivalViolation = isViolation(departureOdo, arrivalOdo)
+  const transportStartViolation = isViolation(arrivalOdo, transportStartOdo)
+  const completionViolation = mode === 'transport'
+    ? isViolation(transportStartOdo, completionOdo)
+    : isViolation(arrivalOdo, completionOdo)
+  const returnViolation = isViolation(completionOdo, returnOdo)
+
   // ── Handlers ──
 
   const handleDispatch = useCallback(async () => {
@@ -424,7 +438,7 @@ export default function DispatchClient({
             dispatchTime: now.toISOString(),
             dispatchGpsLat: gps?.lat ?? null,
             dispatchGpsLng: gps?.lng ?? null,
-            departureOdo: departureOdo ? parseInt(String(departureOdo)) : null,
+            departureOdo: departureOdo ?? null,
             status: 'DISPATCHED',
           }),
           offlineActionType: 'dispatch_update',
@@ -442,7 +456,7 @@ export default function DispatchClient({
           body: JSON.stringify({
             assistanceId,
             type: mode,
-            departureOdo: departureOdo || null,
+            departureOdo: departureOdo ?? null,
             dispatchTime: now.toISOString(),
             dispatchGpsLat: gps?.lat ?? null,
             dispatchGpsLng: gps?.lng ?? null,
@@ -483,6 +497,7 @@ export default function DispatchClient({
           arrivalTime: now.toISOString(),
           arrivalGpsLat: gps?.lat ?? null,
           arrivalGpsLng: gps?.lng ?? null,
+          arrivalOdo: arrivalOdo ?? null,
           status: 'ONSITE',
         }),
         offlineActionType: 'dispatch_update',
@@ -508,7 +523,7 @@ export default function DispatchClient({
     } finally {
       setLoading(false)
     }
-  }, [step, dispatchId, loading, recoveryHighway])
+  }, [step, dispatchId, loading, recoveryHighway, arrivalOdo])
 
   // 現場対応専用: 完了
   const handleCompletion = useCallback(async () => {
@@ -522,7 +537,7 @@ export default function DispatchClient({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           completionTime: now.toISOString(),
-          completionOdo: completionOdo ? parseInt(completionOdo) : null,
+          completionOdo: completionOdo ?? null,
           status: 'COMPLETED',
         }),
         offlineActionType: 'dispatch_update',
@@ -560,6 +575,7 @@ export default function DispatchClient({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           transportStartTime: now.toISOString(),
+          transportStartOdo: transportStartOdo ?? null,
           status: 'TRANSPORTING',
         }),
         offlineActionType: 'dispatch_update',
@@ -572,7 +588,7 @@ export default function DispatchClient({
     } finally {
       setLoading(false)
     }
-  }, [step, dispatchId, loading])
+  }, [step, dispatchId, loading, transportStartOdo])
 
   // 搬送専用: 完了（搬送高速を保存）
   const handleTransportComplete = useCallback(async () => {
@@ -594,7 +610,7 @@ export default function DispatchClient({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           completionTime: now.toISOString(),
-          completionOdo: completionOdo ? parseInt(completionOdo) : null,
+          completionOdo: completionOdo ?? null,
           status: 'COMPLETED',
         }),
         offlineActionType: 'dispatch_update',
@@ -608,44 +624,6 @@ export default function DispatchClient({
       setLoading(false)
     }
   }, [step, dispatchId, loading, completionOdo, transportHighway])
-
-  // 搬送専用: 保管（搬送開始後 step 3 で選択 → 帰社スキップ → 出動記録へ）
-  const handleStorage = useCallback(async () => {
-    if (step !== 3 || !dispatchId || loading) return
-    setLoading(true)
-    try {
-      const now = new Date()
-      // 搬送高速が入力されていればReportへ保存
-      if (transportHighway.trim()) {
-        await offlineFetch(`/api/dispatches/${dispatchId}/report`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ transportHighway: parseInt(transportHighway) }),
-          offlineActionType: 'report_save',
-          offlineDispatchId: dispatchId,
-        }).catch(console.error)
-      }
-      await offlineFetch(`/api/dispatches/${dispatchId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          completionTime: now.toISOString(),
-          completionOdo: completionOdo ? parseInt(completionOdo) : null,
-          status: 'STORED',
-          deliveryType: 'STORAGE',
-        }),
-        offlineActionType: 'dispatch_update',
-        offlineDispatchId: dispatchId,
-      })
-      setCompletionTime({ time: now })
-      setIsStoredDispatch(true)
-      setStep(5) // 帰社をスキップして出動記録へ
-    } catch (e) {
-      console.error(e)
-    } finally {
-      setLoading(false)
-    }
-  }, [step, dispatchId, loading, transportHighway, completionOdo])
 
   const handleReturn = useCallback(async () => {
     const expectedStep = mode === 'transport' ? 4 : 3
@@ -670,6 +648,7 @@ export default function DispatchClient({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           returnTime: now.toISOString(),
+          returnOdo: returnOdo ?? null,
           status: 'RETURNED',
         }),
         offlineActionType: 'dispatch_update',
@@ -683,7 +662,48 @@ export default function DispatchClient({
     } finally {
       setLoading(false)
     }
-  }, [step, mode, dispatchId, loading, returnHighway])
+  }, [step, mode, dispatchId, loading, returnHighway, returnOdo])
+
+  // 搬送専用: 保管（step 4 で選択 → 押下時刻を returnTime として記録 → 出動記録へ）
+  const handleStorageAtReturn = useCallback(async () => {
+    if (step !== 4 || !dispatchId || loading) return
+    setLoading(true)
+    try {
+      const now = new Date()
+
+      // 帰社高速が入力されていればReportへ保存
+      if (returnHighway.trim()) {
+        await offlineFetch(`/api/dispatches/${dispatchId}/report`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ returnHighway: parseInt(returnHighway) }),
+          offlineActionType: 'report_save',
+          offlineDispatchId: dispatchId,
+        }).catch(console.error)
+      }
+
+      await offlineFetch(`/api/dispatches/${dispatchId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          returnTime: now.toISOString(),
+          returnOdo: returnOdo ?? null,
+          status: 'STORED',
+          deliveryType: 'STORAGE',
+        }),
+        offlineActionType: 'dispatch_update',
+        offlineDispatchId: dispatchId,
+      })
+
+      setReturnTime({ time: now })
+      setIsStoredDispatch(true)
+      setStep(5)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoading(false)
+    }
+  }, [step, dispatchId, loading, returnHighway, returnOdo])
 
   const handleTimeCorrection = useCallback(
     async (newDate: Date) => {
@@ -737,14 +757,14 @@ export default function DispatchClient({
           resetState: () => setDispatchTime(null),
         },
         arrival: {
-          fields: { arrivalTime: null, arrivalGpsLat: null, arrivalGpsLng: null, status: 'DISPATCHED' },
+          fields: { arrivalTime: null, arrivalGpsLat: null, arrivalGpsLng: null, arrivalOdo: null, status: 'DISPATCHED' },
           prevStep: 1,
-          resetState: () => setArrivalTime(null),
+          resetState: () => { setArrivalTime(null); setArrivalOdo(null) },
         },
         transportStart: {
-          fields: { transportStartTime: null, status: 'ONSITE' },
+          fields: { transportStartTime: null, transportStartOdo: null, status: 'ONSITE' },
           prevStep: 2,
-          resetState: () => setTransportStartTime(null),
+          resetState: () => { setTransportStartTime(null); setTransportStartOdo(null) },
         },
         completion: {
           fields: {
@@ -752,12 +772,18 @@ export default function DispatchClient({
             status: mode === 'transport' ? 'TRANSPORTING' : 'ONSITE',
           },
           prevStep: mode === 'transport' ? 3 : 2,
-          resetState: () => { setCompletionTime(null); setIsStoredDispatch(false) },
+          resetState: () => { setCompletionTime(null); setCompletionOdo(null); setIsStoredDispatch(false) },
         },
         return: {
-          fields: { returnTime: null, status: isStoredDispatch ? 'STORED' : 'COMPLETED' },
+          fields: isStoredDispatch
+            ? { returnTime: null, returnOdo: null, status: 'COMPLETED', deliveryType: null }
+            : { returnTime: null, returnOdo: null, status: 'COMPLETED' },
           prevStep: mode === 'transport' ? 4 : 3,
-          resetState: () => setReturnTime(null),
+          resetState: () => {
+            setReturnTime(null)
+            setReturnOdo(null)
+            if (isStoredDispatch) setIsStoredDispatch(false)
+          },
         },
       }
 
@@ -780,7 +806,7 @@ export default function DispatchClient({
         setLoading(false)
       }
     },
-    [dispatchId, loading, mode]
+    [dispatchId, loading, mode, isStoredDispatch]
   )
 
   const getClockValue = (): Date => {
@@ -930,7 +956,9 @@ export default function DispatchClient({
                         setTransportStartTime(null)
                         setCompletionTime(null)
                         setReturnTime(null)
-                        setCompletionOdo('')
+                        setTransportStartOdo(null)
+                        setCompletionOdo(null)
+                        setReturnOdo(null)
                         setIsStoredDispatch(false)
                       }
                     }
@@ -971,7 +999,9 @@ export default function DispatchClient({
                         setTransportStartTime(null)
                         setCompletionTime(null)
                         setReturnTime(null)
-                        setCompletionOdo('')
+                        setTransportStartOdo(null)
+                        setCompletionOdo(null)
+                        setReturnOdo(null)
                         setIsStoredDispatch(false)
                       }
                     }
@@ -992,11 +1022,12 @@ export default function DispatchClient({
         </div>
 
         {/* ─── ODO（出発時） ─── */}
-        <OdoInput
+        <OdoDialInput
           label="出発"
           value={departureOdo}
           onChange={setDepartureOdo}
           disabled={step > 0}
+          placeholder={departurePlaceholder}
         />
 
         {/* ─── 出動ボタン ─── */}
@@ -1006,7 +1037,7 @@ export default function DispatchClient({
             label="出動"
             isActive={step === 0}
             isPressed={step >= 1}
-            isDisabled={step > 0 || (step === 0 && !departureOdo.trim())}
+            isDisabled={step > 0 || (step === 0 && departureOdo === null)}
             time={dispatchTime?.time}
             onPress={handleDispatch}
             onCorrect={() => setClockTarget('dispatch')}
@@ -1023,6 +1054,20 @@ export default function DispatchClient({
           disabled={step < 1 || step >= 2}
         />
 
+        {/* ─── ODO（現着時） ─── */}
+        <OdoDialInput
+          label="現着"
+          value={arrivalOdo}
+          onChange={setArrivalOdo}
+          disabled={step !== 1}
+          placeholder={arrivalPlaceholder}
+        />
+        {arrivalViolation && (
+          <p className="text-red-600 text-xs font-bold px-1 -mt-1">
+            前のODOより小さい値です
+          </p>
+        )}
+
         {/* ─── 現着ボタン ─── */}
         <div ref={arrivalBtnRef}>
           <ActionButton
@@ -1031,7 +1076,7 @@ export default function DispatchClient({
             label="現着"
             isActive={step === 1}
             isPressed={step >= 2}
-            isDisabled={step !== 1}
+            isDisabled={step !== 1 || (step === 1 && arrivalOdo === null)}
             time={arrivalTime?.time}
             onPress={handleArrival}
             onCorrect={() => setClockTarget('arrival')}
@@ -1161,12 +1206,18 @@ export default function DispatchClient({
             />
 
             {/* ─── ODO（完了時） ─── */}
-            <OdoInput
+            <OdoDialInput
               label="完了"
               value={completionOdo}
               onChange={setCompletionOdo}
-              disabled={step < 2 || step >= 3}
+              disabled={step !== 2}
+              placeholder={completionPlaceholder}
             />
+            {completionViolation && (
+              <p className="text-red-600 text-xs font-bold px-1 -mt-1">
+                前のODOより小さい値です
+              </p>
+            )}
 
             {/* ─── 完了ボタン ─── */}
             <div ref={completionBtnRef}>
@@ -1176,7 +1227,7 @@ export default function DispatchClient({
                 label="完了"
                 isActive={step === 2}
                 isPressed={step >= 3}
-                isDisabled={step !== 2 || (step === 2 && !completionOdo.trim())}
+                isDisabled={step !== 2 || (step === 2 && completionOdo === null)}
                 time={completionTime?.time}
                 onPress={handleCompletion}
                 onCorrect={() => setClockTarget('completion')}
@@ -1190,6 +1241,20 @@ export default function DispatchClient({
         {/* ─── 搬送専用 UI ─── */}
         {mode === 'transport' && (
           <>
+            {/* ODO（搬開時） — step 2 でアクティブ */}
+            <OdoDialInput
+              label="搬開"
+              value={transportStartOdo}
+              onChange={setTransportStartOdo}
+              disabled={step !== 2}
+              placeholder={transportStartPlaceholder}
+            />
+            {transportStartViolation && (
+              <p className="text-red-600 text-xs font-bold px-1 -mt-1">
+                前のODOより小さい値です
+              </p>
+            )}
+
             {/* 搬送開始 — step 2 でアクティブ */}
             <div ref={completionBtnRef}>
               <ActionButton
@@ -1197,7 +1262,7 @@ export default function DispatchClient({
                 label="搬送開始"
                 isActive={step === 2}
                 isPressed={step >= 3}
-                isDisabled={step !== 2}
+                isDisabled={step !== 2 || (step === 2 && transportStartOdo === null)}
                 time={transportStartTime?.time}
                 onPress={handleTransportStart}
                 onCorrect={() => setClockTarget('transportStart')}
@@ -1217,12 +1282,18 @@ export default function DispatchClient({
               />
 
               {/* ODO（完了時）— step 3 でアクティブ */}
-              <OdoInput
+              <OdoDialInput
                 label="完了"
                 value={completionOdo}
                 onChange={setCompletionOdo}
                 disabled={step !== 3}
+                placeholder={completionPlaceholder}
               />
+              {completionViolation && (
+                <p className="text-red-600 text-xs font-bold px-1 -mt-1">
+                  前のODOより小さい値です
+                </p>
+              )}
 
               {/* 完了/保管ボタン — step 3 でアクティブ */}
               {step >= 4 && completionTime && !isStoredDispatch ? (
@@ -1235,8 +1306,8 @@ export default function DispatchClient({
                     <img src="/icons/completion.svg" alt="" className="w-10 h-10 object-contain" />
                     <span className="text-white font-bold text-2xl" style={{ letterSpacing: '0.25em', paddingLeft: '0.25em' }}>完了</span>
                   </div>
-                  <div className="flex-1 flex flex-col items-center justify-between px-1 py-1">
-                    <span className="text-6xl font-bold" style={{ color: '#1C2948' }}>
+                  <div className="flex-1 flex flex-col items-center justify-end px-1">
+                    <span className="mb-1 text-6xl font-bold" style={{ color: '#1C2948' }}>
                       {formatTime(completionTime.time)}
                     </span>
                     <div className="flex gap-2 w-full">
@@ -1267,8 +1338,8 @@ export default function DispatchClient({
                     <img src="/icons/storage.svg" alt="" className="w-12 h-12 object-contain" />
                     <span className="text-white font-bold text-2xl" style={{ letterSpacing: '0.25em', paddingLeft: '0.25em' }}>保管</span>
                   </div>
-                  <div className="flex-1 flex flex-col items-center justify-between px-1 py-1">
-                    <span className="text-6xl font-bold" style={{ color: '#1C2948' }}>
+                  <div className="flex-1 flex flex-col items-center justify-end px-1">
+                    <span className="mb-1 text-6xl font-bold" style={{ color: '#1C2948' }}>
                       {formatTime(completionTime.time)}
                     </span>
                     <div className="flex gap-2 w-full">
@@ -1290,26 +1361,18 @@ export default function DispatchClient({
                   </div>
                 </div>
               ) : (
-                <div className={`flex gap-3 transition-opacity ${step !== 3 || !completionOdo.trim() ? 'opacity-35 pointer-events-none' : ''}`}>
-                  <button
-                    onClick={step === 3 && completionOdo.trim() ? handleTransportComplete : undefined}
-                    disabled={step !== 3 || loading || !completionOdo.trim()}
-                    className="flex-1 flex flex-col items-center justify-center gap-1 rounded-xl py-5 font-bold text-xl"
-                    style={{ backgroundColor: '#71A9F7' }}
-                  >
-                    <img src="/icons/completion.svg" alt="" className="w-10 h-10 object-contain" />
-                    <span className="text-white text-xl font-bold" style={{ letterSpacing: '0.25em', paddingLeft: '0.25em' }}>完了</span>
-                  </button>
-                  <button
-                    onClick={step === 3 && completionOdo.trim() ? handleStorage : undefined}
-                    disabled={step !== 3 || loading || !completionOdo.trim()}
-                    className="flex-1 flex flex-col items-center justify-center gap-1 rounded-xl py-5 font-bold text-xl"
-                    style={{ backgroundColor: '#71A9F7' }}
-                  >
-                    <img src="/icons/storage.svg" alt="" className="w-12 h-12 object-contain" />
-                    <span className="text-white text-xl font-bold" style={{ letterSpacing: '0.25em', paddingLeft: '0.25em' }}>保管</span>
-                  </button>
-                </div>
+                <button
+                  onClick={step === 3 && completionOdo !== null ? handleTransportComplete : undefined}
+                  disabled={step !== 3 || loading || completionOdo === null}
+                  className="w-full h-[72px] flex items-center justify-center gap-4 rounded-xl font-bold text-3xl transition-all active:scale-[0.97]"
+                  style={{
+                    backgroundColor: '#71A9F7',
+                    opacity: step !== 3 || completionOdo === null ? 0.35 : 1,
+                  }}
+                >
+                  <img src="/icons/completion.svg" alt="" className="w-10 h-10 object-contain" />
+                  <span style={{ color: 'white', letterSpacing: '0.25em', paddingLeft: '0.25em' }}>完了</span>
+                </button>
               )}
             </>
 
@@ -1326,21 +1389,66 @@ export default function DispatchClient({
           </>
         )}
 
+        {/* ─── ODO（帰社時） ─── */}
+        {!(mode === 'transport' && isStoredDispatch) && (() => {
+          const returnActiveStep = mode === 'transport' ? 4 : 3
+          return (
+            <>
+              <OdoDialInput
+                label="帰社"
+                value={returnOdo}
+                onChange={setReturnOdo}
+                disabled={step !== returnActiveStep}
+                placeholder={returnPlaceholder}
+              />
+              {returnViolation && (
+                <p className="text-red-600 text-xs font-bold px-1 -mt-1">
+                  前のODOより小さい値です
+                </p>
+              )}
+            </>
+          )
+        })()}
+
         {/* ─── 帰社ボタン（保管時はスキップ） ─── */}
         {!(mode === 'transport' && isStoredDispatch) && (
           <div ref={returnBtnRef}>
-            <ActionButton
-              iconSrc="/icons/return-truck.svg"
-              label="帰社"
-              isActive={mode === 'transport' ? step === 4 : step === 3}
-              isPressed={mode === 'transport' ? step >= 5 : step >= 4}
-              isDisabled={mode === 'transport' ? step !== 4 : step !== 3}
-              time={returnTime?.time}
-              onPress={handleReturn}
-              onCorrect={() => setClockTarget('return')}
-              onCancel={() => handleCancelStep('return')}
-              loading={loading && (mode === 'transport' ? step === 4 : step === 3)}
-            />
+            {mode === 'transport' && step === 4 ? (
+              /* step 4 「帰社」「保管」2択（押下前のみ表示） */
+              <div className={`flex gap-3 transition-opacity ${returnOdo === null ? 'opacity-35 pointer-events-none' : ''}`}>
+                <button
+                  onClick={returnOdo !== null ? handleReturn : undefined}
+                  disabled={loading || returnOdo === null}
+                  className="flex-1 flex flex-col items-center justify-center gap-1 rounded-xl py-5 font-bold text-xl"
+                  style={{ backgroundColor: '#71A9F7' }}
+                >
+                  <img src="/icons/return-truck.svg" alt="" className="w-12 h-12 object-contain" />
+                  <span className="text-white text-xl font-bold" style={{ letterSpacing: '0.25em', paddingLeft: '0.25em' }}>帰社</span>
+                </button>
+                <button
+                  onClick={returnOdo !== null ? handleStorageAtReturn : undefined}
+                  disabled={loading || returnOdo === null}
+                  className="flex-1 flex flex-col items-center justify-center gap-1 rounded-xl py-5 font-bold text-xl"
+                  style={{ backgroundColor: '#71A9F7' }}
+                >
+                  <img src="/icons/storage.svg" alt="" className="w-12 h-12 object-contain" />
+                  <span className="text-white text-xl font-bold" style={{ letterSpacing: '0.25em', paddingLeft: '0.25em' }}>保管</span>
+                </button>
+              </div>
+            ) : (
+              <ActionButton
+                iconSrc="/icons/return-truck.svg"
+                label="帰社"
+                isActive={mode === 'transport' ? step === 4 : step === 3}
+                isPressed={mode === 'transport' ? step >= 5 : step >= 4}
+                isDisabled={(mode === 'transport' ? step !== 4 : step !== 3) || (returnOdo === null)}
+                time={returnTime?.time}
+                onPress={handleReturn}
+                onCorrect={() => setClockTarget('return')}
+                onCancel={() => handleCancelStep('return')}
+                loading={loading && (mode === 'transport' ? step === 4 : step === 3)}
+              />
+            )}
           </div>
         )}
 

@@ -34,6 +34,7 @@ export default async function SecondaryDispatchPage({ params }: Props) {
     dispatchNumber: parentDispatch.dispatchNumber,
     assistanceId: parentDispatch.assistanceId,
     status: parentDispatch.status,
+    completionOdo: parentDispatch.completionOdo,
   }
 
   const serializedSecondary = existingSecondary ? {

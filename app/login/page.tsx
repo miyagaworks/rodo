@@ -128,7 +128,7 @@ export default function LoginPage() {
 
       </div>
       <p className="pb-4 text-xs text-gray-400">
-        <span style={{ fontSize: '1.5rem', verticalAlign: '-0.2em' }}>&copy;</span> Senrigan {new Date().getFullYear()}
+        <span style={{ fontSize: '1.5rem', verticalAlign: '-0.2em' }}>&copy;</span> RODO {new Date().getFullYear()}
       </p>
     </div>
   )

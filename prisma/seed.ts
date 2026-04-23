@@ -22,6 +22,35 @@ async function main() {
     },
   })
 
+  // 車両マスタ作成
+  const vehicle1 = await prisma.vehicle.upsert({
+    where: {
+      tenantId_plateNumber: {
+        tenantId: tenant.id,
+        plateNumber: '広島 330 あ 1234',
+      },
+    },
+    update: {},
+    create: {
+      tenantId: tenant.id,
+      plateNumber: '広島 330 あ 1234',
+    },
+  })
+
+  const vehicle2 = await prisma.vehicle.upsert({
+    where: {
+      tenantId_plateNumber: {
+        tenantId: tenant.id,
+        plateNumber: '広島 330 い 5678',
+      },
+    },
+    update: {},
+    create: {
+      tenantId: tenant.id,
+      plateNumber: '広島 330 い 5678',
+    },
+  })
+
   // 管理者ユーザー作成
   const adminPasswordHash = await bcrypt.hash(adminPassword, 12)
   await prisma.user.upsert({
@@ -47,7 +76,7 @@ async function main() {
       name: '田中太郎',
       role: 'MEMBER',
       passwordHash: member1PasswordHash,
-      vehicleNumber: '広島 330 あ 1234',
+      vehicleId: vehicle1.id,
       monthlySalary: 250000,
       overtimeRate: 1500,
       transportationAllowance: 10000,
@@ -64,7 +93,7 @@ async function main() {
       name: '鈴木次郎',
       role: 'MEMBER',
       passwordHash: member2PasswordHash,
-      vehicleNumber: '広島 330 い 5678',
+      vehicleId: vehicle2.id,
       monthlySalary: 230000,
       overtimeRate: 1400,
       transportationAllowance: 8000,

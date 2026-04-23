@@ -6,6 +6,7 @@ import ReportOnsiteClient, {
   SerializedReport,
 } from '@/components/dispatch/ReportOnsiteClient'
 import ReportTransportClient from '@/components/dispatch/ReportTransportClient'
+import { enrichReportDistances } from '@/lib/reportDistance'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -60,6 +61,7 @@ export default async function DispatchReportPage({ params, searchParams }: Props
     returnTime: dispatch.returnTime?.toISOString() ?? null,
     departureOdo: dispatch.departureOdo,
     completionOdo: dispatch.completionOdo,
+    returnOdo: dispatch.returnOdo,
     vehicleNumber: dispatch.vehicleNumber,
     deliveryType: dispatch.deliveryType,
   }
@@ -70,13 +72,18 @@ export default async function DispatchReportPage({ params, searchParams }: Props
     | null
     | undefined
 
+  // SSR 段階で距離 3 種を自動補完（Report が null でも Dispatch の ODO から計算）。
+  // 既に Report 側に保存済みの distance（number）があれば尊重する。
+  const enrichedDistances = enrichReportDistances(report, dispatch)
+
   const serializedReport: SerializedReport = {
     id: report?.id ?? null,
     departureOdo: report?.departureOdo ?? null,
-    recoveryDistance: report?.recoveryDistance ?? null,
-    transportDistance: report?.transportDistance ?? null,
-    returnDistance: report?.returnDistance ?? null,
+    recoveryDistance: enrichedDistances.recoveryDistance ?? null,
+    transportDistance: enrichedDistances.transportDistance ?? null,
+    returnDistance: enrichedDistances.returnDistance ?? null,
     completionOdo: report?.completionOdo ?? null,
+    returnOdo: report?.returnOdo ?? null,
     recoveryHighway: report?.recoveryHighway ?? null,
     transportHighway: report?.transportHighway ?? null,
     returnHighway: report?.returnHighway ?? null,
@@ -116,6 +123,11 @@ export default async function DispatchReportPage({ params, searchParams }: Props
   }
 
   if (isTransport) {
+    // 2次搬送の距離補完（Report が無くても Dispatch ODO から計算）
+    const secondaryEnriched = secondaryDispatch
+      ? enrichReportDistances(secondaryDispatch.report, secondaryDispatch)
+      : null
+
     // 2次搬送のシリアライズ
     const serializedSecondary = secondaryDispatch ? {
       dispatch: {
@@ -126,17 +138,19 @@ export default async function DispatchReportPage({ params, searchParams }: Props
         returnTime: secondaryDispatch.returnTime?.toISOString() ?? null,
         departureOdo: secondaryDispatch.departureOdo,
         completionOdo: secondaryDispatch.completionOdo,
+        returnOdo: secondaryDispatch.returnOdo,
         userName: secondaryDispatch.user.name,
         vehicleNumber: secondaryDispatch.vehicleNumber,
       },
-      report: secondaryDispatch.report ? {
-        transportDistance: secondaryDispatch.report.transportDistance,
-        returnDistance: secondaryDispatch.report.returnDistance,
-        departureOdo: secondaryDispatch.report.departureOdo,
-        completionOdo: secondaryDispatch.report.completionOdo,
-        transportHighway: secondaryDispatch.report.transportHighway,
-        returnHighway: secondaryDispatch.report.returnHighway,
-      } : null,
+      report: {
+        transportDistance: secondaryEnriched?.transportDistance ?? null,
+        returnDistance: secondaryEnriched?.returnDistance ?? null,
+        departureOdo: secondaryDispatch.report?.departureOdo ?? null,
+        completionOdo: secondaryDispatch.report?.completionOdo ?? null,
+        returnOdo: secondaryDispatch.report?.returnOdo ?? null,
+        transportHighway: secondaryDispatch.report?.transportHighway ?? null,
+        returnHighway: secondaryDispatch.report?.returnHighway ?? null,
+      },
     } : null
 
     return (

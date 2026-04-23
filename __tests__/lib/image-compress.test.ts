@@ -28,19 +28,21 @@ describe('compressImage', () => {
     expect(options).toEqual({
       maxWidthOrHeight: 1200,
       initialQuality: 0.8,
-      useWebWorker: true,
+      useWebWorker: false,
       fileType: 'image/jpeg',
       preserveExif: false,
     })
   })
 
-  it('圧縮結果の Blob を返す', async () => {
+  it('圧縮結果を File にラップして返す（MIME は image/jpeg、ファイル名は photo.jpg）', async () => {
     const inputFile = new File(['dummy'], 'photo.png', { type: 'image/png' })
     const outputBlob = new Blob(['compressed'], { type: 'image/jpeg' })
     mockImageCompression.mockResolvedValue(outputBlob)
 
     const result = await compressImage(inputFile)
-    expect(result).toBe(outputBlob)
+    expect(result).toBeInstanceOf(File)
+    expect(result.type).toBe('image/jpeg')
+    expect(result.name).toBe('photo.jpg')
   })
 
   // ── 異常系 ──
@@ -60,7 +62,8 @@ describe('compressImage', () => {
     mockImageCompression.mockResolvedValue(outputBlob)
 
     const result = await compressImage(emptyFile)
-    expect(result).toBe(outputBlob)
+    expect(result).toBeInstanceOf(File)
+    expect(result.type).toBe('image/jpeg')
     expect(mockImageCompression).toHaveBeenCalledWith(emptyFile, expect.any(Object))
   })
 })

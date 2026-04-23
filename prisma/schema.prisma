@@ -23,6 +23,25 @@ model Tenant {
   insuranceCompanies InsuranceCompany[]
   dispatches         Dispatch[]
   breakRecords       BreakRecord[]
+  vehicles           Vehicle[]
+}
+
+model Vehicle {
+  id          String  @id @default(cuid())
+  tenantId    String
+  plateNumber String
+  displayName String?
+  isActive    Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant     Tenant     @relation(fields: [tenantId], references: [id])
+  users      User[]
+  dispatches Dispatch[]
+
+  @@unique([tenantId, plateNumber])
+  @@index([tenantId])
 }
 
 model User {
@@ -34,7 +53,7 @@ model User {
   passwordHash String?
   image        String?
 
-  vehicleNumber           String?
+  vehicleId               String?
   monthlySalary           Int?
   overtimeRate            Int?
   transportationAllowance Int?
@@ -43,6 +62,7 @@ model User {
   updatedAt DateTime @updatedAt
 
   tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  vehicle      Vehicle?      @relation(fields: [vehicleId], references: [id])
   dispatches   Dispatch[]
   breakRecords BreakRecord[]
 
@@ -99,10 +119,16 @@ model Dispatch {
   type           DispatchType
   status         DispatchStatus @default(STANDBY)
 
-  vehicleNumber String?
+  vehicleId String?
 
-  departureOdo  Int?
-  completionOdo Int?
+  departureOdo      Int?
+  // 現場到着時の ODO（ONSITE / TRANSPORT 1 次で使用）。SECONDARY TRANSPORT では未使用。
+  arrivalOdo        Int?
+  // 搬送開始時の ODO（TRANSPORT 1 次のみで使用）。ONSITE / SECONDARY TRANSPORT では未使用。
+  transportStartOdo Int?
+  completionOdo     Int?
+  // 帰社時の ODO（ONSITE / TRANSPORT / SECONDARY TRANSPORT の全フローで使用）。
+  returnOdo         Int?
 
   dispatchTime   DateTime?
   arrivalTime    DateTime?
@@ -169,6 +195,7 @@ model Dispatch {
   tenant           Tenant            @relation(fields: [tenantId], references: [id])
   user             User              @relation(fields: [userId], references: [id])
   assistance       Assistance        @relation(fields: [assistanceId], references: [id])
+  vehicle          Vehicle?          @relation(fields: [vehicleId], references: [id])
   insuranceCompany InsuranceCompany? @relation(fields: [insuranceCompanyId], references: [id])
   parentDispatch   Dispatch?         @relation("SecondaryTransport", fields: [parentDispatchId], references: [id])
   childDispatches  Dispatch[]        @relation("SecondaryTransport")
@@ -187,6 +214,7 @@ model Dispatch {
   @@index([assistanceId])
   @@index([status])
   @@index([isDraft])
+  @@index([vehicleId])
 }
 
 enum DispatchType {
@@ -272,15 +300,21 @@ model Report {
   dispatchId String @unique
 
   departureOdo      Int?
+  // 現場到着時の ODO（ONSITE / TRANSPORT 1 次で使用）。ODO から距離自動算出の入力値。
+  arrivalOdo        Int?
+  // 搬送開始時の ODO（TRANSPORT 1 次のみで使用）。ODO から距離自動算出の入力値。
+  transportStartOdo Int?
   recoveryDistance  Float?
   transportDistance Float?
   returnDistance    Float?
   completionOdo     Int?
+  // 帰社時の ODO（ONSITE / TRANSPORT / SECONDARY TRANSPORT の全フローで使用）。ODO から距離自動算出の入力値。
+  returnOdo         Int?
 
-  recoveryHighway Int?
+  recoveryHighway  Int?
   transportHighway Int?
-  returnHighway   Int?
-  totalHighway    Int?
+  returnHighway    Int?
+  totalHighway     Int?
 
   departurePlaceName String?
   arrivalPlaceName   String?
@@ -322,10 +356,10 @@ model WorkConfirmation {
 
   workDate DateTime @default(now())
 
-  preApprovalChecks  Json?
-  customerSignature  String?
-  customerName       String?
-  customerDate       DateTime?
+  preApprovalChecks Json?
+  customerSignature String?
+  customerName      String?
+  customerDate      DateTime?
 
   vehicleType        String?
   registrationNumber String?

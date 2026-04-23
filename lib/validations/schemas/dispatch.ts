@@ -12,6 +12,9 @@ export const createDispatchSchema = z.object({
   assistanceId: cuid,
   type: z.enum(['onsite', 'transport']),
   departureOdo: odometerReading,
+  arrivalOdo: odometerReading,
+  transportStartOdo: odometerReading,
+  returnOdo: odometerReading,
   dispatchTime: dateString,
   dispatchGpsLat: gpsLat,
   dispatchGpsLng: gpsLng,
@@ -52,8 +55,12 @@ export const updateDispatchSchema = z.object({
   arrivalGpsLat: gpsLat,
   arrivalGpsLng: gpsLng,
 
-  // 距離
+  // 距離 (ODO)
+  departureOdo: odometerReading,
+  arrivalOdo: odometerReading,
+  transportStartOdo: odometerReading,
   completionOdo: odometerReading,
+  returnOdo: odometerReading,
 
   // 案件情報
   address: nullableString,

@@ -25,6 +25,7 @@ export interface SerializedDispatchForReport {
   returnTime: string | null
   departureOdo: number | null
   completionOdo: number | null
+  returnOdo: number | null
   vehicleNumber: string | null
   deliveryType?: 'DIRECT' | 'STORAGE' | null
 }
@@ -36,6 +37,7 @@ export interface SerializedReport {
   transportDistance?: number | null
   returnDistance: number | null
   completionOdo: number | null
+  returnOdo: number | null
   recoveryHighway: number | null
   transportHighway?: number | null
   returnHighway: number | null
@@ -129,6 +131,9 @@ export default function ReportOnsiteClient({ dispatch, report, userName }: Props
   const [completionOdo, setCompletionOdo] = useState(
     (report.completionOdo ?? dispatch.completionOdo)?.toString() ?? ''
   )
+  const [returnOdo, setReturnOdo] = useState(
+    (report.returnOdo ?? dispatch.returnOdo)?.toString() ?? ''
+  )
 
   // ── 高速代 ──
   const [recoveryHighway, setRecoveryHighway] = useState(
@@ -182,7 +187,8 @@ export default function ReportOnsiteClient({ dispatch, report, userName }: Props
     departureOdo !== '' &&
     recoveryDistance !== '' &&
     returnDistance !== '' &&
-    completionOdo !== ''
+    completionOdo !== '' &&
+    returnOdo !== ''
   const isPlacesComplete =
     departurePlaceName.trim() !== '' && arrivalPlaceName.trim() !== ''
   const isComplete = isTimesComplete && isDistancesComplete && isPlacesComplete
@@ -236,6 +242,7 @@ export default function ReportOnsiteClient({ dispatch, report, userName }: Props
     recoveryDistance: recoveryDistance ? parseFloat(recoveryDistance) : null,
     returnDistance: returnDistance ? parseFloat(returnDistance) : null,
     completionOdo: completionOdo ? parseInt(completionOdo) : null,
+    returnOdo: returnOdo ? parseInt(returnOdo) : null,
     recoveryHighway: recoveryHighway ? parseInt(recoveryHighway) : null,
     returnHighway: returnHighway ? parseInt(returnHighway) : null,
     totalHighway: totalHighway > 0 ? totalHighway : null,
@@ -260,7 +267,7 @@ export default function ReportOnsiteClient({ dispatch, report, userName }: Props
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     dispatchTime, arrivalTime, completionTime, returnTime,
-    departureOdo, recoveryDistance, returnDistance, completionOdo,
+    departureOdo, recoveryDistance, returnDistance, completionOdo, returnOdo,
     recoveryHighway, returnHighway, departurePlaceName, arrivalPlaceName,
     completionItems, completionNote, primaryAmount, billingContactMemo,
     vehicleNumber,
@@ -496,6 +503,14 @@ export default function ReportOnsiteClient({ dispatch, report, userName }: Props
                   decimal: true,
                 },
                 {
+                  label: '完了 ODO',
+                  key: 'completionOdo',
+                  value: completionOdo,
+                  setValue: setCompletionOdo,
+                  suffix: 'km',
+                  decimal: false,
+                },
+                {
                   label: '帰社距離',
                   key: 'returnDistance',
                   value: returnDistance,
@@ -504,10 +519,10 @@ export default function ReportOnsiteClient({ dispatch, report, userName }: Props
                   decimal: true,
                 },
                 {
-                  label: '完了 ODO',
-                  key: 'completionOdo',
-                  value: completionOdo,
-                  setValue: setCompletionOdo,
+                  label: '帰社 ODO',
+                  key: 'returnOdo',
+                  value: returnOdo,
+                  setValue: setReturnOdo,
                   suffix: 'km',
                   decimal: false,
                 },

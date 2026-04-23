@@ -19,6 +19,7 @@ const nextConfig: NextConfig = {
             value: [
               "default-src 'self'",
               `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''} https://static.bizdeli.net`,
+              "worker-src 'self' blob:",
               "style-src 'self' 'unsafe-inline' https://static.bizdeli.net",
               "connect-src 'self' https://static.bizdeli.net https://app.bizdeli.net",
               "img-src 'self' data: blob:",

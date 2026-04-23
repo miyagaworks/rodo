@@ -390,15 +390,17 @@ export default function RecordClient({ dispatch, userName }: RecordClientProps) 
       >
         {/* タイトル + 日付 */}
         <div className="flex items-center gap-2 mb-2">
-          <span className="font-bold text-base flex-1" style={{ color: '#1C2948' }}>出動記録</span>
+          <span className="font-bold text-base whitespace-nowrap" style={{ color: '#1C2948' }}>出動記録</span>
+          <div className="flex-1" />
           <button
             onClick={() => setShowBackConfirm(true)}
-            className="px-3 py-1.5 rounded-lg text-xs font-bold active:opacity-60"
+            className="px-3 py-1.5 rounded-lg text-xs font-bold active:opacity-60 whitespace-nowrap"
             style={{ backgroundColor: '#1C2948', color: '#FFFFFF' }}
           >
             出動画面に戻る
           </button>
-          <span className="text-xs" style={{ color: '#1C2948' }}>
+          <div className="flex-1" />
+          <span className="text-xs whitespace-nowrap" style={{ color: '#1C2948' }}>
             {formatDate(dispatch.dispatchTime)}
           </span>
         </div>
