@@ -115,7 +115,7 @@ describe('VehiclesTab', () => {
     })
 
     // ナンバー未入力 → 保存ボタンは disabled
-    const saveButton = screen.getByText('保存')
+    const saveButton = screen.getByText('保存').closest('button')!
     expect(saveButton).toBeDisabled()
   })
 

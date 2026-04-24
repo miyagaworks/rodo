@@ -264,10 +264,11 @@ export default function VehiclesTab() {
             <button
               onClick={addVehicle}
               disabled={!newVehicle.plateNumber.trim()}
-              className="flex-1 py-2 rounded-lg text-sm font-medium disabled:opacity-50"
+              className="flex-1 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2.5 disabled:opacity-50"
               style={{ backgroundColor: '#1C2948', color: 'white' }}
             >
-              保存
+              <FaSave className="w-4 h-4" />
+              <span style={{ letterSpacing: '0.15em' }}>保存</span>
             </button>
           </div>
         </div>

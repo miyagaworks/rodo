@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import * as Accordion from '@radix-ui/react-accordion'
 import { ChevronRight, X, CloudUpload, Plus } from 'lucide-react'
+import { FaSave } from 'react-icons/fa'
 
 interface Vehicle {
   id: string
@@ -27,6 +28,24 @@ export default function MembersTab() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editData, setEditData] = useState<Record<string, Member>>({})
   const [loading, setLoading] = useState(true)
+  const [isAdding, setIsAdding] = useState(false)
+  const [newMember, setNewMember] = useState<{
+    name: string
+    email: string
+    password: string
+    vehicleId: string | null
+    monthlySalary: number | null
+    overtimeRate: number | null
+    transportationAllowance: number | null
+  }>({
+    name: '',
+    email: '',
+    password: '',
+    vehicleId: null,
+    monthlySalary: null,
+    overtimeRate: null,
+    transportationAllowance: null,
+  })
 
   useEffect(() => {
     fetchData()
@@ -92,21 +111,45 @@ export default function MembersTab() {
   }
 
   const addMember = async () => {
+    const name = newMember.name.trim()
+    const email = newMember.email.trim()
+    const password = newMember.password
+    if (!name || !email || password.length < 8) return
+
     const res = await fetch('/api/users', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        name: '新しい隊員',
-        email: `member-${Date.now()}@example.com`,
-        password: 'password123',  // 初期パスワード (ユーザーが後で変更する前提)
+        name,
+        email,
+        password,
+        vehicleId: newMember.vehicleId,
+        monthlySalary: newMember.monthlySalary,
+        overtimeRate: newMember.overtimeRate,
+        transportationAllowance: newMember.transportationAllowance,
       }),
     })
+    if (res.status === 409) {
+      alert('このメールアドレスは既に登録されています')
+      return
+    }
+    if (res.status === 400) {
+      alert('入力内容に誤りがあります')
+      return
+    }
     if (!res.ok) {
       alert('隊員の追加に失敗しました')
       return
     }
+    setIsAdding(false)
+    setNewMember({ name: '', email: '', password: '', vehicleId: null, monthlySalary: null, overtimeRate: null, transportationAllowance: null })
     await fetchData()
   }
+
+  const canSubmitNewMember =
+    newMember.name.trim() !== '' &&
+    newMember.email.trim() !== '' &&
+    newMember.password.length >= 8
 
   const formatCurrency = (v: number | null) =>
     v != null ? `¥${v.toLocaleString()}` : '未設定'
@@ -242,9 +285,107 @@ export default function MembersTab() {
         })}
       </Accordion.Root>
 
+      {isAdding && (
+        <div className="bg-white rounded-xl shadow-sm p-4 mt-2">
+          <div className="mb-3">
+            <label className="block text-xs text-gray-500 mb-1">氏名 (必須)</label>
+            <input
+              type="text"
+              value={newMember.name}
+              onChange={(e) => setNewMember(prev => ({ ...prev, name: e.target.value }))}
+              placeholder="例: 山田太郎"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+          <div className="mb-3">
+            <label className="block text-xs text-gray-500 mb-1">メールアドレス (必須)</label>
+            <input
+              type="email"
+              value={newMember.email}
+              onChange={(e) => setNewMember(prev => ({ ...prev, email: e.target.value }))}
+              placeholder="例: yamada@example.com"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+          <div className="mb-3">
+            <label className="block text-xs text-gray-500 mb-1">パスワード (8文字以上)</label>
+            <input
+              type="password"
+              value={newMember.password}
+              onChange={(e) => setNewMember(prev => ({ ...prev, password: e.target.value }))}
+              placeholder="8文字以上"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+          <div className="mb-3">
+            <label className="block text-xs text-gray-500 mb-1">使用車両</label>
+            <select
+              value={newMember.vehicleId ?? ''}
+              onChange={(e) => setNewMember(prev => ({ ...prev, vehicleId: e.target.value || null }))}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            >
+              <option value="">未設定</option>
+              {vehicles.filter(v => v.isActive)
+                .sort((a, b) => a.plateNumber.localeCompare(b.plateNumber, 'ja', { numeric: true }))
+                .map(v => (
+                  <option key={v.id} value={v.id}>
+                    {v.plateNumber + (v.displayName ? ` (${v.displayName})` : '')}
+                  </option>
+                ))}
+            </select>
+          </div>
+          <div className="mb-3">
+            <label className="block text-xs text-gray-500 mb-1">月給（円）</label>
+            <input
+              type="number"
+              value={newMember.monthlySalary ?? ''}
+              onChange={(e) => setNewMember(prev => ({ ...prev, monthlySalary: Number(e.target.value) || null }))}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+          <div className="mb-3">
+            <label className="block text-xs text-gray-500 mb-1">残業単価（円）</label>
+            <input
+              type="number"
+              value={newMember.overtimeRate ?? ''}
+              onChange={(e) => setNewMember(prev => ({ ...prev, overtimeRate: Number(e.target.value) || null }))}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+          <div className="mb-3">
+            <label className="block text-xs text-gray-500 mb-1">交通費/月（円）</label>
+            <input
+              type="number"
+              value={newMember.transportationAllowance ?? ''}
+              onChange={(e) => setNewMember(prev => ({ ...prev, transportationAllowance: Number(e.target.value) || null }))}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => { setIsAdding(false); setNewMember({ name: '', email: '', password: '', vehicleId: null, monthlySalary: null, overtimeRate: null, transportationAllowance: null }) }}
+              className="flex-1 py-2 rounded-lg text-sm font-medium"
+              style={{ backgroundColor: '#9CA3AF', color: 'white' }}
+            >
+              キャンセル
+            </button>
+            <button
+              onClick={addMember}
+              disabled={!canSubmitNewMember}
+              className="flex-1 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2.5 disabled:opacity-50"
+              style={{ backgroundColor: '#1C2948', color: 'white' }}
+            >
+              <FaSave className="w-4 h-4" />
+              <span style={{ letterSpacing: '0.15em' }}>保存</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       <button
-        onClick={addMember}
-        className="w-full mt-4 py-3 rounded-xl border-2 border-dashed border-gray-300 text-gray-500 text-sm flex items-center justify-center gap-2"
+        onClick={() => setIsAdding(true)}
+        disabled={isAdding}
+        className="w-full mt-4 py-3 rounded-xl border-2 border-dashed border-gray-300 text-gray-500 text-sm flex items-center justify-center gap-2 disabled:opacity-50"
       >
         <Plus className="w-4 h-4" />
         隊員を追加
