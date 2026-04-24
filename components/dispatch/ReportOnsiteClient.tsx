@@ -7,8 +7,11 @@ import { FaCircleArrowRight } from 'react-icons/fa6'
 import { IoIosArrowDropleftCircle } from 'react-icons/io'
 import { Check } from 'lucide-react'
 import ClockPicker from './ClockPicker'
+import VehicleSelector from './VehicleSelector'
 import { offlineFetch } from '@/lib/offline-fetch'
 import { useFormAutoSave } from '@/hooks/useFormAutoSave'
+import { useVehicles } from '@/hooks/useVehicles'
+import { formatCurrentVehicleLabel } from '@/lib/vehicle-label'
 
 // -------------------------------------------------------
 // Types
@@ -26,7 +29,8 @@ export interface SerializedDispatchForReport {
   departureOdo: number | null
   completionOdo: number | null
   returnOdo: number | null
-  vehicleNumber: string | null
+  vehicleId: string | null
+  vehicle: { plateNumber: string; displayName: string | null } | null
   deliveryType?: 'DIRECT' | 'STORAGE' | null
 }
 
@@ -171,9 +175,19 @@ export default function ReportOnsiteClient({ dispatch, report, userName }: Props
   // ── 連絡事項 ──
   const [billingContactMemo, setBillingContactMemo] = useState(report.billingContactMemo ?? '')
 
-  // ── 車両番号 ──
-  const [vehicleNumber, setVehicleNumber] = useState(dispatch.vehicleNumber ?? '')
+  // ── 車両 ──
+  const [vehicleId, setVehicleId] = useState<string | null>(dispatch.vehicleId ?? null)
   const [editingVehicle, setEditingVehicle] = useState(false)
+  const { vehicles: allVehicles } = useVehicles()
+  const currentVehicleLabel = (() => {
+    if (!vehicleId) return '---'
+    const v = allVehicles.find((x) => x.id === vehicleId)
+    if (v) return formatCurrentVehicleLabel(v)
+    if (dispatch.vehicle && dispatch.vehicleId === vehicleId) {
+      return formatCurrentVehicleLabel(dispatch.vehicle)
+    }
+    return '---'
+  })()
 
   const [loading, setLoading] = useState(false)
 
@@ -233,7 +247,7 @@ export default function ReportOnsiteClient({ dispatch, report, userName }: Props
     arrivalTime: arrivalTime?.toISOString() ?? null,
     completionTime: completionTime?.toISOString() ?? null,
     returnTime: returnTime?.toISOString() ?? null,
-    vehicleNumber: vehicleNumber || null,
+    vehicleId: vehicleId,
     isDraft,
   })
 
@@ -270,7 +284,7 @@ export default function ReportOnsiteClient({ dispatch, report, userName }: Props
     departureOdo, recoveryDistance, returnDistance, completionOdo, returnOdo,
     recoveryHighway, returnHighway, departurePlaceName, arrivalPlaceName,
     completionItems, completionNote, primaryAmount, billingContactMemo,
-    vehicleNumber,
+    vehicleId,
   ])
 
   // ── 保存処理 ──
@@ -385,15 +399,12 @@ export default function ReportOnsiteClient({ dispatch, report, userName }: Props
             <span className="opacity-60">車両</span>
             {editingVehicle ? (
               <div className="flex items-center gap-1">
-                <input
-                  type="text"
-                  value={vehicleNumber}
-                  onChange={(e) => setVehicleNumber(e.target.value)}
-                  className="border rounded px-2 py-0.5 text-sm font-bold w-16"
+                <VehicleSelector
+                  value={vehicleId}
+                  onChange={setVehicleId}
+                  vehicles={allVehicles}
+                  className="border rounded px-2 py-0.5 text-sm font-bold"
                   style={{ borderColor: 'rgba(28,41,72,0.3)', color: '#1C2948', backgroundColor: 'rgba(255,255,255,0.5)' }}
-                  autoFocus
-                  onBlur={() => setEditingVehicle(false)}
-                  onKeyDown={(e) => e.key === 'Enter' && setEditingVehicle(false)}
                 />
                 <button onClick={() => setEditingVehicle(false)}>
                   <Check className="w-4 h-4" style={{ color: '#2FBF71' }} />
@@ -401,7 +412,7 @@ export default function ReportOnsiteClient({ dispatch, report, userName }: Props
               </div>
             ) : (
               <>
-                <span className="font-bold">{vehicleNumber || '---'}</span>
+                <span className="font-bold">{currentVehicleLabel}</span>
                 <button
                   onClick={() => setEditingVehicle(true)}
                   className="text-xs text-white px-2 py-0.5 rounded font-bold active:opacity-70"

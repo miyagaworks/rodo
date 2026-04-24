@@ -84,6 +84,7 @@ export const updateDispatchSchema = z.object({
   parkingLocation: parkingLocation.nullable().optional(),
   areaIcName: nullableString,
   insuranceCompanyId: z.string().nullable().optional(),
+  vehicleId: z.string().nullable().optional(),
   isDraft: z.boolean().optional(),
 
   // 作業時間

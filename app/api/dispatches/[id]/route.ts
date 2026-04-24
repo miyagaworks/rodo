@@ -156,6 +156,7 @@ export async function PATCH(
   if (body.parkingLocation !== undefined) allowed.parkingLocation = body.parkingLocation
   if (body.areaIcName !== undefined) allowed.areaIcName = body.areaIcName
   if (body.insuranceCompanyId !== undefined) allowed.insuranceCompanyId = body.insuranceCompanyId
+  if (body.vehicleId !== undefined) allowed.vehicleId = body.vehicleId
   if (body.isDraft !== undefined) allowed.isDraft = body.isDraft
 
 
