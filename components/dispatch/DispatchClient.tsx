@@ -46,6 +46,7 @@ interface SerializedDispatch {
   transferredToUserName: string | null
   transferredToDispatchNumber: string | null
   transferredFromUserName: string | null
+  vehicleId: string | null
 }
 
 interface DispatchClientProps {
@@ -53,6 +54,7 @@ interface DispatchClientProps {
   dispatchType: 'onsite' | 'transport'
   session: Session
   initialDispatch?: SerializedDispatch | null
+  initialVehicleId?: string | null
 }
 
 // -------------------------------------------------------
@@ -254,8 +256,12 @@ export default function DispatchClient({
   dispatchType,
   session: _session,
   initialDispatch,
+  initialVehicleId,
 }: DispatchClientProps) {
   const router = useRouter()
+
+  // 既存出動の vehicleId を優先、なければ user.vehicleId を fallback
+  const vehicleId = initialDispatch?.vehicleId ?? initialVehicleId ?? null
 
   const [mode, setMode] = useState<'onsite' | 'transport'>(dispatchType)
   const initStep = getInitialStep(initialDispatch)
@@ -328,10 +334,13 @@ export default function DispatchClient({
 
   // ── 前回帰社 ODO 取得（出発 ODO の placeholder 初期値） ──
   useEffect(() => {
+    if (!vehicleId) return
     let cancelled = false
     ;(async () => {
       try {
-        const res = await fetch('/api/dispatches/last-return-odo')
+        const res = await fetch(
+          `/api/dispatches/last-return-odo?vehicleId=${encodeURIComponent(vehicleId)}`
+        )
         if (!res.ok) return
         const data = (await res.json()) as { lastReturnOdo: number | null }
         if (!cancelled) setLastReturnOdo(data.lastReturnOdo ?? null)
@@ -342,7 +351,7 @@ export default function DispatchClient({
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [vehicleId])
 
   // 振替完了ポーリング（30秒間隔、PENDING 時のみ）
   useEffect(() => {

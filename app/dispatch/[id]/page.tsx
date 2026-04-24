@@ -13,17 +13,23 @@ export default async function DispatchPage({ params }: Props) {
 
   const { id } = await params
 
-  const dispatch = await prisma.dispatch.findFirst({
-    where: { id, tenantId: session.user.tenantId },
-    include: {
-      transferredTo: {
-        select: { dispatchNumber: true, user: { select: { name: true } } },
+  const [dispatch, user] = await Promise.all([
+    prisma.dispatch.findFirst({
+      where: { id, tenantId: session.user.tenantId },
+      include: {
+        transferredTo: {
+          select: { dispatchNumber: true, user: { select: { name: true } } },
+        },
+        transferredFrom: {
+          select: { user: { select: { name: true } } },
+        },
       },
-      transferredFrom: {
-        select: { user: { select: { name: true } } },
-      },
-    },
-  })
+    }),
+    prisma.user.findUnique({
+      where: { id: session.user.userId },
+      select: { vehicleId: true },
+    }),
+  ])
 
   if (!dispatch) redirect('/')
 
@@ -55,6 +61,7 @@ export default async function DispatchPage({ params }: Props) {
     transferredToUserName: dispatch.transferredTo?.user?.name ?? null,
     transferredToDispatchNumber: dispatch.transferredTo?.dispatchNumber ?? null,
     transferredFromUserName: dispatch.transferredFrom?.user?.name ?? null,
+    vehicleId: dispatch.vehicleId,
   }
 
   return (
@@ -63,6 +70,7 @@ export default async function DispatchPage({ params }: Props) {
       dispatchType={dispatchType}
       session={session}
       initialDispatch={serialized}
+      initialVehicleId={user?.vehicleId ?? null}
     />
   )
 }
