@@ -92,11 +92,19 @@ export default function MembersTab() {
   }
 
   const addMember = async () => {
-    await fetch('/api/users', {
+    const res = await fetch('/api/users', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: '新しい隊員', email: `member-${Date.now()}@example.com` }),
+      body: JSON.stringify({
+        name: '新しい隊員',
+        email: `member-${Date.now()}@example.com`,
+        password: 'password123',  // 初期パスワード (ユーザーが後で変更する前提)
+      }),
     })
+    if (!res.ok) {
+      alert('隊員の追加に失敗しました')
+      return
+    }
     await fetchData()
   }
 

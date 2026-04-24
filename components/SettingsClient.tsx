@@ -43,19 +43,19 @@ export default function SettingsClient() {
           </Tabs.Trigger>
         </Tabs.List>
 
-        <Tabs.Content value="assistances" className="p-4">
+        <Tabs.Content value="assistances" className="p-4 pb-24">
           <AssistanceTab />
         </Tabs.Content>
 
-        <Tabs.Content value="members" className="p-4">
+        <Tabs.Content value="members" className="p-4 pb-24">
           <MembersTab />
         </Tabs.Content>
 
-        <Tabs.Content value="vehicles" className="p-4">
+        <Tabs.Content value="vehicles" className="p-4 pb-24">
           <VehiclesTab />
         </Tabs.Content>
 
-        <Tabs.Content value="tenant" className="p-4">
+        <Tabs.Content value="tenant" className="p-4 pb-24">
           <TenantTab />
         </Tabs.Content>
       </Tabs.Root>

@@ -59,7 +59,7 @@ describe('VehiclesTab', () => {
     expect(screen.getByText(/\[停止中\].*品川 200 い 5678/)).toBeInTheDocument()
   })
 
-  it('新規追加: ボタンクリックで POST リクエストが発火する', async () => {
+  it('新規追加: ボタンクリックでフォーム展開 → ナンバー入力 → 保存で POST が発火する', async () => {
     setupFetchMock()
     const VehiclesTab = (await import('@/components/settings/VehiclesTab')).default
     render(<VehiclesTab />)
@@ -68,10 +68,25 @@ describe('VehiclesTab', () => {
       expect(screen.getByText(/品川 100 あ 1234/)).toBeInTheDocument()
     })
 
+    // 「車両を追加」ボタンクリックでフォーム展開
+    fireEvent.click(screen.getByText('車両を追加'))
+
+    // インラインフォームが表示される
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText('例: 広島 330 あ 1234')).toBeInTheDocument()
+    })
+    expect(screen.getByPlaceholderText('例: 1号車')).toBeInTheDocument()
+
+    // ナンバーを入力
+    fireEvent.change(screen.getByPlaceholderText('例: 広島 330 あ 1234'), {
+      target: { value: '広島 330 あ 9999' },
+    })
+
     fetchSpy.mockClear()
     setupFetchMock()
 
-    fireEvent.click(screen.getByText('車両を追加'))
+    // 保存ボタンクリックで POST 発火
+    fireEvent.click(screen.getByText('保存'))
 
     await waitFor(() => {
       const postCall = fetchSpy.mock.calls.find(
@@ -79,6 +94,86 @@ describe('VehiclesTab', () => {
       )
       expect(postCall).toBeDefined()
       expect(postCall![0]).toBe('/api/settings/vehicles')
+      const body = JSON.parse((postCall![1] as RequestInit).body as string)
+      expect(body.plateNumber).toBe('広島 330 あ 9999')
+    })
+  })
+
+  it('新規追加: ナンバー空の場合は保存ボタンが disabled', async () => {
+    setupFetchMock()
+    const VehiclesTab = (await import('@/components/settings/VehiclesTab')).default
+    render(<VehiclesTab />)
+
+    await waitFor(() => {
+      expect(screen.getByText(/品川 100 あ 1234/)).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByText('車両を追加'))
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText('例: 広島 330 あ 1234')).toBeInTheDocument()
+    })
+
+    // ナンバー未入力 → 保存ボタンは disabled
+    const saveButton = screen.getByText('保存')
+    expect(saveButton).toBeDisabled()
+  })
+
+  it('新規追加: キャンセルボタンでフォームが閉じる', async () => {
+    setupFetchMock()
+    const VehiclesTab = (await import('@/components/settings/VehiclesTab')).default
+    render(<VehiclesTab />)
+
+    await waitFor(() => {
+      expect(screen.getByText(/品川 100 あ 1234/)).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByText('車両を追加'))
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText('例: 広島 330 あ 1234')).toBeInTheDocument()
+    })
+
+    // キャンセルクリック
+    fireEvent.click(screen.getByText('キャンセル'))
+
+    // フォームが閉じる
+    await waitFor(() => {
+      expect(screen.queryByPlaceholderText('例: 広島 330 あ 1234')).not.toBeInTheDocument()
+    })
+  })
+
+  it('新規追加 409: 重複ナンバーで alert が表示される', async () => {
+    setupFetchMock()
+    const VehiclesTab = (await import('@/components/settings/VehiclesTab')).default
+    render(<VehiclesTab />)
+
+    await waitFor(() => {
+      expect(screen.getByText(/品川 100 あ 1234/)).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByText('車両を追加'))
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText('例: 広島 330 あ 1234')).toBeInTheDocument()
+    })
+
+    fireEvent.change(screen.getByPlaceholderText('例: 広島 330 あ 1234'), {
+      target: { value: '品川 100 あ 1234' },
+    })
+
+    // POST が 409 を返すよう設定
+    fetchSpy.mockImplementation(async (url, opts) => {
+      if (opts && (opts as RequestInit).method === 'POST') {
+        return { ok: false, status: 409, json: async () => ({}) } as Response
+      }
+      return { ok: true, status: 200, json: async () => mockVehicles } as Response
+    })
+
+    fireEvent.click(screen.getByText('保存'))
+
+    await waitFor(() => {
+      expect(window.alert).toHaveBeenCalledWith('このナンバーは既に登録されています')
     })
   })
 
@@ -164,8 +259,9 @@ describe('VehiclesTab', () => {
     fetchSpy.mockClear()
     setupFetchMock()
 
-    // 保存ボタンをクリック
-    fireEvent.click(screen.getByText('保存'))
+    // 保存ボタンをクリック — 編集フォーム内の保存ボタン
+    const saveButtons = screen.getAllByText('保存')
+    fireEvent.click(saveButtons[0])
 
     await waitFor(() => {
       const patchCall = fetchSpy.mock.calls.find(

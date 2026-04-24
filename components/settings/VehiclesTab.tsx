@@ -20,6 +20,11 @@ export default function VehiclesTab() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editData, setEditData] = useState<Record<string, { plateNumber: string; displayName: string | null; isActive: boolean }>>({})
   const [loading, setLoading] = useState(true)
+  const [isAdding, setIsAdding] = useState(false)
+  const [newVehicle, setNewVehicle] = useState<{ plateNumber: string; displayName: string }>({
+    plateNumber: '',
+    displayName: '',
+  })
 
   useEffect(() => {
     fetchVehicles()
@@ -82,15 +87,26 @@ export default function VehiclesTab() {
   }
 
   const addVehicle = async () => {
+    if (!newVehicle.plateNumber.trim()) return
     const res = await fetch('/api/settings/vehicles', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ plateNumber: `新規-${Date.now()}`, displayName: null, isActive: true }),
+      body: JSON.stringify({
+        plateNumber: newVehicle.plateNumber.trim(),
+        displayName: newVehicle.displayName.trim() || null,
+        isActive: true,
+      }),
     })
     if (res.status === 409) {
+      alert('このナンバーは既に登録されています')
+      return
+    }
+    if (!res.ok) {
       alert('車両の追加に失敗しました')
       return
     }
+    setIsAdding(false)
+    setNewVehicle({ plateNumber: '', displayName: '' })
     await fetchVehicles()
   }
 
@@ -215,9 +231,52 @@ export default function VehiclesTab() {
         })}
       </Accordion.Root>
 
+      {isAdding && (
+        <div className="bg-white rounded-xl shadow-sm p-4 mt-2">
+          <div className="mb-3">
+            <label className="block text-xs text-gray-500 mb-1">ナンバー (必須)</label>
+            <input
+              type="text"
+              value={newVehicle.plateNumber}
+              onChange={(e) => setNewVehicle(prev => ({ ...prev, plateNumber: e.target.value }))}
+              placeholder="例: 広島 330 あ 1234"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+          <div className="mb-3">
+            <label className="block text-xs text-gray-500 mb-1">表示名 (任意)</label>
+            <input
+              type="text"
+              value={newVehicle.displayName}
+              onChange={(e) => setNewVehicle(prev => ({ ...prev, displayName: e.target.value }))}
+              placeholder="例: 1号車"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => { setIsAdding(false); setNewVehicle({ plateNumber: '', displayName: '' }) }}
+              className="flex-1 py-2 rounded-lg text-sm font-medium"
+              style={{ backgroundColor: '#9CA3AF', color: 'white' }}
+            >
+              キャンセル
+            </button>
+            <button
+              onClick={addVehicle}
+              disabled={!newVehicle.plateNumber.trim()}
+              className="flex-1 py-2 rounded-lg text-sm font-medium disabled:opacity-50"
+              style={{ backgroundColor: '#1C2948', color: 'white' }}
+            >
+              保存
+            </button>
+          </div>
+        </div>
+      )}
+
       <button
-        onClick={addVehicle}
-        className="w-full mt-4 py-3 rounded-xl border-2 border-dashed border-gray-300 text-gray-500 text-sm flex items-center justify-center gap-2 hover:bg-white/50"
+        onClick={() => setIsAdding(true)}
+        disabled={isAdding}
+        className="w-full mt-4 py-3 rounded-xl border-2 border-dashed border-gray-300 text-gray-500 text-sm flex items-center justify-center gap-2 hover:bg-white/50 disabled:opacity-50"
       >
         <Plus className="w-4 h-4" />
         車両を追加
