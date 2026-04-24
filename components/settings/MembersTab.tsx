@@ -4,10 +4,18 @@ import { useState, useEffect } from 'react'
 import * as Accordion from '@radix-ui/react-accordion'
 import { ChevronRight, X, CloudUpload, Plus } from 'lucide-react'
 
+interface Vehicle {
+  id: string
+  plateNumber: string
+  displayName: string | null
+  isActive: boolean
+}
+
 interface Member {
   id: string
   name: string
-  vehicleNumber: string | null
+  vehicleId: string | null
+  vehicle: { plateNumber: string; displayName: string | null } | null
   monthlySalary: number | null
   overtimeRate: number | null
   transportationAllowance: number | null
@@ -15,21 +23,43 @@ interface Member {
 
 export default function MembersTab() {
   const [members, setMembers] = useState<Member[]>([])
+  const [vehicles, setVehicles] = useState<Vehicle[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editData, setEditData] = useState<Record<string, Member>>({})
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetchMembers()
+    fetchData()
   }, [])
 
-  const fetchMembers = async () => {
-    const res = await fetch('/api/users')
-    if (res.ok) {
-      const data = await res.json()
+  const fetchData = async () => {
+    const [membersRes, vehiclesRes] = await Promise.all([
+      fetch('/api/users'),
+      fetch('/api/settings/vehicles'),
+    ])
+    if (membersRes.ok) {
+      const data = await membersRes.json()
       setMembers(data)
     }
+    if (vehiclesRes.ok) {
+      const data = await vehiclesRes.json()
+      setVehicles(data)
+    }
     setLoading(false)
+  }
+
+  const vehicleOptionsFor = (member: Member): Vehicle[] => {
+    const activeList = vehicles
+      .filter(v => v.isActive)
+      .sort((a, b) => a.plateNumber.localeCompare(b.plateNumber, 'ja', { numeric: true }))
+
+    if (member.vehicleId) {
+      const current = vehicles.find(v => v.id === member.vehicleId)
+      if (current && !current.isActive && !activeList.some(v => v.id === current.id)) {
+        return [current, ...activeList]
+      }
+    }
+    return activeList
   }
 
   const startEditing = (m: Member) => {
@@ -39,19 +69,26 @@ export default function MembersTab() {
 
   const saveMember = async (id: string) => {
     const data = editData[id]
+    const payload = {
+      name: data.name,
+      vehicleId: data.vehicleId,
+      monthlySalary: data.monthlySalary,
+      overtimeRate: data.overtimeRate,
+      transportationAllowance: data.transportationAllowance,
+    }
     await fetch(`/api/users/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
+      body: JSON.stringify(payload),
     })
-    await fetchMembers()
+    await fetchData()
     setEditingId(null)
   }
 
   const deleteMember = async (id: string) => {
     if (!confirm('削除しますか？')) return
     await fetch(`/api/users/${id}`, { method: 'DELETE' })
-    await fetchMembers()
+    await fetchData()
   }
 
   const addMember = async () => {
@@ -60,7 +97,7 @@ export default function MembersTab() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: '新しい隊員', email: `member-${Date.now()}@example.com` }),
     })
-    await fetchMembers()
+    await fetchData()
   }
 
   const formatCurrency = (v: number | null) =>
@@ -102,7 +139,11 @@ export default function MembersTab() {
               <Accordion.Content className="px-4 pb-4">
                 {!isEditing ? (
                   <div>
-                    <p className="text-sm text-gray-600 mb-1">使用車両: {member.vehicleNumber || '未設定'}</p>
+                    <p className="text-sm text-gray-600 mb-1">
+                      使用車両: {member.vehicle
+                        ? member.vehicle.plateNumber + (member.vehicle.displayName ? ` (${member.vehicle.displayName})` : '')
+                        : '未設定'}
+                    </p>
                     <p className="text-sm text-gray-600 mb-1">月給: {formatCurrency(member.monthlySalary)}</p>
                     <p className="text-sm text-gray-600 mb-1">残業単価: {formatCurrency(member.overtimeRate)}</p>
                     <p className="text-sm text-gray-600 mb-3">交通費/月: {formatCurrency(member.transportationAllowance)}</p>
@@ -115,23 +156,53 @@ export default function MembersTab() {
                   </div>
                 ) : (
                   <div>
-                    {[
-                      { key: 'name', label: '氏名', type: 'text' },
-                      { key: 'vehicleNumber', label: '使用車両', type: 'text' },
-                      { key: 'monthlySalary', label: '月給（円）', type: 'number' },
-                      { key: 'overtimeRate', label: '残業単価（円）', type: 'number' },
-                      { key: 'transportationAllowance', label: '交通費/月（円）', type: 'number' },
-                    ].map(({ key, label, type }) => (
+                    <div className="mb-3">
+                      <label className="block text-xs text-gray-500 mb-1">氏名</label>
+                      <input
+                        type="text"
+                        value={data?.name ?? ''}
+                        onChange={(e) => setEditData(prev => ({
+                          ...prev,
+                          [member.id]: { ...prev[member.id], name: e.target.value },
+                        }))}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                      />
+                    </div>
+
+                    <div className="mb-3">
+                      <label className="block text-xs text-gray-500 mb-1">使用車両</label>
+                      <select
+                        value={data?.vehicleId ?? ''}
+                        onChange={(e) => setEditData(prev => ({
+                          ...prev,
+                          [member.id]: { ...prev[member.id], vehicleId: e.target.value || null },
+                        }))}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                      >
+                        <option value="">未設定</option>
+                        {vehicleOptionsFor(member).map(v => (
+                          <option key={v.id} value={v.id}>
+                            {(v.isActive ? '' : '[停止中] ') + v.plateNumber + (v.displayName ? ` (${v.displayName})` : '')}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {([
+                      { key: 'monthlySalary' as const, label: '月給（円）' },
+                      { key: 'overtimeRate' as const, label: '残業単価（円）' },
+                      { key: 'transportationAllowance' as const, label: '交通費/月（円）' },
+                    ] as const).map(({ key, label }) => (
                       <div key={key} className="mb-3">
                         <label className="block text-xs text-gray-500 mb-1">{label}</label>
                         <input
-                          type={type}
-                          value={(data as any)?.[key] ?? ''}
+                          type="number"
+                          value={data?.[key] ?? ''}
                           onChange={(e) => setEditData(prev => ({
                             ...prev,
                             [member.id]: {
                               ...prev[member.id],
-                              [key]: type === 'number' ? Number(e.target.value) || null : e.target.value,
+                              [key]: Number(e.target.value) || null,
                             }
                           }))}
                           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"

@@ -8,6 +8,9 @@ vi.mock('@/components/settings/AssistanceTab', () => ({
 vi.mock('@/components/settings/MembersTab', () => ({
   default: () => <div data-testid="members-tab">MembersTab</div>,
 }))
+vi.mock('@/components/settings/VehiclesTab', () => ({
+  default: () => <div data-testid="vehicles-tab">VehiclesTab</div>,
+}))
 vi.mock('@/components/settings/TenantTab', () => ({
   default: () => <div data-testid="tenant-tab">TenantTab</div>,
 }))
@@ -26,11 +29,12 @@ describe('SettingsClient', () => {
     expect(backLink.closest('a')).toHaveAttribute('href', '/')
   })
 
-  it('3つのタブトリガーを表示する', () => {
+  it('4つのタブトリガーを表示する', () => {
     render(<SettingsClient />)
 
     expect(screen.getByText('アシスタンス')).toBeInTheDocument()
     expect(screen.getByText('隊員登録')).toBeInTheDocument()
+    expect(screen.getByText('車両管理')).toBeInTheDocument()
     expect(screen.getByText('テナント設定')).toBeInTheDocument()
   })
 
@@ -44,10 +48,11 @@ describe('SettingsClient', () => {
     render(<SettingsClient />)
 
     const tabs = screen.getAllByRole('tab')
-    expect(tabs).toHaveLength(3)
+    expect(tabs).toHaveLength(4)
     expect(tabs[0]).toHaveTextContent('アシスタンス')
     expect(tabs[1]).toHaveTextContent('隊員登録')
-    expect(tabs[2]).toHaveTextContent('テナント設定')
+    expect(tabs[2]).toHaveTextContent('車両管理')
+    expect(tabs[3]).toHaveTextContent('テナント設定')
   })
 
   it('デフォルトでアシスタンスタブが active、その他は inactive', () => {
@@ -57,6 +62,7 @@ describe('SettingsClient', () => {
     expect(tabs[0]).toHaveAttribute('data-state', 'active')
     expect(tabs[1]).toHaveAttribute('data-state', 'inactive')
     expect(tabs[2]).toHaveAttribute('data-state', 'inactive')
+    expect(tabs[3]).toHaveAttribute('data-state', 'inactive')
   })
 
   it('tabpanel にアシスタンスタブの内容が表示される', () => {
