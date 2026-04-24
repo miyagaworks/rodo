@@ -87,7 +87,7 @@ export async function POST(req: Request) {
   // ログインユーザーの車両番号を取得
   const currentUser = await prisma.user.findUnique({
     where: { id: session.user.userId },
-    select: { vehicleNumber: true },
+    select: { vehicleId: true },
   })
 
   // 出動番号採番: YYYYMMDD + 3桁連番（テナントごと・同日内でリセット）
@@ -159,7 +159,7 @@ export async function POST(req: Request) {
         type: type === 'onsite' ? 'ONSITE' : 'TRANSPORT',
         status: 'DISPATCHED',
         dispatchNumber: newDispatchNumber,
-        vehicleNumber: currentUser?.vehicleNumber ?? null,
+        vehicleId: currentUser?.vehicleId ?? null,
         departureOdo: departureOdo != null ? parseInt(String(departureOdo)) : null,
         dispatchTime: now,
         dispatchGpsLat: dispatchGpsLat ?? null,

@@ -39,7 +39,7 @@ export async function POST(
     // 引き受けた隊員の車両番号を取得
     const acceptUser = await prisma.user.findUnique({
       where: { id: session.user.userId },
-      select: { vehicleNumber: true },
+      select: { vehicleId: true },
     })
 
     const result = await prisma.$transaction(async (tx) => {
@@ -79,7 +79,7 @@ export async function POST(
           dispatchNumber: transferNumber,
           type: dispatch.type,
           status: 'ONSITE',
-          vehicleNumber: acceptUser?.vehicleNumber ?? null,
+          vehicleId: acceptUser?.vehicleId ?? null,
           transferredFromId: dispatch.id,
           // 時刻・GPS（現着までのデータのみ引き継ぎ）
           dispatchTime: dispatch.dispatchTime,

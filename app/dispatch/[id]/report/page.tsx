@@ -23,6 +23,7 @@ export default async function DispatchReportPage({ params, searchParams }: Props
   const [dispatch, report] = await Promise.all([
     prisma.dispatch.findFirst({
       where: { id, tenantId: session.user.tenantId },
+      include: { vehicle: { select: { plateNumber: true } } },
     }),
     prisma.report.findUnique({
       where: { dispatchId: id },
@@ -43,7 +44,7 @@ export default async function DispatchReportPage({ params, searchParams }: Props
   const secondaryDispatch = dispatch.deliveryType === 'STORAGE'
     ? await prisma.dispatch.findFirst({
         where: { parentDispatchId: dispatch.id, isSecondaryTransport: true },
-        include: { report: true, user: true },
+        include: { report: true, user: true, vehicle: { select: { plateNumber: true } } },
       })
     : null
 
@@ -62,7 +63,7 @@ export default async function DispatchReportPage({ params, searchParams }: Props
     departureOdo: dispatch.departureOdo,
     completionOdo: dispatch.completionOdo,
     returnOdo: dispatch.returnOdo,
-    vehicleNumber: dispatch.vehicleNumber,
+    vehicleNumber: dispatch.vehicle?.plateNumber ?? null,
     deliveryType: dispatch.deliveryType,
   }
 
@@ -140,7 +141,7 @@ export default async function DispatchReportPage({ params, searchParams }: Props
         completionOdo: secondaryDispatch.completionOdo,
         returnOdo: secondaryDispatch.returnOdo,
         userName: secondaryDispatch.user.name,
-        vehicleNumber: secondaryDispatch.vehicleNumber,
+        vehicleNumber: secondaryDispatch.vehicle?.plateNumber ?? null,
       },
       report: {
         transportDistance: secondaryEnriched?.transportDistance ?? null,

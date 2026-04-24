@@ -157,7 +157,7 @@ export async function PATCH(
   if (body.areaIcName !== undefined) allowed.areaIcName = body.areaIcName
   if (body.insuranceCompanyId !== undefined) allowed.insuranceCompanyId = body.insuranceCompanyId
   if (body.isDraft !== undefined) allowed.isDraft = body.isDraft
-  if (body.vehicleNumber !== undefined) allowed.vehicleNumber = body.vehicleNumber
+
 
   // type 変更時: DB enum 形式に変換し、originalType / typeChangedAt を自動記録
   if (body.type !== undefined) {
