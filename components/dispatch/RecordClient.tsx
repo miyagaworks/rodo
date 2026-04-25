@@ -2,14 +2,17 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronLeft, Pencil, Check } from 'lucide-react'
+import { Pencil, Check } from 'lucide-react'
 import { FaPen } from 'react-icons/fa'
 import { IoIosArrowDroprightCircle } from 'react-icons/io'
 import NumberPlateInput, { PlateValue } from './NumberPlateInput'
 import ClockPicker from './ClockPicker'
+import VehicleSelector from './VehicleSelector'
 import { offlineFetch } from '@/lib/offline-fetch'
 import { useFormAutoSave } from '@/hooks/useFormAutoSave'
 import { usePhotoCapture } from '@/hooks/usePhotoCapture'
+import { useVehicles } from '@/hooks/useVehicles'
+import { formatCurrentVehicleLabel } from '@/lib/vehicle-label'
 import PhotoThumbnails from './PhotoThumbnails'
 import PhotoModal from './PhotoModal'
 import type { PhotoItem } from './PhotoThumbnails'
@@ -50,7 +53,8 @@ export interface SerializedDispatch {
   areaIcName: string | null
   insuranceCompanyId: string | null
   isDraft: boolean
-  vehicleNumber: string | null
+  vehicleId: string | null
+  vehicle: { plateNumber: string; displayName: string | null } | null
 }
 
 interface RecordClientProps {
@@ -233,8 +237,19 @@ export default function RecordClient({ dispatch, userName }: RecordClientProps) 
   const [insuranceCompanyId, setInsuranceCompanyId] = useState(
     dispatch.insuranceCompanyId ?? ''
   )
-  const [vehicleNumber, setVehicleNumber] = useState(dispatch.vehicleNumber ?? '')
+  const [vehicleId, setVehicleId] = useState<string | null>(dispatch.vehicleId ?? null)
   const [editingVehicle, setEditingVehicle] = useState(false)
+  const { vehicles: allVehicles } = useVehicles()
+  const currentVehicleLabel = (() => {
+    if (!vehicleId) return '---'
+    const v = allVehicles.find((x) => x.id === vehicleId)
+    if (v) return formatCurrentVehicleLabel(v)
+    // fallback: SSR から流された dispatch.vehicle（vehicles fetch 前の初期表示）
+    if (dispatch.vehicle && dispatch.vehicleId === vehicleId) {
+      return formatCurrentVehicleLabel(dispatch.vehicle)
+    }
+    return '---'
+  })()
   const [loading, setLoading] = useState(false)
   const [insuranceCompanies, setInsuranceCompanies] = useState<InsuranceCompany[]>([])
   const [workStartStr, setWorkStartStr] = useState<string | null>(
@@ -246,6 +261,7 @@ export default function RecordClient({ dispatch, userName }: RecordClientProps) 
   })
   const [showWorkStartPicker, setShowWorkStartPicker] = useState(false)
   const [showWorkEndPicker, setShowWorkEndPicker] = useState(false)
+  const [showBackConfirm, setShowBackConfirm] = useState(false)
 
   // ── 写真（Phase 10） ──
   const { photos, removePhoto } = usePhotoCapture(dispatch.id)
@@ -310,7 +326,7 @@ export default function RecordClient({ dispatch, userName }: RecordClientProps) 
         : null,
     insuranceCompanyId: insuranceCompanyId || null,
     isDraft,
-    vehicleNumber: vehicleNumber || null,
+    vehicleId: vehicleId,
     ...(workStartStr ? { arrivalTime: timeStrToIso(workStartStr, dispatch.arrivalTime) } : {}),
     ...(workEndStr
       ? dispatch.type === 'ONSITE'
@@ -329,7 +345,7 @@ export default function RecordClient({ dispatch, userName }: RecordClientProps) 
     address, highwayName, highwayDirection, kiloPost, customerName,
     vehicleName, plate, situationType, situationDetails, canDrive,
     deliveryType, memo, weather, trafficControl, parkingLocation,
-    areaIcFrom, areaIcTo, insuranceCompanyId, vehicleNumber,
+    areaIcFrom, areaIcTo, insuranceCompanyId, vehicleId,
     workStartStr, workEndStr,
   ])
 
@@ -387,17 +403,19 @@ export default function RecordClient({ dispatch, userName }: RecordClientProps) 
         className="flex-shrink-0 px-4 pt-3 pb-3"
         style={{ backgroundColor: '#D7AF70' }}
       >
-        {/* 戻るボタン + タイトル + 日付 */}
+        {/* タイトル + 日付 */}
         <div className="flex items-center gap-2 mb-2">
+          <span className="font-bold text-base whitespace-nowrap" style={{ color: '#1C2948' }}>出動記録</span>
+          <div className="flex-1" />
           <button
-            onClick={() => router.push('/')}
-            className="p-1 -ml-1 rounded-lg active:opacity-60"
-            style={{ color: '#1C2948' }}
+            onClick={() => setShowBackConfirm(true)}
+            className="px-3 py-1.5 rounded-lg text-xs font-bold active:opacity-60 whitespace-nowrap"
+            style={{ backgroundColor: '#1C2948', color: '#FFFFFF' }}
           >
-            <ChevronLeft className="w-5 h-5" />
+            出動画面に戻る
           </button>
-          <span className="font-bold text-base flex-1" style={{ color: '#1C2948' }}>出動記録</span>
-          <span className="text-xs" style={{ color: '#1C2948' }}>
+          <div className="flex-1" />
+          <span className="text-xs whitespace-nowrap" style={{ color: '#1C2948' }}>
             {formatDate(dispatch.dispatchTime)}
           </span>
         </div>
@@ -419,15 +437,12 @@ export default function RecordClient({ dispatch, userName }: RecordClientProps) 
           <span className="text-sm" style={{ color: '#1C2948', opacity: 0.7 }}>車両</span>
           {editingVehicle ? (
             <div className="flex items-center gap-1.5 flex-1">
-              <input
-                type="text"
-                value={vehicleNumber}
-                onChange={(e) => setVehicleNumber(e.target.value)}
-                className="rounded-lg px-2 py-1 text-sm font-bold w-24 border"
+              <VehicleSelector
+                value={vehicleId}
+                onChange={setVehicleId}
+                vehicles={allVehicles}
+                className="rounded-lg px-2 py-1 text-sm font-bold border"
                 style={{ backgroundColor: 'rgba(255,255,255,0.5)', color: '#1C2948', borderColor: 'rgba(28,41,72,0.3)' }}
-                autoFocus
-                onBlur={() => setEditingVehicle(false)}
-                onKeyDown={(e) => e.key === 'Enter' && setEditingVehicle(false)}
               />
               <button onClick={() => setEditingVehicle(false)} style={{ color: '#1C2948' }}>
                 <Check className="w-4 h-4" />
@@ -435,7 +450,7 @@ export default function RecordClient({ dispatch, userName }: RecordClientProps) 
             </div>
           ) : (
             <>
-              <span className="font-bold text-sm" style={{ color: '#1C2948' }}>{vehicleNumber || '---'}</span>
+              <span className="font-bold text-sm" style={{ color: '#1C2948' }}>{currentVehicleLabel}</span>
               <button
                 onClick={() => setEditingVehicle(true)}
                 className="text-xs rounded px-1.5 py-0.5 active:opacity-60 border"
@@ -581,8 +596,8 @@ export default function RecordClient({ dispatch, userName }: RecordClientProps) 
           {/* 現場対応 / 搬送 表示 */}
           <div className="mb-3">
             <span
-              className="inline-block px-3 py-1 rounded-full text-xs font-bold text-white"
-              style={{ backgroundColor: '#2FBF71' }}
+              className="inline-block px-5 py-2 rounded-full text-base font-bold text-white"
+              style={{ backgroundColor: dispatch.type === 'ONSITE' ? '#E67E22' : '#3B82F6' }}
             >
               {dispatch.type === 'ONSITE' ? '現場対応' : '搬送'}
             </span>
@@ -959,6 +974,75 @@ export default function RecordClient({ dispatch, userName }: RecordClientProps) 
           setSelectedPhoto(null)
         }}
       />
+
+      {/* ─── 出動画面に戻る確認モーダル ─── */}
+      {showBackConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+          onClick={() => setShowBackConfirm(false)}
+        >
+          <div
+            className="mx-6 w-full max-w-sm rounded-2xl p-5 space-y-4"
+            style={{ backgroundColor: '#FFFFFF' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-sm font-bold text-center" style={{ color: '#1C2948' }}>
+              保存していないデータがあります。<br />下書き保存しますか？
+            </p>
+            <div className="space-y-2">
+              <button
+                onClick={async () => {
+                  if (loading) return
+                  setLoading(true)
+                  try {
+                    const res = await offlineFetch(`/api/dispatches/${dispatch.id}`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(buildPayload(true)),
+                      offlineActionType: 'dispatch_update',
+                      offlineDispatchId: dispatch.id,
+                    })
+                    if (!res.ok) throw new Error('下書きの保存に失敗しました')
+                    await clearDraft()
+                    router.push(`/dispatch/${dispatch.id}`)
+                  } catch (e) {
+                    console.error(e)
+                    alert(e instanceof Error ? e.message : '保存に失敗しました')
+                  } finally {
+                    setLoading(false)
+                    setShowBackConfirm(false)
+                  }
+                }}
+                disabled={loading}
+                className="w-full py-3 rounded-lg font-bold text-sm text-white active:opacity-80"
+                style={{ backgroundColor: '#1C2948' }}
+              >
+                {loading ? '保存中...' : '下書き保存して戻る'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowBackConfirm(false)
+                  router.push(`/dispatch/${dispatch.id}`)
+                }}
+                disabled={loading}
+                className="w-full py-3 rounded-lg font-bold text-sm active:opacity-80 border"
+                style={{ color: '#D3170A', borderColor: '#D3170A' }}
+              >
+                保存せずに戻る
+              </button>
+              <button
+                onClick={() => setShowBackConfirm(false)}
+                disabled={loading}
+                className="w-full py-3 rounded-lg font-bold text-sm active:opacity-80"
+                style={{ color: '#6B7280' }}
+              >
+                キャンセル
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

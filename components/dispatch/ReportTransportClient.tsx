@@ -8,8 +8,11 @@ import { IoIosArrowDropleftCircle } from 'react-icons/io'
 import { Check } from 'lucide-react'
 import ClockPicker from './ClockPicker'
 import TransportShopAutocomplete from './TransportShopAutocomplete'
+import VehicleSelector from './VehicleSelector'
 import { offlineFetch } from '@/lib/offline-fetch'
 import { useFormAutoSave } from '@/hooks/useFormAutoSave'
+import { useVehicles } from '@/hooks/useVehicles'
+import { formatCurrentVehicleLabel } from '@/lib/vehicle-label'
 import type { SerializedDispatchForReport, SerializedReport } from './ReportOnsiteClient'
 
 // -------------------------------------------------------
@@ -25,14 +28,17 @@ interface SecondaryData {
     returnTime: string | null
     departureOdo: number | null
     completionOdo: number | null
+    returnOdo: number | null
     userName: string
-    vehicleNumber: string | null
+    vehicleId: string | null
+    vehicle: { plateNumber: string; displayName: string | null } | null
   }
   report: {
     transportDistance: number | null
     returnDistance: number | null
     departureOdo: number | null
     completionOdo: number | null
+    returnOdo: number | null
     transportHighway: number | null
     returnHighway: number | null
   } | null
@@ -135,6 +141,9 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
   const [completionOdo, setCompletionOdo] = useState(
     (report.completionOdo ?? dispatch.completionOdo)?.toString() ?? ''
   )
+  const [returnOdo, setReturnOdo] = useState(
+    (report.returnOdo ?? dispatch.returnOdo)?.toString() ?? ''
+  )
 
   // ── 2次距離・ODO ──
   const [secondaryDepartureOdo, setSecondaryDepartureOdo] = useState(
@@ -148,6 +157,9 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
   )
   const [secondaryCompletionOdo, setSecondaryCompletionOdo] = useState(
     (secondaryData?.report?.completionOdo ?? secondaryData?.dispatch.completionOdo)?.toString() ?? ''
+  )
+  const [secondaryReturnOdo, setSecondaryReturnOdo] = useState(
+    (secondaryData?.report?.returnOdo ?? secondaryData?.dispatch.returnOdo)?.toString() ?? ''
   )
 
   // ── 高速代 ──
@@ -219,15 +231,35 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
   // ── 連絡事項 ──
   const [billingContactMemo, setBillingContactMemo] = useState(report.billingContactMemo ?? '')
 
-  // ── 車両番号 ──
-  const [vehicleNumber, setVehicleNumber] = useState(dispatch.vehicleNumber ?? '')
+  // ── 車両 ──
+  const [vehicleId, setVehicleId] = useState<string | null>(dispatch.vehicleId ?? null)
   const [editingVehicle, setEditingVehicle] = useState(false)
 
-  // ── 2次車両番号（未設定なら1次の車両番号を初期値にする） ──
-  const [secondaryVehicleNumber, setSecondaryVehicleNumber] = useState(
-    secondaryData?.dispatch.vehicleNumber ?? dispatch.vehicleNumber ?? ''
+  // ── 2次車両（未設定なら1次の車両を初期値にする） ──
+  const [secondaryVehicleId, setSecondaryVehicleId] = useState<string | null>(
+    secondaryData?.dispatch.vehicleId ?? dispatch.vehicleId ?? null
   )
   const [editingSecondaryVehicle, setEditingSecondaryVehicle] = useState(false)
+
+  // ── 車両一覧と表示ラベル ──
+  const { vehicles: allVehicles } = useVehicles()
+  const buildVehicleLabel = (
+    id: string | null,
+    fallback: { plateNumber: string; displayName: string | null } | null | undefined,
+    fallbackId: string | null | undefined,
+  ): string => {
+    if (!id) return '---'
+    const v = allVehicles.find((x) => x.id === id)
+    if (v) return formatCurrentVehicleLabel(v)
+    if (fallback && fallbackId === id) return formatCurrentVehicleLabel(fallback)
+    return '---'
+  }
+  const primaryVehicleLabel = buildVehicleLabel(vehicleId, dispatch.vehicle, dispatch.vehicleId)
+  const secondaryVehicleLabel = buildVehicleLabel(
+    secondaryVehicleId,
+    secondaryData?.dispatch.vehicle ?? dispatch.vehicle,
+    secondaryData?.dispatch.vehicleId ?? dispatch.vehicleId,
+  )
 
   const [loading, setLoading] = useState(false)
 
@@ -240,7 +272,8 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
     recoveryDistance !== '' &&
     transportDistance !== '' &&
     returnDistance !== '' &&
-    completionOdo !== ''
+    completionOdo !== '' &&
+    returnOdo !== ''
   const isPlacesComplete =
     departurePlaceName.trim() !== '' &&
     arrivalPlaceName.trim() !== '' &&
@@ -294,10 +327,8 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
     dispatchTime: dispatchTime?.toISOString() ?? null,
     arrivalTime: arrivalTime?.toISOString() ?? null,
     completionTime: completionTime?.toISOString() ?? null,
-    returnTime: isStored
-      ? (completionTime?.toISOString() ?? null) // 保管時: 帰社時間=完了時間
-      : (returnTime?.toISOString() ?? null),
-    vehicleNumber: vehicleNumber || null,
+    returnTime: returnTime?.toISOString() ?? null,
+    vehicleId: vehicleId,
     isDraft,
   })
 
@@ -307,6 +338,7 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
     transportDistance: transportDistance ? parseFloat(transportDistance) : null,
     returnDistance: returnDistance ? parseFloat(returnDistance) : null,
     completionOdo: completionOdo ? parseInt(completionOdo) : null,
+    returnOdo: returnOdo ? parseInt(returnOdo) : null,
     recoveryHighway: recoveryHighway ? parseInt(recoveryHighway) : null,
     transportHighway: transportHighway ? parseInt(transportHighway) : null,
     returnHighway: returnHighway ? parseInt(returnHighway) : null,
@@ -347,15 +379,15 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     dispatchTime, arrivalTime, transportStartTime, completionTime, returnTime,
-    departureOdo, recoveryDistance, transportDistance, returnDistance, completionOdo,
+    departureOdo, recoveryDistance, transportDistance, returnDistance, completionOdo, returnOdo,
     recoveryHighway, transportHighway, returnHighway,
     secondaryTransportStartTime, secondaryArrivalTime, secondaryCompletionTime, secondaryReturnTime,
-    secondaryDepartureOdo, secondaryTransportDistance, secondaryReturnDistance, secondaryCompletionOdo,
+    secondaryDepartureOdo, secondaryTransportDistance, secondaryReturnDistance, secondaryCompletionOdo, secondaryReturnOdo,
     secondaryTransportHighway, secondaryReturnHighway,
     departurePlaceName, arrivalPlaceName, transportPlaceName,
     transportShopName, transportPhone, transportAddress, transportContact, transportMemo,
     completionItems, completionNote, secondaryCompletionItems, secondaryCompletionNote,
-    storageRequired, primaryAmount, secondaryAmount, billingContactMemo, vehicleNumber,
+    storageRequired, primaryAmount, secondaryAmount, billingContactMemo, vehicleId,
   ])
 
   // ── 保存処理 ──
@@ -373,12 +405,12 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
       })
       if (!dispatchRes.ok) throw new Error('出動情報の保存に失敗しました')
 
-      // 2次搬送の車両番号を保存
+      // 2次搬送の車両を保存
       if (secondaryData) {
         await offlineFetch(`/api/dispatches/${secondaryData.dispatch.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ vehicleNumber: secondaryVehicleNumber || null }),
+          body: JSON.stringify({ vehicleId: secondaryVehicleId }),
           offlineActionType: 'dispatch_update',
           offlineDispatchId: secondaryData.dispatch.id,
         })
@@ -480,15 +512,12 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
             <span className="opacity-60">車両</span>
             {editingVehicle ? (
               <div className="flex items-center gap-1">
-                <input
-                  type="text"
-                  value={vehicleNumber}
-                  onChange={(e) => setVehicleNumber(e.target.value)}
-                  className="border rounded px-2 py-0.5 text-sm font-bold w-16"
+                <VehicleSelector
+                  value={vehicleId}
+                  onChange={setVehicleId}
+                  vehicles={allVehicles}
+                  className="border rounded px-2 py-0.5 text-sm font-bold"
                   style={{ borderColor: 'rgba(28,41,72,0.3)', color: '#1C2948', backgroundColor: 'rgba(255,255,255,0.5)' }}
-                  autoFocus
-                  onBlur={() => setEditingVehicle(false)}
-                  onKeyDown={(e) => e.key === 'Enter' && setEditingVehicle(false)}
                 />
                 <button onClick={() => setEditingVehicle(false)}>
                   <Check className="w-4 h-4" style={{ color: '#2FBF71' }} />
@@ -496,7 +525,7 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
               </div>
             ) : (
               <>
-                <span className="font-bold">{vehicleNumber || '---'}</span>
+                <span className="font-bold">{primaryVehicleLabel}</span>
                 <button
                   onClick={() => setEditingVehicle(true)}
                   className="text-xs text-white px-2 py-0.5 rounded font-bold active:opacity-70"
@@ -520,15 +549,12 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
               <span className="opacity-60">車両</span>
               {editingSecondaryVehicle ? (
                 <div className="flex items-center gap-1">
-                  <input
-                    type="text"
-                    value={secondaryVehicleNumber}
-                    onChange={(e) => setSecondaryVehicleNumber(e.target.value)}
-                    className="border rounded px-2 py-0.5 text-sm font-bold w-16"
+                  <VehicleSelector
+                    value={secondaryVehicleId}
+                    onChange={setSecondaryVehicleId}
+                    vehicles={allVehicles}
+                    className="border rounded px-2 py-0.5 text-sm font-bold"
                     style={{ borderColor: 'rgba(28,41,72,0.3)', color: '#1C2948', backgroundColor: 'rgba(255,255,255,0.5)' }}
-                    autoFocus
-                    onBlur={() => setEditingSecondaryVehicle(false)}
-                    onKeyDown={(e) => e.key === 'Enter' && setEditingSecondaryVehicle(false)}
                   />
                   <button onClick={() => setEditingSecondaryVehicle(false)}>
                     <Check className="w-4 h-4" style={{ color: '#2FBF71' }} />
@@ -536,7 +562,7 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
                 </div>
               ) : (
                 <>
-                  <span className="font-bold">{secondaryVehicleNumber || '---'}</span>
+                  <span className="font-bold">{secondaryVehicleLabel}</span>
                   <button
                     onClick={() => setEditingSecondaryVehicle(true)}
                     className="text-xs text-white px-2 py-0.5 rounded font-bold active:opacity-70"
@@ -575,7 +601,7 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
                     { label: '現着時間', field: 'arrival' as TimeField, value: arrivalTime },
                     { label: '搬送開始', field: 'transportStart' as TimeField, value: transportStartTime },
                     { label: '完了時間', field: 'completion' as TimeField, value: completionTime },
-                    { label: '帰社時間', field: null, value: completionTime }, // 保管時: 帰社=完了
+                    { label: '帰社時間', field: 'return' as TimeField, value: returnTime },
                   ].map(({ label, field, value }, i) => (
                     <div key={`primary-time-${i}`} className="flex items-center gap-2">
                       <RequiredDot />
@@ -681,8 +707,9 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
                     { label: '出発 ODO', key: 'departureOdo', value: departureOdo, setValue: setDepartureOdo, suffix: 'km', decimal: false },
                     { label: '回送距離', key: 'recoveryDistance', value: recoveryDistance, setValue: setRecoveryDistance, suffix: 'km', decimal: true },
                     { label: '搬送距離', key: 'transportDistance', value: transportDistance, setValue: setTransportDistance, suffix: 'km', decimal: true },
-                    { label: '帰社距離', key: 'returnDistance', value: returnDistance, setValue: setReturnDistance, suffix: 'km', decimal: true },
                     { label: '完了 ODO', key: 'completionOdo', value: completionOdo, setValue: setCompletionOdo, suffix: 'km', decimal: false },
+                    { label: '帰社距離', key: 'returnDistance', value: returnDistance, setValue: setReturnDistance, suffix: 'km', decimal: true },
+                    { label: '帰社 ODO', key: 'returnOdo', value: returnOdo, setValue: setReturnOdo, suffix: 'km', decimal: false },
                   ].map(({ label, key, value, setValue, suffix, decimal }) => (
                     <div key={key} className="flex items-center gap-2">
                       <RequiredDot />
@@ -710,10 +737,11 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
                 </div>
                 <div className="flex-1 space-y-3 pt-0.5">
                   {[
-                    { label: '出発 ODO', key: 'sec_departureOdo', value: secondaryDepartureOdo, setValue: setSecondaryDepartureOdo, suffix: 'km', decimal: false },
+                    { label: '搬開 ODO', key: 'sec_departureOdo', value: secondaryDepartureOdo, setValue: setSecondaryDepartureOdo, suffix: 'km', decimal: false },
                     { label: '搬送距離', key: 'sec_transportDistance', value: secondaryTransportDistance, setValue: setSecondaryTransportDistance, suffix: 'km', decimal: true },
-                    { label: '帰社距離', key: 'sec_returnDistance', value: secondaryReturnDistance, setValue: setSecondaryReturnDistance, suffix: 'km', decimal: true },
                     { label: '完了 ODO', key: 'sec_completionOdo', value: secondaryCompletionOdo, setValue: setSecondaryCompletionOdo, suffix: 'km', decimal: false },
+                    { label: '帰社距離', key: 'sec_returnDistance', value: secondaryReturnDistance, setValue: setSecondaryReturnDistance, suffix: 'km', decimal: true },
+                    { label: '帰社 ODO', key: 'sec_returnOdo', value: secondaryReturnOdo, setValue: setSecondaryReturnOdo, suffix: 'km', decimal: false },
                   ].map(({ label, key, value, setValue, suffix, decimal }) => (
                     <div key={key} className="flex items-center gap-2">
                       <RequiredDot />
@@ -744,8 +772,9 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
                   { label: '出発 ODO', key: 'departureOdo', value: departureOdo, setValue: setDepartureOdo, suffix: 'km', decimal: false },
                   { label: '回送距離', key: 'recoveryDistance', value: recoveryDistance, setValue: setRecoveryDistance, suffix: 'km', decimal: true },
                   { label: '搬送距離', key: 'transportDistance', value: transportDistance, setValue: setTransportDistance, suffix: 'km', decimal: true },
-                  { label: '帰社距離', key: 'returnDistance', value: returnDistance, setValue: setReturnDistance, suffix: 'km', decimal: true },
                   { label: '完了 ODO', key: 'completionOdo', value: completionOdo, setValue: setCompletionOdo, suffix: 'km', decimal: false },
+                  { label: '帰社距離', key: 'returnDistance', value: returnDistance, setValue: setReturnDistance, suffix: 'km', decimal: true },
+                  { label: '帰社 ODO', key: 'returnOdo', value: returnOdo, setValue: setReturnOdo, suffix: 'km', decimal: false },
                 ].map(({ label, key, value, setValue, suffix, decimal }) => (
                   <div key={key} className="flex items-center gap-2">
                     <RequiredDot />

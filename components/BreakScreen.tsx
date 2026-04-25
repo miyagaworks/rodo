@@ -16,20 +16,57 @@ export default function BreakScreen() {
   )
   const [isFinished, setIsFinished] = useState(false)
   const rafRef = useRef<number | null>(null)
+  // React 19 Strict Mode では dev 時に useEffect が二重実行される。
+  // initRef に初回実行済みフラグを持たせて startBreak / resumeBreak の二重呼び出しを防ぐ。
+  // useRef は再マウント間で初期値に戻るため、真に新しい休憩開始時のみリセットされる。
+  const initRef = useRef(false)
 
   // 休憩開始: APIコール + atom更新
+  // - 201: 正常作成（新規休憩）
+  // - 409: DB に未終了の休憩が残っている → GET /api/breaks/active で復元
+  // - その他: エラー扱い
   const startBreak = useCallback(async () => {
     try {
       const res = await fetch('/api/breaks', { method: 'POST' })
-      const data = await res.json()
 
-      setBreakState({
-        status: 'breaking',
-        startTime: Date.now(),
-        remainingSeconds: BREAK_DURATION,
-        pausedAt: null,
-        breakRecordId: data.id,
-      })
+      if (res.ok) {
+        // 正常系（201）: 新規休憩として開始
+        const data = await res.json()
+        setBreakState({
+          status: 'breaking',
+          startTime: Date.now(),
+          remainingSeconds: BREAK_DURATION,
+          pausedAt: null,
+          breakRecordId: data.id,
+        })
+        return
+      }
+
+      if (res.status === 409) {
+        // 既存休憩が残っている → GET で詳細取得して復元
+        const activeRes = await fetch('/api/breaks/active')
+        if (!activeRes.ok) {
+          console.error('Failed to fetch active break:', activeRes.status)
+          return
+        }
+        const active = await activeRes.json()
+
+        // 経過時間を逆算して残り秒を計算（サーバーの startTime 起点）
+        const serverStartMs = new Date(active.startTime).getTime()
+        const elapsedSec = Math.max(0, (Date.now() - serverStartMs) / 1000)
+        const remaining = Math.max(0, BREAK_DURATION - elapsedSec)
+
+        setBreakState({
+          status: 'breaking',
+          startTime: Date.now(),
+          remainingSeconds: remaining,
+          pausedAt: null,
+          breakRecordId: active.id,
+        })
+        return
+      }
+
+      console.error('Failed to start break: HTTP', res.status)
     } catch (e) {
       console.error('Failed to start break:', e)
     }
@@ -55,7 +92,17 @@ export default function BreakScreen() {
   }, [breakState.breakRecordId, setBreakState])
 
   // 初期化
+  // Strict Mode 対策:
+  //   - Strict Mode dev 時は同じマウント内で useEffect が 2 回実行される。
+  //   - useRef のフラグで「同じ React マウントサイクル内での二重実行」を防ぐ。
+  //   - cleanup では初期化済みフラグはリセットしない（Strict Mode 二度目の実行時にフラグが
+  //     既に true なので skip される想定）。
+  //   - useRef は真にコンポーネントが unmount/remount された場合には初期値 (false) に戻るため、
+  //     ユーザー操作による再マウント時は正しく再初期化される。
   useEffect(() => {
+    if (initRef.current) return
+    initRef.current = true
+
     if (breakState.status === 'idle') {
       startBreak()
     } else if (breakState.status === 'paused') {

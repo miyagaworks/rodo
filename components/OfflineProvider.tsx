@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { SessionProvider } from 'next-auth/react'
 import SyncIndicator from '@/components/common/SyncIndicator'
 import { useOnlineStatus } from '@/hooks/useOnlineStatus'
 
@@ -28,10 +29,10 @@ function SyncIndicatorWrapper() {
 
 export default function OfflineProvider({ children }: { children: React.ReactNode }) {
   return (
-    <>
+    <SessionProvider>
       <ServiceWorkerRegistrar />
       <SyncIndicatorWrapper />
       {children}
-    </>
+    </SessionProvider>
   )
 }

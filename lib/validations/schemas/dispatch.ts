@@ -12,6 +12,9 @@ export const createDispatchSchema = z.object({
   assistanceId: cuid,
   type: z.enum(['onsite', 'transport']),
   departureOdo: odometerReading,
+  arrivalOdo: odometerReading,
+  transportStartOdo: odometerReading,
+  returnOdo: odometerReading,
   dispatchTime: dateString,
   dispatchGpsLat: gpsLat,
   dispatchGpsLng: gpsLng,
@@ -29,6 +32,7 @@ const dispatchStatus = z.enum([
   'STORED',
   'RETURNED',
   'CANCELLED',
+  'TRANSFERRED',
 ])
 
 const highwayDirection = z.enum(['UP', 'DOWN'])
@@ -38,6 +42,7 @@ const parkingLocation = z.enum(['EMERGENCY_PARKING', 'SHOULDER', 'DRIVING_LANE']
 
 export const updateDispatchSchema = z.object({
   status: dispatchStatus.optional(),
+  type: z.enum(['onsite', 'transport']).optional(),
 
   // タイムスタンプ
   arrivalTime: dateString,
@@ -50,8 +55,12 @@ export const updateDispatchSchema = z.object({
   arrivalGpsLat: gpsLat,
   arrivalGpsLng: gpsLng,
 
-  // 距離
+  // 距離 (ODO)
+  departureOdo: odometerReading,
+  arrivalOdo: odometerReading,
+  transportStartOdo: odometerReading,
   completionOdo: odometerReading,
+  returnOdo: odometerReading,
 
   // 案件情報
   address: nullableString,
@@ -75,8 +84,8 @@ export const updateDispatchSchema = z.object({
   parkingLocation: parkingLocation.nullable().optional(),
   areaIcName: nullableString,
   insuranceCompanyId: z.string().nullable().optional(),
+  vehicleId: z.string().nullable().optional(),
   isDraft: z.boolean().optional(),
-  vehicleNumber: nullableString,
 
   // 作業時間
   workStartTime: dateString,

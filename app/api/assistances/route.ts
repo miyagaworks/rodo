@@ -34,11 +34,19 @@ export async function POST(req: Request) {
   }
   const body = parsed.data
 
+  // sortOrder: 末尾配置 (同一テナント内の max + 1)
+  const maxResult = await prisma.assistance.aggregate({
+    where: { tenantId: session.user.tenantId },
+    _max: { sortOrder: true },
+  })
+  const nextSortOrder = (maxResult._max.sortOrder ?? -1) + 1
+
   const assistance = await prisma.assistance.create({
     data: {
       tenantId: session.user.tenantId,
       name: body.name,
       displayAbbreviation: body.displayAbbreviation,
+      sortOrder: nextSortOrder,
     },
     include: { insuranceCompanies: true },
   })

@@ -24,7 +24,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     where: { id, tenantId: session.user.tenantId },
     data: {
       name: body.name,
-      vehicleNumber: body.vehicleNumber ?? null,
+      vehicleId: body.vehicleId ?? null,
       monthlySalary: body.monthlySalary ?? null,
       overtimeRate: body.overtimeRate ?? null,
       transportationAllowance: body.transportationAllowance ?? null,

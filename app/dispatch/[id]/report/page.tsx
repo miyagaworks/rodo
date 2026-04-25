@@ -6,6 +6,7 @@ import ReportOnsiteClient, {
   SerializedReport,
 } from '@/components/dispatch/ReportOnsiteClient'
 import ReportTransportClient from '@/components/dispatch/ReportTransportClient'
+import { enrichReportDistances } from '@/lib/reportDistance'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -22,6 +23,9 @@ export default async function DispatchReportPage({ params, searchParams }: Props
   const [dispatch, report] = await Promise.all([
     prisma.dispatch.findFirst({
       where: { id, tenantId: session.user.tenantId },
+      include: {
+        vehicle: { select: { plateNumber: true, displayName: true } },
+      },
     }),
     prisma.report.findUnique({
       where: { dispatchId: id },
@@ -29,6 +33,9 @@ export default async function DispatchReportPage({ params, searchParams }: Props
   ])
 
   if (!dispatch) redirect('/')
+
+  // 振替済みの出動は報告書作成不可 → 出動詳細へリダイレクト
+  if (dispatch.status === 'TRANSFERRED') redirect(`/dispatch/${id}`)
 
   // 出動記録の必須項目（ナンバープレート・損保会社）が未入力なら出動記録へ飛ばす
   const isRecordComplete =
@@ -39,7 +46,11 @@ export default async function DispatchReportPage({ params, searchParams }: Props
   const secondaryDispatch = dispatch.deliveryType === 'STORAGE'
     ? await prisma.dispatch.findFirst({
         where: { parentDispatchId: dispatch.id, isSecondaryTransport: true },
-        include: { report: true, user: true },
+        include: {
+          report: true,
+          user: true,
+          vehicle: { select: { plateNumber: true, displayName: true } },
+        },
       })
     : null
 
@@ -57,7 +68,9 @@ export default async function DispatchReportPage({ params, searchParams }: Props
     returnTime: dispatch.returnTime?.toISOString() ?? null,
     departureOdo: dispatch.departureOdo,
     completionOdo: dispatch.completionOdo,
-    vehicleNumber: dispatch.vehicleNumber,
+    returnOdo: dispatch.returnOdo,
+    vehicleId: dispatch.vehicleId,
+    vehicle: dispatch.vehicle,
     deliveryType: dispatch.deliveryType,
   }
 
@@ -67,13 +80,18 @@ export default async function DispatchReportPage({ params, searchParams }: Props
     | null
     | undefined
 
+  // SSR 段階で距離 3 種を自動補完（Report が null でも Dispatch の ODO から計算）。
+  // 既に Report 側に保存済みの distance（number）があれば尊重する。
+  const enrichedDistances = enrichReportDistances(report, dispatch)
+
   const serializedReport: SerializedReport = {
     id: report?.id ?? null,
     departureOdo: report?.departureOdo ?? null,
-    recoveryDistance: report?.recoveryDistance ?? null,
-    transportDistance: report?.transportDistance ?? null,
-    returnDistance: report?.returnDistance ?? null,
+    recoveryDistance: enrichedDistances.recoveryDistance ?? null,
+    transportDistance: enrichedDistances.transportDistance ?? null,
+    returnDistance: enrichedDistances.returnDistance ?? null,
     completionOdo: report?.completionOdo ?? null,
+    returnOdo: report?.returnOdo ?? null,
     recoveryHighway: report?.recoveryHighway ?? null,
     transportHighway: report?.transportHighway ?? null,
     returnHighway: report?.returnHighway ?? null,
@@ -113,6 +131,11 @@ export default async function DispatchReportPage({ params, searchParams }: Props
   }
 
   if (isTransport) {
+    // 2次搬送の距離補完（Report が無くても Dispatch ODO から計算）
+    const secondaryEnriched = secondaryDispatch
+      ? enrichReportDistances(secondaryDispatch.report, secondaryDispatch)
+      : null
+
     // 2次搬送のシリアライズ
     const serializedSecondary = secondaryDispatch ? {
       dispatch: {
@@ -123,17 +146,20 @@ export default async function DispatchReportPage({ params, searchParams }: Props
         returnTime: secondaryDispatch.returnTime?.toISOString() ?? null,
         departureOdo: secondaryDispatch.departureOdo,
         completionOdo: secondaryDispatch.completionOdo,
+        returnOdo: secondaryDispatch.returnOdo,
         userName: secondaryDispatch.user.name,
-        vehicleNumber: secondaryDispatch.vehicleNumber,
+        vehicleId: secondaryDispatch.vehicleId,
+        vehicle: secondaryDispatch.vehicle,
       },
-      report: secondaryDispatch.report ? {
-        transportDistance: secondaryDispatch.report.transportDistance,
-        returnDistance: secondaryDispatch.report.returnDistance,
-        departureOdo: secondaryDispatch.report.departureOdo,
-        completionOdo: secondaryDispatch.report.completionOdo,
-        transportHighway: secondaryDispatch.report.transportHighway,
-        returnHighway: secondaryDispatch.report.returnHighway,
-      } : null,
+      report: {
+        transportDistance: secondaryEnriched?.transportDistance ?? null,
+        returnDistance: secondaryEnriched?.returnDistance ?? null,
+        departureOdo: secondaryDispatch.report?.departureOdo ?? null,
+        completionOdo: secondaryDispatch.report?.completionOdo ?? null,
+        returnOdo: secondaryDispatch.report?.returnOdo ?? null,
+        transportHighway: secondaryDispatch.report?.transportHighway ?? null,
+        returnHighway: secondaryDispatch.report?.returnHighway ?? null,
+      },
     } : null
 
     return (

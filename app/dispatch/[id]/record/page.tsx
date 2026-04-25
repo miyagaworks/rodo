@@ -16,14 +16,29 @@ export default async function DispatchRecordPage({ params }: Props) {
   const [dispatch, user] = await Promise.all([
     prisma.dispatch.findFirst({
       where: { id, tenantId: session.user.tenantId },
+      include: {
+        vehicle: { select: { plateNumber: true, displayName: true } },
+      },
     }),
     prisma.user.findUnique({
       where: { id: session.user.userId },
-      select: { vehicleNumber: true },
+      select: {
+        vehicleId: true,
+        vehicle: { select: { plateNumber: true, displayName: true } },
+      },
     }),
   ])
 
   if (!dispatch) redirect('/')
+
+  // 振替済みの出動は記録編集不可 → 出動詳細へリダイレクト
+  if (dispatch.status === 'TRANSFERRED') redirect(`/dispatch/${id}`)
+
+  // vehicleId: Dispatch を優先、無ければ User のデフォルト車両
+  const resolvedVehicleId = dispatch.vehicleId ?? user?.vehicleId ?? null
+  // vehicle: Dispatch の紐付けがあればそれ、無ければ User の車両（resolvedVehicleId と整合）
+  const resolvedVehicle = dispatch.vehicle
+    ?? (dispatch.vehicleId === null ? (user?.vehicle ?? null) : null)
 
   const serialized: SerializedDispatch = {
     id: dispatch.id,
@@ -56,7 +71,8 @@ export default async function DispatchRecordPage({ params }: Props) {
     areaIcName: dispatch.areaIcName,
     insuranceCompanyId: dispatch.insuranceCompanyId,
     isDraft: dispatch.isDraft,
-    vehicleNumber: dispatch.vehicleNumber ?? user?.vehicleNumber ?? null,
+    vehicleId: resolvedVehicleId,
+    vehicle: resolvedVehicle,
   }
 
   return <RecordClient dispatch={serialized} userName={session.user.name} />

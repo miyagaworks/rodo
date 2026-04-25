@@ -77,6 +77,9 @@ export async function POST(
   if (!dispatch) {
     return NextResponse.json({ error: 'Dispatch not found' }, { status: 404 })
   }
+  if (dispatch.status === 'TRANSFERRED') {
+    return NextResponse.json({ error: 'Cannot upload photos for transferred dispatch' }, { status: 403 })
+  }
 
   try {
     const formData = await req.formData()

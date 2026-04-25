@@ -7,8 +7,11 @@ import { FaCircleArrowRight } from 'react-icons/fa6'
 import { IoIosArrowDropleftCircle } from 'react-icons/io'
 import { Check } from 'lucide-react'
 import ClockPicker from './ClockPicker'
+import VehicleSelector from './VehicleSelector'
 import { offlineFetch } from '@/lib/offline-fetch'
 import { useFormAutoSave } from '@/hooks/useFormAutoSave'
+import { useVehicles } from '@/hooks/useVehicles'
+import { formatCurrentVehicleLabel } from '@/lib/vehicle-label'
 
 // -------------------------------------------------------
 // Types
@@ -25,7 +28,9 @@ export interface SerializedDispatchForReport {
   returnTime: string | null
   departureOdo: number | null
   completionOdo: number | null
-  vehicleNumber: string | null
+  returnOdo: number | null
+  vehicleId: string | null
+  vehicle: { plateNumber: string; displayName: string | null } | null
   deliveryType?: 'DIRECT' | 'STORAGE' | null
 }
 
@@ -36,6 +41,7 @@ export interface SerializedReport {
   transportDistance?: number | null
   returnDistance: number | null
   completionOdo: number | null
+  returnOdo: number | null
   recoveryHighway: number | null
   transportHighway?: number | null
   returnHighway: number | null
@@ -129,6 +135,9 @@ export default function ReportOnsiteClient({ dispatch, report, userName }: Props
   const [completionOdo, setCompletionOdo] = useState(
     (report.completionOdo ?? dispatch.completionOdo)?.toString() ?? ''
   )
+  const [returnOdo, setReturnOdo] = useState(
+    (report.returnOdo ?? dispatch.returnOdo)?.toString() ?? ''
+  )
 
   // ── 高速代 ──
   const [recoveryHighway, setRecoveryHighway] = useState(
@@ -166,9 +175,19 @@ export default function ReportOnsiteClient({ dispatch, report, userName }: Props
   // ── 連絡事項 ──
   const [billingContactMemo, setBillingContactMemo] = useState(report.billingContactMemo ?? '')
 
-  // ── 車両番号 ──
-  const [vehicleNumber, setVehicleNumber] = useState(dispatch.vehicleNumber ?? '')
+  // ── 車両 ──
+  const [vehicleId, setVehicleId] = useState<string | null>(dispatch.vehicleId ?? null)
   const [editingVehicle, setEditingVehicle] = useState(false)
+  const { vehicles: allVehicles } = useVehicles()
+  const currentVehicleLabel = (() => {
+    if (!vehicleId) return '---'
+    const v = allVehicles.find((x) => x.id === vehicleId)
+    if (v) return formatCurrentVehicleLabel(v)
+    if (dispatch.vehicle && dispatch.vehicleId === vehicleId) {
+      return formatCurrentVehicleLabel(dispatch.vehicle)
+    }
+    return '---'
+  })()
 
   const [loading, setLoading] = useState(false)
 
@@ -182,7 +201,8 @@ export default function ReportOnsiteClient({ dispatch, report, userName }: Props
     departureOdo !== '' &&
     recoveryDistance !== '' &&
     returnDistance !== '' &&
-    completionOdo !== ''
+    completionOdo !== '' &&
+    returnOdo !== ''
   const isPlacesComplete =
     departurePlaceName.trim() !== '' && arrivalPlaceName.trim() !== ''
   const isComplete = isTimesComplete && isDistancesComplete && isPlacesComplete
@@ -227,7 +247,7 @@ export default function ReportOnsiteClient({ dispatch, report, userName }: Props
     arrivalTime: arrivalTime?.toISOString() ?? null,
     completionTime: completionTime?.toISOString() ?? null,
     returnTime: returnTime?.toISOString() ?? null,
-    vehicleNumber: vehicleNumber || null,
+    vehicleId: vehicleId,
     isDraft,
   })
 
@@ -236,6 +256,7 @@ export default function ReportOnsiteClient({ dispatch, report, userName }: Props
     recoveryDistance: recoveryDistance ? parseFloat(recoveryDistance) : null,
     returnDistance: returnDistance ? parseFloat(returnDistance) : null,
     completionOdo: completionOdo ? parseInt(completionOdo) : null,
+    returnOdo: returnOdo ? parseInt(returnOdo) : null,
     recoveryHighway: recoveryHighway ? parseInt(recoveryHighway) : null,
     returnHighway: returnHighway ? parseInt(returnHighway) : null,
     totalHighway: totalHighway > 0 ? totalHighway : null,
@@ -260,10 +281,10 @@ export default function ReportOnsiteClient({ dispatch, report, userName }: Props
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     dispatchTime, arrivalTime, completionTime, returnTime,
-    departureOdo, recoveryDistance, returnDistance, completionOdo,
+    departureOdo, recoveryDistance, returnDistance, completionOdo, returnOdo,
     recoveryHighway, returnHighway, departurePlaceName, arrivalPlaceName,
     completionItems, completionNote, primaryAmount, billingContactMemo,
-    vehicleNumber,
+    vehicleId,
   ])
 
   // ── 保存処理 ──
@@ -378,15 +399,12 @@ export default function ReportOnsiteClient({ dispatch, report, userName }: Props
             <span className="opacity-60">車両</span>
             {editingVehicle ? (
               <div className="flex items-center gap-1">
-                <input
-                  type="text"
-                  value={vehicleNumber}
-                  onChange={(e) => setVehicleNumber(e.target.value)}
-                  className="border rounded px-2 py-0.5 text-sm font-bold w-16"
+                <VehicleSelector
+                  value={vehicleId}
+                  onChange={setVehicleId}
+                  vehicles={allVehicles}
+                  className="border rounded px-2 py-0.5 text-sm font-bold"
                   style={{ borderColor: 'rgba(28,41,72,0.3)', color: '#1C2948', backgroundColor: 'rgba(255,255,255,0.5)' }}
-                  autoFocus
-                  onBlur={() => setEditingVehicle(false)}
-                  onKeyDown={(e) => e.key === 'Enter' && setEditingVehicle(false)}
                 />
                 <button onClick={() => setEditingVehicle(false)}>
                   <Check className="w-4 h-4" style={{ color: '#2FBF71' }} />
@@ -394,7 +412,7 @@ export default function ReportOnsiteClient({ dispatch, report, userName }: Props
               </div>
             ) : (
               <>
-                <span className="font-bold">{vehicleNumber || '---'}</span>
+                <span className="font-bold">{currentVehicleLabel}</span>
                 <button
                   onClick={() => setEditingVehicle(true)}
                   className="text-xs text-white px-2 py-0.5 rounded font-bold active:opacity-70"
@@ -496,6 +514,14 @@ export default function ReportOnsiteClient({ dispatch, report, userName }: Props
                   decimal: true,
                 },
                 {
+                  label: '完了 ODO',
+                  key: 'completionOdo',
+                  value: completionOdo,
+                  setValue: setCompletionOdo,
+                  suffix: 'km',
+                  decimal: false,
+                },
+                {
                   label: '帰社距離',
                   key: 'returnDistance',
                   value: returnDistance,
@@ -504,10 +530,10 @@ export default function ReportOnsiteClient({ dispatch, report, userName }: Props
                   decimal: true,
                 },
                 {
-                  label: '完了 ODO',
-                  key: 'completionOdo',
-                  value: completionOdo,
-                  setValue: setCompletionOdo,
+                  label: '帰社 ODO',
+                  key: 'returnOdo',
+                  value: returnOdo,
+                  setValue: setReturnOdo,
                   suffix: 'km',
                   decimal: false,
                 },

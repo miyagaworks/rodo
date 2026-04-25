@@ -6,6 +6,7 @@ import { Session } from 'next-auth'
 import { ChevronLeft } from 'lucide-react'
 import { IoIosArrowDroprightCircle } from 'react-icons/io'
 import ClockPicker from './ClockPicker'
+import OdoDialInput from '@/components/common/OdoDialInput'
 import { offlineFetch } from '@/lib/offline-fetch'
 
 // -------------------------------------------------------
@@ -17,6 +18,7 @@ interface SerializedParentDispatch {
   dispatchNumber: string
   assistanceId: string
   status: string
+  completionOdo: number | null
 }
 
 interface SerializedSecondaryDispatch {
@@ -53,40 +55,6 @@ function getInitialStep(d: SerializedSecondaryDispatch | null): number {
   if (d.arrivalTime) return 2
   if (d.dispatchTime) return 1
   return 0
-}
-
-// -------------------------------------------------------
-// OdoInput（1次搬送と同一）
-// -------------------------------------------------------
-
-function OdoInput({ value, onChange, disabled, label }: {
-  value: string
-  onChange: (v: string) => void
-  disabled: boolean
-  label?: string
-}) {
-  return (
-    <div className={`flex items-center gap-3 px-1 transition-opacity ${disabled ? 'opacity-40' : ''}`}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/icons/odo.svg" alt="" className="w-10 h-10 object-contain flex-shrink-0" />
-      <span className="font-bold text-lg flex-shrink-0" style={{ color: '#1C2948' }}>
-        {label && <span className="mr-1">{label}</span>}ODO
-      </span>
-      <div className="flex-1 bg-white rounded-lg border-2 border-gray-200 px-4 py-2.5 flex items-center">
-        <input
-          type="number"
-          inputMode="numeric"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          disabled={disabled}
-          placeholder=""
-          className="w-full text-right text-2xl font-bold outline-none bg-transparent"
-          style={{ color: disabled ? '#9CA3AF' : '#1C2948' }}
-        />
-      </div>
-      <span className="font-medium text-gray-500 flex-shrink-0 text-xl">km</span>
-    </div>
-  )
 }
 
 // -------------------------------------------------------
@@ -187,8 +155,8 @@ function ActionButton({
         </div>
 
         {/* 右50%: 時刻（上）+ 修正・取消ボタン（底揃え） */}
-        <div className="flex-1 flex flex-col items-center justify-between px-1 py-1">
-          <span className="text-6xl font-bold" style={{ color: '#1C2948' }}>
+        <div className="flex-1 flex flex-col items-center justify-end px-1">
+          <span className="mb-1 text-6xl font-bold" style={{ color: '#1C2948' }}>
             {formatTime(time)}
           </span>
           <div className="flex gap-2 w-full">
@@ -244,8 +212,17 @@ export default function SecondaryDispatchClient({ parentDispatch, initialSeconda
 
   const [step, setStep] = useState(getInitialStep(initialSecondary))
   const [secondaryId, setSecondaryId] = useState<string | null>(initialSecondary?.id ?? null)
-  const [departureOdo, setDepartureOdo] = useState(initialSecondary?.departureOdo?.toString() ?? '')
-  const [completionOdo, setCompletionOdo] = useState(initialSecondary?.completionOdo?.toString() ?? '')
+  const [departureOdo, setDepartureOdo] = useState<number | null>(initialSecondary?.departureOdo ?? null)
+  const [completionOdo, setCompletionOdo] = useState<number | null>(initialSecondary?.completionOdo ?? null)
+
+  // ── ODO placeholder chain ──
+  // 各 ODO の value が null のとき、前段 ODO の値をそのまま薄く表示
+  // 2次搬送の出発は親 Dispatch の完了 ODO を初期値とする
+  const secondaryDeparturePlaceholder: number =
+    departureOdo ?? (parentDispatch.completionOdo ?? 0)
+  const secondaryCompletionPlaceholder: number =
+    completionOdo ?? secondaryDeparturePlaceholder
+
   const [transportHighway, setTransportHighway] = useState('')
   const [returnHighway, setReturnHighway] = useState('')
   const [loading, setLoading] = useState(false)
@@ -301,7 +278,7 @@ export default function SecondaryDispatchClient({ parentDispatch, initialSeconda
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             dispatchTime: now.toISOString(),
-            departureOdo: departureOdo ? parseInt(String(departureOdo)) : null,
+            departureOdo: departureOdo,
             status: 'DISPATCHED',
           }),
           offlineActionType: 'dispatch_update',
@@ -318,7 +295,7 @@ export default function SecondaryDispatchClient({ parentDispatch, initialSeconda
           body: JSON.stringify({
             assistanceId: parentDispatch.assistanceId,
             type: 'transport',
-            departureOdo: departureOdo || null,
+            departureOdo: departureOdo,
             dispatchTime: now.toISOString(),
             parentDispatchId: parentDispatch.id,
             isSecondaryTransport: true,
@@ -380,7 +357,7 @@ export default function SecondaryDispatchClient({ parentDispatch, initialSeconda
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           completionTime: now.toISOString(),
-          completionOdo: completionOdo ? parseInt(completionOdo) : null,
+          completionOdo: completionOdo,
           status: 'COMPLETED',
         }),
         offlineActionType: 'dispatch_update',
@@ -612,7 +589,7 @@ export default function SecondaryDispatchClient({ parentDispatch, initialSeconda
         </div>
 
         {/* ─── ODO（出発） ─── */}
-        <OdoInput label="出発" value={departureOdo} onChange={setDepartureOdo} disabled={step > 0} />
+        <OdoDialInput label="搬開" value={departureOdo} onChange={setDepartureOdo} disabled={step > 0} placeholder={secondaryDeparturePlaceholder} />
 
         {/* ─── 搬送開始ボタン ─── */}
         <div ref={dispatchBtnRef}>
@@ -621,7 +598,7 @@ export default function SecondaryDispatchClient({ parentDispatch, initialSeconda
             label="搬送開始"
             isActive={step === 0}
             isPressed={step >= 1}
-            isDisabled={step > 0 || (step === 0 && !departureOdo.trim())}
+            isDisabled={step > 0 || (step === 0 && departureOdo === null)}
             time={dispatchTime}
             onPress={handleDispatch}
             onCorrect={() => setClockTarget('dispatch')}
@@ -656,11 +633,12 @@ export default function SecondaryDispatchClient({ parentDispatch, initialSeconda
         </div>
 
         {/* ─── ODO（完了） ─── */}
-        <OdoInput
+        <OdoDialInput
           label="完了"
           value={completionOdo}
           onChange={setCompletionOdo}
           disabled={step < 2 || step >= 3}
+          placeholder={secondaryCompletionPlaceholder}
         />
 
         {/* ─── 完了ボタン ─── */}
@@ -671,7 +649,7 @@ export default function SecondaryDispatchClient({ parentDispatch, initialSeconda
             label="完了"
             isActive={step === 2}
             isPressed={step >= 3}
-            isDisabled={step !== 2 || (step === 2 && !completionOdo.trim())}
+            isDisabled={step !== 2 || (step === 2 && completionOdo === null)}
             time={completionTime}
             onPress={handleComplete}
             onCorrect={() => setClockTarget('completion')}

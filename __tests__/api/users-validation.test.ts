@@ -10,7 +10,7 @@ describe('createUserSchema', () => {
     email: 'test@example.com',
     password: 'password123',
     role: 'ADMIN' as const,
-    vehicleNumber: '1234',
+    vehicleId: 'veh-123',
     monthlySalary: 300000,
     overtimeRate: 2000,
     transportationAllowance: 10000,

@@ -3,6 +3,8 @@
 import * as Tabs from '@radix-ui/react-tabs'
 import AssistanceTab from '@/components/settings/AssistanceTab'
 import MembersTab from '@/components/settings/MembersTab'
+import VehiclesTab from '@/components/settings/VehiclesTab'
+import TenantTab from '@/components/settings/TenantTab'
 
 export default function SettingsClient() {
   return (
@@ -17,24 +19,44 @@ export default function SettingsClient() {
         <Tabs.List className="flex" style={{ backgroundColor: '#374151' }}>
           <Tabs.Trigger
             value="assistances"
-            className="flex-1 py-3 text-sm font-medium text-gray-300 data-[state=active]:text-white data-[state=active]:bg-gray-600 transition-colors"
+            className="flex-1 py-3 text-xs font-medium text-gray-300 data-[state=active]:text-white data-[state=active]:bg-gray-600 transition-colors"
           >
             アシスタンス
           </Tabs.Trigger>
           <Tabs.Trigger
             value="members"
-            className="flex-1 py-3 text-sm font-medium text-gray-300 data-[state=active]:text-white data-[state=active]:bg-gray-600 transition-colors"
+            className="flex-1 py-3 text-xs font-medium text-gray-300 data-[state=active]:text-white data-[state=active]:bg-gray-600 transition-colors"
           >
             隊員登録
           </Tabs.Trigger>
+          <Tabs.Trigger
+            value="vehicles"
+            className="flex-1 py-3 text-xs font-medium text-gray-300 data-[state=active]:text-white data-[state=active]:bg-gray-600 transition-colors"
+          >
+            車両管理
+          </Tabs.Trigger>
+          <Tabs.Trigger
+            value="tenant"
+            className="flex-1 py-3 text-xs font-medium text-gray-300 data-[state=active]:text-white data-[state=active]:bg-gray-600 transition-colors"
+          >
+            テナント設定
+          </Tabs.Trigger>
         </Tabs.List>
 
-        <Tabs.Content value="assistances" className="p-4">
+        <Tabs.Content value="assistances" className="p-4 pb-24">
           <AssistanceTab />
         </Tabs.Content>
 
-        <Tabs.Content value="members" className="p-4">
+        <Tabs.Content value="members" className="p-4 pb-24">
           <MembersTab />
+        </Tabs.Content>
+
+        <Tabs.Content value="vehicles" className="p-4 pb-24">
+          <VehiclesTab />
+        </Tabs.Content>
+
+        <Tabs.Content value="tenant" className="p-4 pb-24">
+          <TenantTab />
         </Tabs.Content>
       </Tabs.Root>
     </div>

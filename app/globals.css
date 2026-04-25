@@ -1,5 +1,21 @@
 @import "tailwindcss";
 
+/* Tailwind v4: @theme で font トークンを上書きする。
+ * Tailwind v4 は Preflight で html に font-family: var(--default-font-family) を適用するため、
+ * body にだけ font-family を宣言してもクラス未指定要素で上書きされるケースがある。
+ * ここで --font-sans / --font-mono / --default-font-family の全てを Metrophobic 優先に揃え、
+ * font-sans / font-mono クラス・無指定要素の全てで Metrophobic が先頭になるようにする。
+ *
+ * Metrophobic は latin のみの Google Font。日本語グリフは持たないため、
+ * ブラウザが自動で次の候補（Hiragino）へフォールバックする。結果、
+ * 数字・英字のみ Metrophobic、日本語は Hiragino という挙動になる。
+ */
+@theme {
+  --font-sans: var(--font-metrophobic), "Hiragino Kaku Gothic ProN", "Hiragino Kaku Gothic Pro", "ヒラギノ角ゴ ProN W3", sans-serif;
+  --font-mono: var(--font-metrophobic), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --default-font-family: var(--font-metrophobic), "Hiragino Kaku Gothic ProN", "Hiragino Kaku Gothic Pro", "ヒラギノ角ゴ ProN W3", sans-serif;
+}
+
 :root {
   --color-main: #1C2948;
   --color-sub: #71A9F7;
@@ -10,5 +26,5 @@
 }
 
 body {
-  font-family: "Hiragino Kaku Gothic ProN", "Hiragino Kaku Gothic Pro", "ヒラギノ角ゴ ProN W3", sans-serif;
+  font-family: var(--font-metrophobic), "Hiragino Kaku Gothic ProN", "Hiragino Kaku Gothic Pro", "ヒラギノ角ゴ ProN W3", sans-serif;
 }
