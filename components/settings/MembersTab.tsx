@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import * as Accordion from '@radix-ui/react-accordion'
-import { ChevronRight, X, CloudUpload, Plus } from 'lucide-react'
+import { ChevronRight, X, Plus } from 'lucide-react'
 import { FaSave } from 'react-icons/fa'
 
 interface Vehicle {
@@ -264,17 +264,17 @@ export default function MembersTab() {
                       <button
                         onClick={() => setEditingId(null)}
                         className="flex-1 py-2 rounded-lg text-sm font-medium"
-                        style={{ backgroundColor: '#F5E6B0' }}
+                        style={{ backgroundColor: '#9CA3AF', color: 'white' }}
                       >
                         キャンセル
                       </button>
                       <button
                         onClick={() => saveMember(member.id)}
-                        className="flex-1 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-1"
-                        style={{ backgroundColor: '#1C2948', color: '#D7AF70' }}
+                        className="flex-1 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2.5"
+                        style={{ backgroundColor: '#1C2948', color: 'white' }}
                       >
-                        <CloudUpload className="w-4 h-4" />
-                        保存
+                        <FaSave className="w-4 h-4" />
+                        <span style={{ letterSpacing: '0.15em' }}>保存</span>
                       </button>
                     </div>
                   </div>
