@@ -24,13 +24,14 @@ export function formatVehicleLabel(vehicle: VehicleLabelInput): string {
 
 /**
  * ヘッダー等の「現在選択中の車両」表示用ラベル。
- * - null なら "---"
- * - isActive は無視（ヘッダーでは停止中プレフィックス不要）
+ * - vehicle 自体が null/undefined なら "---"
+ * - displayName があればそれだけを表示
+ * - displayName が null なら「未設定」
+ * - plateNumber は表示しない (重複表示回避)
  */
 export function formatCurrentVehicleLabel(
   vehicle: { plateNumber: string; displayName: string | null } | null | undefined
 ): string {
   if (!vehicle) return '---'
-  const suffix = vehicle.displayName ? ` (${vehicle.displayName})` : ''
-  return vehicle.plateNumber + suffix
+  return vehicle.displayName ?? '未設定'
 }
