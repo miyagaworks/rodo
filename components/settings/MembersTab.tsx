@@ -33,6 +33,7 @@ export default function MembersTab() {
     name: string
     email: string
     password: string
+    role: 'ADMIN' | 'MEMBER'
     vehicleId: string | null
     monthlySalary: number | null
     overtimeRate: number | null
@@ -41,6 +42,7 @@ export default function MembersTab() {
     name: '',
     email: '',
     password: '',
+    role: 'MEMBER',
     vehicleId: null,
     monthlySalary: null,
     overtimeRate: null,
@@ -123,6 +125,7 @@ export default function MembersTab() {
         name,
         email,
         password,
+        role: newMember.role,
         vehicleId: newMember.vehicleId,
         monthlySalary: newMember.monthlySalary,
         overtimeRate: newMember.overtimeRate,
@@ -142,7 +145,7 @@ export default function MembersTab() {
       return
     }
     setIsAdding(false)
-    setNewMember({ name: '', email: '', password: '', vehicleId: null, monthlySalary: null, overtimeRate: null, transportationAllowance: null })
+    setNewMember({ name: '', email: '', password: '', role: 'MEMBER', vehicleId: null, monthlySalary: null, overtimeRate: null, transportationAllowance: null })
     await fetchData()
   }
 
@@ -318,6 +321,17 @@ export default function MembersTab() {
             />
           </div>
           <div className="mb-3">
+            <label className="block text-xs text-gray-500 mb-1">権限</label>
+            <select
+              value={newMember.role}
+              onChange={(e) => setNewMember(prev => ({ ...prev, role: e.target.value as 'ADMIN' | 'MEMBER' }))}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            >
+              <option value="MEMBER">隊員</option>
+              <option value="ADMIN">管理者</option>
+            </select>
+          </div>
+          <div className="mb-3">
             <label className="block text-xs text-gray-500 mb-1">使用車両</label>
             <select
               value={newMember.vehicleId ?? ''}
@@ -363,7 +377,7 @@ export default function MembersTab() {
           </div>
           <div className="flex gap-2">
             <button
-              onClick={() => { setIsAdding(false); setNewMember({ name: '', email: '', password: '', vehicleId: null, monthlySalary: null, overtimeRate: null, transportationAllowance: null }) }}
+              onClick={() => { setIsAdding(false); setNewMember({ name: '', email: '', password: '', role: 'MEMBER', vehicleId: null, monthlySalary: null, overtimeRate: null, transportationAllowance: null }) }}
               className="flex-1 py-2 rounded-lg text-sm font-medium"
               style={{ backgroundColor: '#9CA3AF', color: 'white' }}
             >
