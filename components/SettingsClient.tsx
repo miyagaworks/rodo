@@ -1,5 +1,6 @@
 'use client'
 
+import { IoIosArrowBack } from 'react-icons/io'
 import * as Tabs from '@radix-ui/react-tabs'
 import AssistanceTab from '@/components/settings/AssistanceTab'
 import MembersTab from '@/components/settings/MembersTab'
@@ -11,7 +12,7 @@ export default function SettingsClient() {
     <div className="min-h-screen" style={{ backgroundColor: '#C6D8FF' }}>
       {/* ヘッダー */}
       <header className="px-4 py-3 flex items-center gap-3" style={{ backgroundColor: '#1C2948' }}>
-        <a href="/" className="text-white">← 戻る</a>
+        <a href="/" className="text-white p-1 -ml-1 active:opacity-60"><IoIosArrowBack className="w-6 h-6" /></a>
         <h1 className="text-white font-bold text-lg">設定</h1>
       </header>
 

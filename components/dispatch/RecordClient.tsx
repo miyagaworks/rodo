@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Pencil, Check } from 'lucide-react'
 import { FaPen } from 'react-icons/fa'
-import { IoIosArrowDroprightCircle } from 'react-icons/io'
+import { IoIosArrowForward } from 'react-icons/io'
 import NumberPlateInput, { PlateValue } from './NumberPlateInput'
 import ClockPicker from './ClockPicker'
 import VehicleSelector from './VehicleSelector'
@@ -906,7 +906,7 @@ export default function RecordClient({ dispatch, userName }: RecordClientProps) 
           }}
         >
           <span>報告兼請求項目へ</span>
-          <IoIosArrowDroprightCircle className="text-xl" />
+          <IoIosArrowForward className="text-xl" />
         </button>
       </div>
 

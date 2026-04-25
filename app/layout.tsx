@@ -1,15 +1,28 @@
 import type { Metadata } from 'next'
 import Script from 'next/script'
 import { Metrophobic } from 'next/font/google'
+import localFont from 'next/font/local'
 import OfflineProvider from '@/components/OfflineProvider'
 import './globals.css'
 
 // ODO メーター数字表示用フォント（Google Fonts: Metrophobic）
-// CSS 変数 --font-metrophobic として全体で利用可能
+// CSS 変数 --font-metrophobic として OdoDialInput 等で利用
 const metrophobic = Metrophobic({
   subsets: ['latin'],
   weight: '400',
   variable: '--font-metrophobic',
+  display: 'swap',
+})
+
+// デフォルトフォント: LINE Seed JP
+const lineSeedJP = localFont({
+  src: [
+    { path: '../fonts/LINESeedJP_OTF_Th.woff2', weight: '100' },
+    { path: '../fonts/LINESeedJP_OTF_Rg.woff2', weight: '400' },
+    { path: '../fonts/LINESeedJP_OTF_Bd.woff2', weight: '700' },
+    { path: '../fonts/LINESeedJP_OTF_Eb.woff2', weight: '800' },
+  ],
+  variable: '--font-line-seed-jp',
   display: 'swap',
 })
 
@@ -25,7 +38,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="ja" suppressHydrationWarning className={metrophobic.variable}>
+    <html lang="ja" suppressHydrationWarning className={`${lineSeedJP.variable} ${metrophobic.variable}`}>
       <head>
         <meta name="theme-color" content="#1C2948" />
         <link rel="stylesheet" href="https://static.bizdeli.net/style.css" />

@@ -3,9 +3,8 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Session } from 'next-auth'
-import { IoMdCamera, IoIosArrowDroprightCircle } from 'react-icons/io'
+import { IoMdCamera, IoIosArrowBack, IoIosArrowForward } from 'react-icons/io'
 import { MdPeopleAlt } from 'react-icons/md'
-import { ChevronLeft } from 'lucide-react'
 import ClockPicker from './ClockPicker'
 import OdoDialInput from '@/components/common/OdoDialInput'
 import { offlineFetch } from '@/lib/offline-fetch'
@@ -892,7 +891,7 @@ export default function DispatchClient({
           onClick={() => router.push('/')}
           className="text-white p-1 -ml-1 rounded-lg active:opacity-60"
         >
-          <ChevronLeft className="w-6 h-6" />
+          <IoIosArrowBack className="w-6 h-6" />
         </button>
         <span className="text-white text-sm opacity-50 font-medium">出動画面</span>
       </header>
@@ -1476,7 +1475,7 @@ export default function DispatchClient({
               }}
             >
               <span>出動記録へ</span>
-              <IoIosArrowDroprightCircle className="text-3xl" />
+              <IoIosArrowForward className="text-3xl" />
             </button>
           </div>
         )}

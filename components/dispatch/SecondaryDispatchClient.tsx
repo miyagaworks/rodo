@@ -3,8 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Session } from 'next-auth'
-import { ChevronLeft } from 'lucide-react'
-import { IoIosArrowDroprightCircle } from 'react-icons/io'
+import { IoIosArrowBack, IoIosArrowForward } from 'react-icons/io'
 import ClockPicker from './ClockPicker'
 import OdoDialInput from '@/components/common/OdoDialInput'
 import { offlineFetch } from '@/lib/offline-fetch'
@@ -539,7 +538,7 @@ export default function SecondaryDispatchClient({ parentDispatch, initialSeconda
   type StatusConfig = { iconSrc: string; label: string; color: string }
   const statusConfig: StatusConfig = (() => {
     if (step === 0) return { iconSrc: '/icons/stand-by.svg', label: '待機中', color: '#2FBF71' }
-    if (step === 1) return { iconSrc: '/icons/dispatch.svg', label: '出動中', color: '#D3170A' }
+    if (step === 1) return { iconSrc: '/icons/transportation.svg', label: '搬送中', color: '#71A9F7' }
     if (step === 2) return { iconSrc: '/icons/work.svg', label: '作業中', color: '#F1A900' }
     return { iconSrc: '/icons/transportation.svg', label: '搬送中', color: '#71A9F7' }
   })()
@@ -557,7 +556,7 @@ export default function SecondaryDispatchClient({ parentDispatch, initialSeconda
           onClick={() => router.push('/')}
           className="text-white p-1 -ml-1 rounded-lg active:opacity-60"
         >
-          <ChevronLeft className="w-6 h-6" />
+          <IoIosArrowBack className="w-6 h-6" />
         </button>
         <span className="text-white text-sm opacity-50 font-medium">出動画面</span>
       </header>
@@ -697,7 +696,7 @@ export default function SecondaryDispatchClient({ parentDispatch, initialSeconda
               }}
             >
               <span>報告兼請求項目へ</span>
-              <IoIosArrowDroprightCircle className="text-3xl" />
+              <IoIosArrowForward className="text-3xl" />
             </button>
           </div>
         )}

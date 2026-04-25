@@ -2,7 +2,8 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronLeft, ChevronDown, ChevronUp } from 'lucide-react'
+import { ChevronDown, ChevronUp } from 'lucide-react'
+import { IoIosArrowBack } from 'react-icons/io'
 import SignatureCanvas from 'react-signature-canvas'
 import { offlineFetch } from '@/lib/offline-fetch'
 
@@ -419,7 +420,7 @@ export default function ConfirmationClient({ dispatchId, confirmation, userName 
         style={{ backgroundColor: MAIN }}
       >
         <button onClick={handleCancel} className="mr-2">
-          <ChevronLeft className="w-7 h-7 text-white" />
+          <IoIosArrowBack className="w-7 h-7 text-white" />
         </button>
         <h1 className="text-white text-lg font-bold tracking-widest flex-1 text-center pr-7">
           作業確認書
