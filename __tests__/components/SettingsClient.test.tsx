@@ -24,9 +24,9 @@ describe('SettingsClient', () => {
     render(<SettingsClient />)
 
     expect(screen.getByText('設定')).toBeInTheDocument()
-    const backLink = screen.getByText('← 戻る')
-    expect(backLink).toBeInTheDocument()
-    expect(backLink.closest('a')).toHaveAttribute('href', '/')
+    // 戻るボタンはアイコン（IoIosArrowBack）に変更済み。テキストではなく href="/" のリンクで検証
+    const backLink = screen.getByRole('link', { name: '' })
+    expect(backLink).toHaveAttribute('href', '/')
   })
 
   it('4つのタブトリガーを表示する', () => {

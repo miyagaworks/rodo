@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { FaPen, FaCheckSquare } from 'react-icons/fa'
 import { FaCircleArrowRight } from 'react-icons/fa6'
-import { IoIosArrowDropleftCircle } from 'react-icons/io'
+import { IoIosArrowBack } from 'react-icons/io'
 import { Check } from 'lucide-react'
 import ClockPicker from './ClockPicker'
 import VehicleSelector from './VehicleSelector'
@@ -793,7 +793,7 @@ export default function ReportOnsiteClient({ dispatch, report, userName }: Props
           className="w-full flex items-center gap-2 px-4 py-3 rounded-lg font-bold text-white text-sm active:opacity-80"
           style={{ backgroundColor: '#1C2948' }}
         >
-          <IoIosArrowDropleftCircle className="text-lg" />
+          <IoIosArrowBack className="text-lg" />
           <span>出動記録へ</span>
         </button>
       </div>
