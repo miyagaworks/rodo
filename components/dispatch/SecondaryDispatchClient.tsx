@@ -7,6 +7,7 @@ import { IoIosArrowBack, IoIosArrowForward } from 'react-icons/io'
 import ClockPicker from './ClockPicker'
 import OdoDialInput from '@/components/common/OdoDialInput'
 import { offlineFetch } from '@/lib/offline-fetch'
+import AppFooter from '@/components/common/AppFooter'
 
 // -------------------------------------------------------
 // Types
@@ -25,7 +26,9 @@ interface SerializedSecondaryDispatch {
   dispatchNumber: string
   status: string
   departureOdo: number | null
+  arrivalOdo: number | null
   completionOdo: number | null
+  returnOdo: number | null
   dispatchTime: string | null
   arrivalTime: string | null
   completionTime: string | null
@@ -212,15 +215,28 @@ export default function SecondaryDispatchClient({ parentDispatch, initialSeconda
   const [step, setStep] = useState(getInitialStep(initialSecondary))
   const [secondaryId, setSecondaryId] = useState<string | null>(initialSecondary?.id ?? null)
   const [departureOdo, setDepartureOdo] = useState<number | null>(initialSecondary?.departureOdo ?? null)
+  const [arrivalOdo, setArrivalOdo] = useState<number | null>(initialSecondary?.arrivalOdo ?? null)
   const [completionOdo, setCompletionOdo] = useState<number | null>(initialSecondary?.completionOdo ?? null)
+  const [returnOdo, setReturnOdo] = useState<number | null>(initialSecondary?.returnOdo ?? null)
 
   // ── ODO placeholder chain ──
   // 各 ODO の value が null のとき、前段 ODO の値をそのまま薄く表示
   // 2次搬送の出発は親 Dispatch の完了 ODO を初期値とする
   const secondaryDeparturePlaceholder: number =
     departureOdo ?? (parentDispatch.completionOdo ?? 0)
+  const secondaryArrivalPlaceholder: number =
+    arrivalOdo ?? secondaryDeparturePlaceholder
   const secondaryCompletionPlaceholder: number =
-    completionOdo ?? secondaryDeparturePlaceholder
+    completionOdo ?? secondaryArrivalPlaceholder
+  const secondaryReturnPlaceholder: number =
+    returnOdo ?? secondaryCompletionPlaceholder
+
+  // ── 単調増加違反の判定（前 ODO より小さい値で入力されているか） ──
+  const isViolation = (prev: number | null, curr: number | null) =>
+    prev !== null && curr !== null && curr < prev
+  const arrivalViolation = isViolation(departureOdo, arrivalOdo)
+  const completionViolation = isViolation(arrivalOdo, completionOdo)
+  const returnViolation = isViolation(completionOdo, returnOdo)
 
   const [transportHighway, setTransportHighway] = useState('')
   const [returnHighway, setReturnHighway] = useState('')
@@ -249,17 +265,19 @@ export default function SecondaryDispatchClient({ parentDispatch, initialSeconda
   const recordBtnRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    const refMap: Record<number, React.RefObject<HTMLDivElement | null>> = {
-      0: dispatchBtnRef,
-      1: arrivalBtnRef,
-      2: completeBtnRef,
-      3: returnBtnRef,
-      4: recordBtnRef,
-    }
-    const ref = refMap[step]
-    if (ref?.current) {
-      ref.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    }
+    // step 0 (待機中) は初期表示のためスクロール不要
+    if (step === 0) return
+
+    // 押下したボタン自体をヘッダー直下に揃える（block: 'start'）。
+    // step 4 (帰社押下後) は report ボタンへスクロールし、可能な限り上部 + フッターが見える位置で停止。
+    const refs = [
+      null,             // step 0
+      dispatchBtnRef,   // step 1: 搬送開始押下後
+      arrivalBtnRef,    // step 2: 現着押下後
+      completeBtnRef,   // step 3: 完了押下後
+      recordBtnRef,     // step 4: 帰社押下後 → 報告兼請求項目へボタンを可能な限り上部
+    ]
+    refs[Math.min(step, refs.length - 1)]?.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }, [step])
 
   // ── Handlers ──
@@ -333,7 +351,11 @@ export default function SecondaryDispatchClient({ parentDispatch, initialSeconda
       await offlineFetch(`/api/dispatches/${secondaryId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ arrivalTime: now.toISOString(), status: 'ONSITE' }),
+        body: JSON.stringify({
+          arrivalTime: now.toISOString(),
+          arrivalOdo: arrivalOdo ?? null,
+          status: 'ONSITE',
+        }),
         offlineActionType: 'dispatch_update',
         offlineDispatchId: secondaryId,
       })
@@ -344,7 +366,7 @@ export default function SecondaryDispatchClient({ parentDispatch, initialSeconda
     } finally {
       setLoading(false)
     }
-  }, [step, secondaryId, loading, transportHighway])
+  }, [step, secondaryId, loading, transportHighway, arrivalOdo])
 
   const handleComplete = useCallback(async () => {
     if (step !== 2 || !secondaryId || loading) return
@@ -389,7 +411,11 @@ export default function SecondaryDispatchClient({ parentDispatch, initialSeconda
       await offlineFetch(`/api/dispatches/${secondaryId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ returnTime: now.toISOString(), status: 'RETURNED' }),
+        body: JSON.stringify({
+          returnTime: now.toISOString(),
+          returnOdo: returnOdo ?? null,
+          status: 'RETURNED',
+        }),
         offlineActionType: 'dispatch_update',
         offlineDispatchId: secondaryId,
       })
@@ -408,7 +434,7 @@ export default function SecondaryDispatchClient({ parentDispatch, initialSeconda
     } finally {
       setLoading(false)
     }
-  }, [step, secondaryId, loading, returnHighway, parentDispatch.id])
+  }, [step, secondaryId, loading, returnHighway, parentDispatch.id, returnOdo])
 
   // ── 時刻修正 ──
 
@@ -456,19 +482,19 @@ export default function SecondaryDispatchClient({ parentDispatch, initialSeconda
           resetState: () => setDispatchTime(null),
         },
         arrival: {
-          fields: { arrivalTime: null, status: 'DISPATCHED' },
+          fields: { arrivalTime: null, arrivalOdo: null, status: 'DISPATCHED' },
           prevStep: 1,
-          resetState: () => setArrivalTime(null),
+          resetState: () => { setArrivalTime(null); setArrivalOdo(null) },
         },
         completion: {
           fields: { completionTime: null, completionOdo: null, status: 'ONSITE' },
           prevStep: 2,
-          resetState: () => setCompletionTime(null),
+          resetState: () => { setCompletionTime(null); setCompletionOdo(null) },
         },
         return: {
-          fields: { returnTime: null, status: 'COMPLETED' },
+          fields: { returnTime: null, returnOdo: null, status: 'COMPLETED' },
           prevStep: 3,
-          resetState: () => setReturnTime(null),
+          resetState: () => { setReturnTime(null); setReturnOdo(null) },
         },
       }
 
@@ -614,6 +640,20 @@ export default function SecondaryDispatchClient({ parentDispatch, initialSeconda
           disabled={step < 1 || step >= 2}
         />
 
+        {/* ─── ODO（現着） ─── */}
+        <OdoDialInput
+          label="現着"
+          value={arrivalOdo}
+          onChange={setArrivalOdo}
+          disabled={step !== 1}
+          placeholder={secondaryArrivalPlaceholder}
+        />
+        {arrivalViolation && (
+          <p className="text-red-600 text-xs font-bold px-1 -mt-1">
+            前のODOより小さい値です
+          </p>
+        )}
+
         {/* ─── 現着ボタン ─── */}
         <div ref={arrivalBtnRef}>
           <ActionButton
@@ -622,7 +662,7 @@ export default function SecondaryDispatchClient({ parentDispatch, initialSeconda
             label="現着"
             isActive={step === 1}
             isPressed={step >= 2}
-            isDisabled={step !== 1}
+            isDisabled={step !== 1 || (step === 1 && arrivalOdo === null)}
             time={arrivalTime}
             onPress={handleArrival}
             onCorrect={() => setClockTarget('arrival')}
@@ -636,9 +676,14 @@ export default function SecondaryDispatchClient({ parentDispatch, initialSeconda
           label="完了"
           value={completionOdo}
           onChange={setCompletionOdo}
-          disabled={step < 2 || step >= 3}
+          disabled={step !== 2}
           placeholder={secondaryCompletionPlaceholder}
         />
+        {completionViolation && (
+          <p className="text-red-600 text-xs font-bold px-1 -mt-1">
+            前のODOより小さい値です
+          </p>
+        )}
 
         {/* ─── 完了ボタン ─── */}
         <div ref={completeBtnRef}>
@@ -665,6 +710,20 @@ export default function SecondaryDispatchClient({ parentDispatch, initialSeconda
           disabled={step < 3 || step >= 4}
         />
 
+        {/* ─── ODO（帰社） ─── */}
+        <OdoDialInput
+          label="帰社"
+          value={returnOdo}
+          onChange={setReturnOdo}
+          disabled={step !== 3}
+          placeholder={secondaryReturnPlaceholder}
+        />
+        {returnViolation && (
+          <p className="text-red-600 text-xs font-bold px-1 -mt-1">
+            前のODOより小さい値です
+          </p>
+        )}
+
         {/* ─── 帰社ボタン ─── */}
         <div ref={returnBtnRef}>
           <ActionButton
@@ -672,7 +731,7 @@ export default function SecondaryDispatchClient({ parentDispatch, initialSeconda
             label="帰社"
             isActive={step === 3}
             isPressed={step >= 4}
-            isDisabled={step !== 3}
+            isDisabled={step !== 3 || (step === 3 && returnOdo === null)}
             time={returnTime}
             onPress={handleReturn}
             onCorrect={() => setClockTarget('return')}
@@ -700,6 +759,8 @@ export default function SecondaryDispatchClient({ parentDispatch, initialSeconda
             </button>
           </div>
         )}
+
+        <AppFooter />
       </div>
 
       {/* ─── Clock Picker ─── */}

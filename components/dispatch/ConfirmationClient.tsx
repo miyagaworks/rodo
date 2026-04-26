@@ -6,6 +6,8 @@ import { ChevronDown, ChevronUp } from 'lucide-react'
 import { IoIosArrowBack } from 'react-icons/io'
 import SignatureCanvas from 'react-signature-canvas'
 import { offlineFetch } from '@/lib/offline-fetch'
+import QrShareModal from './QrShareModal'
+import AppFooter from '@/components/common/AppFooter'
 
 // -------------------------------------------------------
 // Types
@@ -303,6 +305,7 @@ function ToggleButton({
 export default function ConfirmationClient({ dispatchId, confirmation, userName }: Props) {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
+  const [qrToken, setQrToken] = useState<string | null>(null)
 
   // --- Pre-approval ---
   const [preChecks, setPreChecks] = useState<boolean[]>(
@@ -380,13 +383,28 @@ export default function ConfirmationClient({ dispatchId, confirmation, userName 
         batteryDetails: battery,
         notes: notes || null,
       }
-      await offlineFetch(`/api/dispatches/${dispatchId}/confirmation`, {
+      const res = await offlineFetch(`/api/dispatches/${dispatchId}/confirmation`, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
         offlineActionType: 'confirmation_save',
         offlineDispatchId: dispatchId,
       })
+
+      // 作業完了後署名を保存した場合のみQRモーダル表示
+      if (postSig && res.ok) {
+        try {
+          const data = await res.json()
+          if (data.shareToken) {
+            setQrToken(data.shareToken)
+            setSaving(false)
+            return
+          }
+        } catch {
+          // JSON parse 失敗時はそのまま遷移
+        }
+      }
+
       router.push(`/dispatch/${dispatchId}`)
     } catch (err) {
       console.error('Save confirmation error:', err)
@@ -713,6 +731,8 @@ export default function ConfirmationClient({ dispatchId, confirmation, userName 
           <h2 className="font-bold text-base mb-2" style={{ color: MAIN }}>担当者氏名</h2>
           <p className="text-sm px-1" style={{ color: '#333' }}>{userName}</p>
         </section>
+
+        <AppFooter />
       </div>
 
       {/* ─── Fixed Bottom Buttons ─── */}
@@ -744,6 +764,16 @@ export default function ConfirmationClient({ dispatchId, confirmation, userName 
           {saving ? '保存中...' : '保存'}
         </button>
       </div>
+
+      {qrToken && (
+        <QrShareModal
+          token={qrToken}
+          onClose={() => {
+            setQrToken(null)
+            router.push(`/dispatch/${dispatchId}?focus=confirmation`)
+          }}
+        />
+      )}
     </div>
   )
 }

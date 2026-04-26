@@ -9,6 +9,7 @@ import ClockPicker from './ClockPicker'
 import OdoDialInput from '@/components/common/OdoDialInput'
 import { offlineFetch } from '@/lib/offline-fetch'
 import { usePhotoCapture } from '@/hooks/usePhotoCapture'
+import AppFooter from '@/components/common/AppFooter'
 
 // -------------------------------------------------------
 // Types
@@ -376,32 +377,61 @@ export default function DispatchClient({
   // ── 自動スクロール用 ref ──
   const dispatchBtnRef  = useRef<HTMLDivElement>(null)
   const arrivalBtnRef   = useRef<HTMLDivElement>(null)
+  const transferBtnRef  = useRef<HTMLDivElement>(null)
+  const confirmationBtnRef = useRef<HTMLDivElement>(null)
+  const transportStartBtnRef = useRef<HTMLDivElement>(null)
   const completionBtnRef = useRef<HTMLDivElement>(null)
   const returnBtnRef    = useRef<HTMLDivElement>(null)
   const recordBtnRef    = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    // QRモーダル閉じからの遷移（?focus=confirmation）時は別 useEffect 側でスクロールするためスキップ
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      if (params.get('focus') === 'confirmation') return
+    }
+
+    // step 0 (待機中) は初期表示のためスクロール不要
+    if (step === 0) return
+
+    // 押下したボタン自体をヘッダー直下に揃える（block: 'start'）。
+    // 帰社押下後の最終 step も同じく block: 'start'。
+    // 出動記録へボタンはコンテナ末尾近くにあるため、コンテナの最大スクロールで止まり、
+    // フッターが見える位置で停止する（最上部までは行かない）。
     if (mode === 'transport') {
       const refs = [
-        dispatchBtnRef,    // step 0
-        arrivalBtnRef,     // step 1
-        completionBtnRef,  // step 2
-        completionBtnRef,  // step 3 (搬送開始後 → 完了付近)
-        returnBtnRef,      // step 4
-        recordBtnRef,      // step 5
+        null,                  // step 0
+        dispatchBtnRef,        // step 1: 出動押下後
+        arrivalBtnRef,         // step 2: 現着押下後
+        transportStartBtnRef,  // step 3: 搬開押下後
+        completionBtnRef,      // step 4: 完了押下後
+        recordBtnRef,          // step 5: 帰社押下後 → 出動記録へボタンを可能な限り上部
       ]
-      refs[Math.min(step, refs.length - 1)]?.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      refs[Math.min(step, refs.length - 1)]?.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     } else {
       const refs = [
-        dispatchBtnRef,    // step 0
-        arrivalBtnRef,     // step 1
-        completionBtnRef,  // step 2
-        returnBtnRef,      // step 3
-        recordBtnRef,      // step 4
+        null,             // step 0
+        dispatchBtnRef,   // step 1: 出動押下後
+        arrivalBtnRef,    // step 2: 現着押下後
+        completionBtnRef, // step 3: 完了押下後
+        recordBtnRef,     // step 4: 帰社押下後 → 出動記録へボタンを可能な限り上部
       ]
-      refs[Math.min(step, refs.length - 1)]?.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      refs[Math.min(step, refs.length - 1)]?.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
   }, [step, mode])
+
+  // QRモーダル閉じ後のスクロール（?focus=confirmation 付きで遷移してきた場合）
+  // step useEffect 側はこの場合スキップされるため、干渉なく一段階で動く。
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('focus') !== 'confirmation') return
+
+    confirmationBtnRef.current?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    })
+  }, [])
 
   // ── ODO placeholder chain ──
   // 各 ODO の value が null のとき、前段 ODO の値をそのまま薄く表示する推奨値
@@ -1094,81 +1124,85 @@ export default function DispatchClient({
         </div>
 
         {/* ─── 振替ボタン（現着後に表示・共通） ─── */}
-        {transferPending ? (
-          /* 振替待ち中 */
-          transferCompleted ? (
-            <div
-              className="w-full h-[72px] flex items-center justify-center gap-4 rounded-lg font-bold text-3xl"
-              style={{ backgroundColor: '#2FBF71' }}
-            >
-              <MdPeopleAlt className="w-12 h-12 text-white scale-x-[-1]" />
-              <span className="text-white">振替が完了しました</span>
-            </div>
-          ) : (
-            <div className="space-y-2">
+        <div ref={transferBtnRef}>
+          {transferPending ? (
+            /* 振替待ち中 */
+            transferCompleted ? (
               <div
                 className="w-full h-[72px] flex items-center justify-center gap-4 rounded-lg font-bold text-3xl"
                 style={{ backgroundColor: '#2FBF71' }}
               >
                 <MdPeopleAlt className="w-12 h-12 text-white scale-x-[-1]" />
-                <span className="text-white">振替待ち中...</span>
+                <span className="text-white">振替が完了しました</span>
               </div>
-              <button
-                onClick={async () => {
-                  if (!dispatchId) return
-                  try {
-                    const res = await offlineFetch(`/api/dispatches/${dispatchId}/transfer/cancel`, {
-                      method: 'POST',
-                      offlineActionType: 'transfer_cancel',
-                      offlineDispatchId: dispatchId,
-                    })
-                    if (res.ok) setTransferPending(false)
-                  } catch (e) { console.error(e) }
-                }}
-                className="w-full py-3 rounded-md font-bold text-lg text-center bg-white border-2 border-red-300 active:bg-red-50"
-                style={{ color: '#D3170A' }}
-              >
-                振替キャンセル
-              </button>
-            </div>
-          )
-        ) : (
-          <button
-            disabled={step < 2 || isTransferred}
-            onClick={async () => {
-              if (!dispatchId || step < 2) return
-              if (!window.confirm('この案件を他の隊員に振り替えますか？')) return
-              try {
-                const res = await offlineFetch(`/api/dispatches/${dispatchId}/transfer`, {
-                  method: 'POST',
-                  offlineActionType: 'transfer_request',
-                  offlineDispatchId: dispatchId,
-                })
-                if (res.ok) setTransferPending(true)
-              } catch (e) { console.error(e) }
-            }}
-            className={`w-full h-[72px] flex items-center justify-center gap-4 rounded-lg font-bold text-3xl transition-opacity ${step < 2 || isTransferred ? 'opacity-35' : 'active:brightness-90'}`}
-            style={{ backgroundColor: '#2FBF71', cursor: step < 2 || isTransferred ? 'not-allowed' : 'pointer' }}
-          >
-            <MdPeopleAlt className="w-12 h-12 text-white scale-x-[-1]" />
-            <span className="text-white" style={{ letterSpacing: '0.25em', paddingLeft: '0.25em' }}>振替</span>
-          </button>
-        )}
+            ) : (
+              <div className="space-y-2">
+                <div
+                  className="w-full h-[72px] flex items-center justify-center gap-4 rounded-lg font-bold text-3xl"
+                  style={{ backgroundColor: '#2FBF71' }}
+                >
+                  <MdPeopleAlt className="w-12 h-12 text-white scale-x-[-1]" />
+                  <span className="text-white">振替待ち中...</span>
+                </div>
+                <button
+                  onClick={async () => {
+                    if (!dispatchId) return
+                    try {
+                      const res = await offlineFetch(`/api/dispatches/${dispatchId}/transfer/cancel`, {
+                        method: 'POST',
+                        offlineActionType: 'transfer_cancel',
+                        offlineDispatchId: dispatchId,
+                      })
+                      if (res.ok) setTransferPending(false)
+                    } catch (e) { console.error(e) }
+                  }}
+                  className="w-full py-3 rounded-md font-bold text-lg text-center bg-white border-2 border-red-300 active:bg-red-50"
+                  style={{ color: '#D3170A' }}
+                >
+                  振替キャンセル
+                </button>
+              </div>
+            )
+          ) : (
+            <button
+              disabled={step < 2 || isTransferred}
+              onClick={async () => {
+                if (!dispatchId || step < 2) return
+                if (!window.confirm('この案件を他の隊員に振り替えますか？')) return
+                try {
+                  const res = await offlineFetch(`/api/dispatches/${dispatchId}/transfer`, {
+                    method: 'POST',
+                    offlineActionType: 'transfer_request',
+                    offlineDispatchId: dispatchId,
+                  })
+                  if (res.ok) setTransferPending(true)
+                } catch (e) { console.error(e) }
+              }}
+              className={`w-full h-[72px] flex items-center justify-center gap-4 rounded-lg font-bold text-3xl transition-opacity ${step < 2 || isTransferred ? 'opacity-35' : 'active:brightness-90'}`}
+              style={{ backgroundColor: '#2FBF71', cursor: step < 2 || isTransferred ? 'not-allowed' : 'pointer' }}
+            >
+              <MdPeopleAlt className="w-12 h-12 text-white scale-x-[-1]" />
+              <span className="text-white" style={{ letterSpacing: '0.25em', paddingLeft: '0.25em' }}>振替</span>
+            </button>
+          )}
+        </div>
 
         {/* ─── 作業確認書（Phase 6） ─── */}
-        <button
-          disabled={step < 2 || isTransferred}
-          onClick={() => { if (step >= 2 && !isTransferred) router.push(`/dispatch/${dispatchId}/confirmation`) }}
-          className="w-full h-[72px] flex items-center justify-center gap-4 rounded-lg font-bold text-3xl active:brightness-90 transition-all"
-          style={{
-            backgroundColor: '#71A9F7',
-            opacity: step < 2 || isTransferred ? 0.35 : 1,
-            cursor: step < 2 || isTransferred ? 'not-allowed' : 'pointer',
-          }}
-        >
-          <img src="/icons/confirmation.svg" alt="" className="w-10 h-10 object-contain" />
-          <span className="text-white" style={{ letterSpacing: '0.1em', paddingLeft: '0.1em' }}>作業確認書</span>
-        </button>
+        <div ref={confirmationBtnRef}>
+          <button
+            disabled={step < 2 || isTransferred}
+            onClick={() => { if (step >= 2 && !isTransferred) router.push(`/dispatch/${dispatchId}/confirmation`) }}
+            className="w-full h-[72px] flex items-center justify-center gap-4 rounded-lg font-bold text-3xl active:brightness-90 transition-all"
+            style={{
+              backgroundColor: '#71A9F7',
+              opacity: step < 2 || isTransferred ? 0.35 : 1,
+              cursor: step < 2 || isTransferred ? 'not-allowed' : 'pointer',
+            }}
+          >
+            <img src="/icons/confirmation.svg" alt="" className="w-10 h-10 object-contain" />
+            <span className="text-white" style={{ letterSpacing: '0.1em', paddingLeft: '0.1em' }}>作業確認書</span>
+          </button>
+        </div>
 
         {/* ─── 写真（Phase 10） ─── */}
         <button
@@ -1264,7 +1298,7 @@ export default function DispatchClient({
             )}
 
             {/* 搬送開始 — step 2 でアクティブ */}
-            <div ref={completionBtnRef}>
+            <div ref={transportStartBtnRef}>
               <ActionButton
                 iconSrc="/icons/transportation-start.svg"
                 label="搬送開始"
@@ -1304,6 +1338,7 @@ export default function DispatchClient({
               )}
 
               {/* 完了/保管ボタン — step 3 でアクティブ */}
+              <div ref={completionBtnRef}>
               {step >= 4 && completionTime && !isStoredDispatch ? (
                 /* 完了済み表示 */
                 <div className="flex gap-2 w-full" style={{ height: '7rem' }}>
@@ -1382,6 +1417,7 @@ export default function DispatchClient({
                   <span style={{ color: 'white', letterSpacing: '0.25em', paddingLeft: '0.25em' }}>完了</span>
                 </button>
               )}
+              </div>
             </>
 
             {/* ─── 帰社高速 ─── */}
@@ -1479,6 +1515,8 @@ export default function DispatchClient({
             </button>
           </div>
         )}
+
+        <AppFooter />
       </div>
 
       {/* ─── Clock Picker ─── */}

@@ -6,6 +6,7 @@ import AssistanceTab from '@/components/settings/AssistanceTab'
 import MembersTab from '@/components/settings/MembersTab'
 import VehiclesTab from '@/components/settings/VehiclesTab'
 import TenantTab from '@/components/settings/TenantTab'
+import AppFooter from '@/components/common/AppFooter'
 
 export default function SettingsClient() {
   return (
@@ -63,6 +64,8 @@ export default function SettingsClient() {
           <TenantTab />
         </Tabs.Content>
       </Tabs.Root>
+
+      <AppFooter />
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod/v4'
+import { createId } from '@paralleldrive/cuid2'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/prisma'
 import { upsertConfirmationSchema } from '@/lib/validations'
@@ -72,11 +73,22 @@ export async function POST(
   const data = buildData(body)
 
   try {
-    const confirmation = await prisma.workConfirmation.upsert({
+    let confirmation = await prisma.workConfirmation.upsert({
       where: { dispatchId: id },
       update: data,
       create: { dispatchId: id, ...data },
     })
+
+    if (body.postApprovalSignature && !confirmation.shareToken) {
+      confirmation = await prisma.workConfirmation.update({
+        where: { id: confirmation.id },
+        data: {
+          shareToken: createId(),
+          sharedAt: new Date(),
+        },
+      })
+    }
+
     return NextResponse.json(confirmation, { status: 201 })
   } catch (err) {
     console.error('POST /api/dispatches/[id]/confirmation error:', err)
@@ -110,11 +122,22 @@ export async function PATCH(
   const data = buildData(body)
 
   try {
-    const confirmation = await prisma.workConfirmation.upsert({
+    let confirmation = await prisma.workConfirmation.upsert({
       where: { dispatchId: id },
       update: data,
       create: { dispatchId: id, ...data },
     })
+
+    if (body.postApprovalSignature && !confirmation.shareToken) {
+      confirmation = await prisma.workConfirmation.update({
+        where: { id: confirmation.id },
+        data: {
+          shareToken: createId(),
+          sharedAt: new Date(),
+        },
+      })
+    }
+
     return NextResponse.json(confirmation)
   } catch (err) {
     console.error('PATCH /api/dispatches/[id]/confirmation error:', err)
