@@ -767,7 +767,7 @@ export default function ConfirmationClient({ dispatchId, confirmation, userName 
           token={qrToken}
           onClose={() => {
             setQrToken(null)
-            router.push(`/dispatch/${dispatchId}`)
+            router.push(`/dispatch/${dispatchId}?focus=confirmation`)
           }}
         />
       )}

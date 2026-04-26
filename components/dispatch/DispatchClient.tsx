@@ -377,6 +377,7 @@ export default function DispatchClient({
   const dispatchBtnRef  = useRef<HTMLDivElement>(null)
   const arrivalBtnRef   = useRef<HTMLDivElement>(null)
   const transferBtnRef  = useRef<HTMLDivElement>(null)
+  const confirmationBtnRef = useRef<HTMLDivElement>(null)
   const completionBtnRef = useRef<HTMLDivElement>(null)
   const returnBtnRef    = useRef<HTMLDivElement>(null)
   const recordBtnRef    = useRef<HTMLDivElement>(null)
@@ -403,6 +404,21 @@ export default function DispatchClient({
       refs[Math.min(step, refs.length - 1)]?.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
     }
   }, [step, mode])
+
+  // QRモーダル閉じ後のスクロール（?focus=confirmation 付きで遷移してきた場合）
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('focus') === 'confirmation') {
+      // step ベース useEffect が先に走るため、setTimeout で後勝ちにする
+      setTimeout(() => {
+        confirmationBtnRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+        })
+      }, 200)
+    }
+  }, [])
 
   // ── ODO placeholder chain ──
   // 各 ODO の value が null のとき、前段 ODO の値をそのまま薄く表示する推奨値
@@ -1159,19 +1175,21 @@ export default function DispatchClient({
         </div>
 
         {/* ─── 作業確認書（Phase 6） ─── */}
-        <button
-          disabled={step < 2 || isTransferred}
-          onClick={() => { if (step >= 2 && !isTransferred) router.push(`/dispatch/${dispatchId}/confirmation`) }}
-          className="w-full h-[72px] flex items-center justify-center gap-4 rounded-lg font-bold text-3xl active:brightness-90 transition-all"
-          style={{
-            backgroundColor: '#71A9F7',
-            opacity: step < 2 || isTransferred ? 0.35 : 1,
-            cursor: step < 2 || isTransferred ? 'not-allowed' : 'pointer',
-          }}
-        >
-          <img src="/icons/confirmation.svg" alt="" className="w-10 h-10 object-contain" />
-          <span className="text-white" style={{ letterSpacing: '0.1em', paddingLeft: '0.1em' }}>作業確認書</span>
-        </button>
+        <div ref={confirmationBtnRef}>
+          <button
+            disabled={step < 2 || isTransferred}
+            onClick={() => { if (step >= 2 && !isTransferred) router.push(`/dispatch/${dispatchId}/confirmation`) }}
+            className="w-full h-[72px] flex items-center justify-center gap-4 rounded-lg font-bold text-3xl active:brightness-90 transition-all"
+            style={{
+              backgroundColor: '#71A9F7',
+              opacity: step < 2 || isTransferred ? 0.35 : 1,
+              cursor: step < 2 || isTransferred ? 'not-allowed' : 'pointer',
+            }}
+          >
+            <img src="/icons/confirmation.svg" alt="" className="w-10 h-10 object-contain" />
+            <span className="text-white" style={{ letterSpacing: '0.1em', paddingLeft: '0.1em' }}>作業確認書</span>
+          </button>
+        </div>
 
         {/* ─── 写真（Phase 10） ─── */}
         <button
