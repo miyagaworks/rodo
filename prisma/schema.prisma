@@ -32,6 +32,7 @@ model Vehicle {
   plateNumber String
   displayName String?
   isActive    Boolean @default(true)
+  sortOrder   Int     @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -57,6 +58,8 @@ model User {
   monthlySalary           Int?
   overtimeRate            Int?
   transportationAllowance Int?
+
+  sortOrder Int @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

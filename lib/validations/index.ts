@@ -39,6 +39,11 @@ export {
   type TenantSettingsPatchInput,
 } from './schemas/tenant'
 
+export {
+  reorderSchema,
+  type ReorderInput,
+} from './schemas/reorder'
+
 // Helpers
 export {
   gpsLat,
