@@ -7,6 +7,7 @@ import { IoIosArrowBack } from 'react-icons/io'
 import SignatureCanvas from 'react-signature-canvas'
 import { offlineFetch } from '@/lib/offline-fetch'
 import QrShareModal from './QrShareModal'
+import AppFooter from '@/components/common/AppFooter'
 
 // -------------------------------------------------------
 // Types
@@ -730,6 +731,8 @@ export default function ConfirmationClient({ dispatchId, confirmation, userName 
           <h2 className="font-bold text-base mb-2" style={{ color: MAIN }}>担当者氏名</h2>
           <p className="text-sm px-1" style={{ color: '#333' }}>{userName}</p>
         </section>
+
+        <AppFooter />
       </div>
 
       {/* ─── Fixed Bottom Buttons ─── */}

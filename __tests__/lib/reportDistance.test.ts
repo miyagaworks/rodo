@@ -168,18 +168,19 @@ describe('enrichReportDistances — Report が null（新規ケース）', () =>
     })
   })
 
-  it('SECONDARY TRANSPORT / Dispatch に ODO あり → recovery は null、transport = completion − departure', () => {
+  it('SECONDARY TRANSPORT / Dispatch に ODO あり → recovery = arrival − departure、transport = completion − arrival', () => {
     const dispatch = makeDispatch({
       type: 'TRANSPORT',
       isSecondaryTransport: true,
       departureOdo: 20000,
+      arrivalOdo: 20050,
       completionOdo: 20080,
       returnOdo: 20120,
     })
     const result = enrichReportDistances(null, dispatch)
     expect(result).toEqual({
-      recoveryDistance: null,
-      transportDistance: 80,
+      recoveryDistance: 50,
+      transportDistance: 30,
       returnDistance: 40,
     })
   })
@@ -292,7 +293,7 @@ describe('enrichReportDistances — Report が存在', () => {
     expect(result.recoveryDistance).toBe(50)
   })
 
-  it('SECONDARY TRANSPORT + Report 存在 → transport = completion − departure を補完', () => {
+  it('SECONDARY TRANSPORT + Report 存在 → recovery / transport / return すべて区間分割で補完', () => {
     const report: ReportLikeForEnrich = {
       recoveryDistance: null,
       transportDistance: null,
@@ -302,12 +303,13 @@ describe('enrichReportDistances — Report が存在', () => {
       type: 'TRANSPORT',
       isSecondaryTransport: true,
       departureOdo: 20000,
+      arrivalOdo: 20050,
       completionOdo: 20080,
       returnOdo: 20120,
     })
     const result = enrichReportDistances(report, dispatch)
-    expect(result.recoveryDistance).toBeNull()
-    expect(result.transportDistance).toBe(80)
+    expect(result.recoveryDistance).toBe(50)
+    expect(result.transportDistance).toBe(30)
     expect(result.returnDistance).toBe(40)
   })
 

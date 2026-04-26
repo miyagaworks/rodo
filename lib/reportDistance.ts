@@ -22,7 +22,7 @@ export function calculateRecoveryDistance(
 /**
  * 搬送距離 = 搬送完了 ODO − 搬送開始 ODO
  * - TRANSPORT 1 次: startOdo = transportStartOdo
- * - SECONDARY TRANSPORT: startOdo = departureOdo（2 次は出発がそのまま搬送開始）
+ * - SECONDARY TRANSPORT: startOdo = arrivalOdo（2 次は現着が搬送開始扱い、TRANSPORT 1 次と同じ区間分割）
  * - ONSITE では呼び出さない想定。
  */
 export function calculateTransportDistance(
@@ -103,7 +103,7 @@ function pickOdo(
  * フロー分岐:
  * - ONSITE              : recovery = arrival − departure, transport = null,                 return = returnOdo − completion
  * - TRANSPORT 1 次      : recovery = arrival − departure, transport = completion − tStart,  return = returnOdo − completion
- * - SECONDARY TRANSPORT : recovery = null,                transport = completion − departure, return = returnOdo − completion
+ * - SECONDARY TRANSPORT : recovery = arrival − departure, transport = completion − arrival, return = returnOdo − completion
  *
  * ODO 取得優先順位: Report 側が非 null → Report、そうでなければ Dispatch。
  * 既存の distance 値（report 側が number）は上書きしない（ユーザー意図を尊重）。
@@ -132,9 +132,10 @@ export function enrichReportDistances<T extends ReportLikeForEnrich>(
   const computedReturn = calculateReturnDistance(completionOdo, returnOdo)
 
   if (isSecondary) {
-    // 2 次搬送: 出発 → 搬送完了 = 搬送距離（回送は無し）
-    computedRecovery = null
-    computedTransport = calculateTransportDistance(departureOdo, completionOdo)
+    // 2 次搬送: TRANSPORT 1 次と同じく区間分割（現着が搬送開始の代わり）
+    // 回送 = 現着 − 出発、搬送 = 完了 − 現着、帰社 = 帰社 − 完了
+    computedRecovery = calculateRecoveryDistance(departureOdo, arrivalOdo)
+    computedTransport = calculateTransportDistance(arrivalOdo, completionOdo)
   } else if (isTransport) {
     // TRANSPORT 1 次
     computedRecovery = calculateRecoveryDistance(departureOdo, arrivalOdo)

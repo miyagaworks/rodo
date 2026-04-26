@@ -1,4 +1,5 @@
 import type { WorkConfirmation } from '@prisma/client'
+import AppFooter from '@/components/common/AppFooter'
 
 // -------------------------------------------------------
 // Types
@@ -418,6 +419,8 @@ export function ConfirmationView({ token, confirmation }: Props) {
             {confirmation.postApprovalName ?? ''}
           </p>
         </section>
+
+        <AppFooter />
       </div>
 
       {/* ─── Fixed Bottom: PDF Download ─── */}

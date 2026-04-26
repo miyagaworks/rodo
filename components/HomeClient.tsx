@@ -10,6 +10,7 @@ import { HiOutlineLogout } from 'react-icons/hi'
 import AssistanceButton from '@/components/AssistanceButton'
 import ProcessingBar from '@/components/ProcessingBar'
 import BreakBar from '@/components/BreakBar'
+import AppFooter from '@/components/common/AppFooter'
 import { breakStateAtom } from '@/store/breakAtom'
 
 // displayAbbreviation → ロゴ・表示設定のマッピング
@@ -203,6 +204,8 @@ export default function HomeClient({ session }: HomeClientProps) {
           </button>
         )}
       </main>
+
+      <AppFooter />
 
       {/* 処理バー（固定） */}
       <ProcessingBar />
