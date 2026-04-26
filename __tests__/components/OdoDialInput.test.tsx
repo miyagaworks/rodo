@@ -461,7 +461,7 @@ describe('OdoDialInput (new UX)', () => {
       fireEvent.click(screen.getByTestId('odo-compact'))
       const dialog = screen.getByRole('dialog')
       // シート本体（オーバーレイの子）の backgroundColor を確認
-      const sheet = dialog.querySelector('[class*="rounded-t-3xl"]') as HTMLElement | null
+      const sheet = dialog.querySelector('[class*="rounded-t-2xl"]') as HTMLElement | null
       expect(sheet).not.toBeNull()
       expect(sheet?.style.backgroundColor).toBe('rgb(28, 28, 30)') // #1c1c1e
     })

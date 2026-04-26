@@ -143,7 +143,7 @@ function ActionButton({
       <div className="flex gap-2 w-full" style={{ height: '7rem' }}>
         {/* 左50%: アイコン + ラベル（底揃え） */}
         <div
-          className="flex-1 flex flex-col items-center justify-end gap-1 rounded-xl pb-3"
+          className="flex-1 flex flex-col items-center justify-end gap-1 rounded-lg pb-3"
           style={{ backgroundColor: '#1C2948' }}
         >
           {iconSrc && (
@@ -161,7 +161,7 @@ function ActionButton({
           <div className="flex gap-2 w-full">
             {onCorrect && (
               <button
-                className="flex-1 bg-white rounded-lg py-2 text-center font-bold text-lg shadow-sm border-2 border-gray-200 active:bg-gray-100"
+                className="flex-1 bg-white rounded-md py-2 text-center font-bold text-lg shadow-sm border-2 border-gray-200 active:bg-gray-100"
                 style={{ color: '#1C2948', letterSpacing: '0.25em', paddingLeft: '0.25em' }}
                 onClick={onCorrect}
               >
@@ -170,7 +170,7 @@ function ActionButton({
             )}
             {onCancel && (
               <button
-                className="flex-1 bg-white rounded-lg py-2 text-center font-bold text-lg shadow-sm border-2 border-red-300 active:bg-red-50"
+                className="flex-1 bg-white rounded-md py-2 text-center font-bold text-lg shadow-sm border-2 border-red-300 active:bg-red-50"
                 style={{ color: '#D3170A', letterSpacing: '0.25em', paddingLeft: '0.25em' }}
                 onClick={onCancel}
               >
@@ -188,7 +188,7 @@ function ActionButton({
     <button
       onClick={!isDisabled && !loading ? onPress : undefined}
       disabled={isDisabled || loading}
-      className="w-full h-[72px] flex items-center justify-center gap-4 rounded-xl font-bold text-3xl transition-all active:scale-[0.97]"
+      className="w-full h-[72px] flex items-center justify-center gap-4 rounded-lg font-bold text-3xl transition-all active:scale-[0.97]"
       style={{ backgroundColor: bgColorFinal, opacity: buttonOpacity }}
     >
       {iconSrc && (
@@ -554,7 +554,7 @@ export default function SecondaryDispatchClient({ parentDispatch, initialSeconda
       >
         <button
           onClick={() => router.push('/')}
-          className="text-white p-1 -ml-1 rounded-lg active:opacity-60"
+          className="text-white p-1 -ml-1 rounded-md active:opacity-60"
         >
           <IoIosArrowBack className="w-6 h-6" />
         </button>
@@ -687,7 +687,7 @@ export default function SecondaryDispatchClient({ parentDispatch, initialSeconda
             <button
               onClick={step >= 4 ? () => router.push(`/dispatch/${parentDispatch.id}/report?type=transport`) : undefined}
               disabled={step < 4}
-              className="w-full flex items-center justify-center gap-3 rounded-xl py-5 font-bold text-2xl transition-opacity"
+              className="w-full flex items-center justify-center gap-3 rounded-lg py-5 font-bold text-2xl transition-opacity"
               style={{
                 backgroundColor: '#D7AF70',
                 color: '#1C2948',

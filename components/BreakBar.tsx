@@ -22,7 +22,7 @@ export default function BreakBar() {
   return (
     <button
       onClick={handleTap}
-      className="w-full flex items-center justify-center gap-3 py-4 text-white font-bold cursor-pointer rounded-xl"
+      className="w-full flex items-center justify-center gap-3 py-4 text-white font-bold cursor-pointer rounded-lg"
       style={{ backgroundColor: '#2FBF71' }}
     >
       <FaCoffee className="text-3xl" />

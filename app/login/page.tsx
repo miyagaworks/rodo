@@ -54,7 +54,7 @@ export default function LoginPage() {
         {/* Googleログインボタン */}
         <button
           onClick={handleGoogleLogin}
-          className="w-full flex items-center justify-center gap-3 bg-white rounded-xl py-4 px-6 shadow-md hover:shadow-lg transition-shadow mb-2"
+          className="w-full flex items-center justify-center gap-3 bg-white rounded-lg py-4 px-6 shadow-md hover:shadow-lg transition-shadow mb-2"
         >
           <img src="/icons/google-logo.svg" alt="Google" className="w-5 h-5" />
           <span className="font-medium text-gray-700">Google でログイン</span>
@@ -73,7 +73,7 @@ export default function LoginPage() {
         {/* メール/パスワードログイン（折りたたみ） */}
         <button
           onClick={() => setShowEmailForm(!showEmailForm)}
-          className="w-full flex items-center justify-center gap-2 py-4 px-6 rounded-xl mb-2"
+          className="w-full flex items-center justify-center gap-2 py-4 px-6 rounded-lg mb-2"
           style={{ backgroundColor: '#f1f1f1', border: '1px solid #bdbdbd' }}
         >
           <span className="font-medium" style={{ color: '#1C2948' }}>
@@ -87,7 +87,7 @@ export default function LoginPage() {
         </button>
 
         {showEmailForm && (
-          <form onSubmit={handleCredentialsLogin} className="bg-white rounded-xl p-5 mb-4 shadow-md">
+          <form onSubmit={handleCredentialsLogin} className="bg-white rounded-lg p-5 mb-4 shadow-md">
             {error && (
               <p className="text-sm mb-3 text-center" style={{ color: '#D3170A' }}>{error}</p>
             )}
@@ -118,7 +118,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 rounded-lg font-medium text-white transition-opacity"
+              className="w-full py-3 rounded-md font-medium text-white transition-opacity"
               style={{ backgroundColor: '#1C2948' }}
             >
               {loading ? 'ログイン中...' : 'ログイン'}

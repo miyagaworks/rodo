@@ -24,10 +24,12 @@ export default function AssistanceTab() {
   const [newCompanyInput, setNewCompanyInput] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [isAdding, setIsAdding] = useState(false)
-  const [newAssistance, setNewAssistance] = useState<{ name: string; displayAbbreviation: string }>({
+  const [newAssistance, setNewAssistance] = useState<{ name: string; displayAbbreviation: string; insuranceCompanies: string[] }>({
     name: '',
     displayAbbreviation: '',
+    insuranceCompanies: [],
   })
+  const [newAddCompanyInput, setNewAddCompanyInput] = useState('')
 
   useEffect(() => {
     fetchAssistances()
@@ -115,14 +117,15 @@ export default function AssistanceTab() {
     const res = await fetch('/api/assistances', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, displayAbbreviation }),
+      body: JSON.stringify({ name, displayAbbreviation, insuranceCompanies: newAssistance.insuranceCompanies }),
     })
     if (!res.ok) {
       alert('アシスタンスの追加に失敗しました')
       return
     }
     setIsAdding(false)
-    setNewAssistance({ name: '', displayAbbreviation: '' })
+    setNewAssistance({ name: '', displayAbbreviation: '', insuranceCompanies: [] })
+    setNewAddCompanyInput('')
     await fetchAssistances()
   }
 
@@ -143,7 +146,7 @@ export default function AssistanceTab() {
             <Accordion.Item
               key={assistance.id}
               value={assistance.id}
-              className="bg-white rounded-xl shadow-sm overflow-hidden"
+              className="bg-white rounded-lg shadow-sm overflow-hidden"
             >
               <Accordion.Header>
                 <Accordion.Trigger className="w-full flex items-center justify-between px-4 py-3 text-left group">
@@ -172,7 +175,7 @@ export default function AssistanceTab() {
                     <p className="text-sm text-gray-500 mb-3">略称: {assistance.displayAbbreviation}</p>
                     <button
                       onClick={() => startEditing(assistance)}
-                      className="text-sm px-3 py-1 rounded-lg border border-gray-300 hover:bg-gray-50"
+                      className="text-sm px-3 py-1 rounded-md border border-gray-300 hover:bg-gray-50"
                     >
                       編集
                     </button>
@@ -229,7 +232,7 @@ export default function AssistanceTab() {
                         />
                         <button
                           onClick={() => addCompany(assistance.id)}
-                          className="text-sm px-3 py-1.5 rounded-lg text-white"
+                          className="text-sm px-3 py-1.5 rounded-md text-white"
                           style={{ backgroundColor: '#71A9F7' }}
                         >
                           <Plus className="w-4 h-4" />
@@ -239,14 +242,14 @@ export default function AssistanceTab() {
                     <div className="flex gap-2 mt-3">
                       <button
                         onClick={cancelEditing}
-                        className="flex-1 py-2 rounded-lg text-sm font-medium"
+                        className="flex-1 py-2 rounded-md text-sm font-medium"
                         style={{ backgroundColor: '#9CA3AF', color: 'white' }}
                       >
                         キャンセル
                       </button>
                       <button
                         onClick={() => saveAssistance(assistance.id)}
-                        className="flex-1 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2.5"
+                        className="flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2.5"
                         style={{ backgroundColor: '#1C2948', color: 'white' }}
                       >
                         <FaSave className="w-4 h-4" />
@@ -262,7 +265,7 @@ export default function AssistanceTab() {
       </Accordion.Root>
 
       {isAdding && (
-        <div className="bg-white rounded-xl shadow-sm p-4 mt-2">
+        <div className="bg-white rounded-lg shadow-sm p-4 mt-2">
           <div className="mb-3">
             <label className="block text-xs text-gray-500 mb-1">名称 (必須)</label>
             <input
@@ -283,10 +286,64 @@ export default function AssistanceTab() {
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
             />
           </div>
+          <div className="mb-3">
+            <label className="block text-xs text-gray-500 mb-1">損保会社</label>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {newAssistance.insuranceCompanies.map((name, i) => (
+                <span
+                  key={i}
+                  className="flex items-center gap-1 bg-blue-50 text-blue-700 text-xs px-2 py-1 rounded-full"
+                >
+                  {name}
+                  <button onClick={() => setNewAssistance(prev => ({
+                    ...prev,
+                    insuranceCompanies: prev.insuranceCompanies.filter((_, idx) => idx !== i),
+                  }))}>
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newAddCompanyInput}
+                onChange={(e) => setNewAddCompanyInput(e.target.value)}
+                placeholder="損保会社名"
+                className="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                    const n = newAddCompanyInput.trim()
+                    if (!n) return
+                    setNewAssistance(prev => ({
+                      ...prev,
+                      insuranceCompanies: [...prev.insuranceCompanies, n],
+                    }))
+                    setNewAddCompanyInput('')
+                  }
+                }}
+              />
+              <button
+                onClick={() => {
+                  const n = newAddCompanyInput.trim()
+                  if (!n) return
+                  setNewAssistance(prev => ({
+                    ...prev,
+                    insuranceCompanies: [...prev.insuranceCompanies, n],
+                  }))
+                  setNewAddCompanyInput('')
+                }}
+                className="text-sm px-3 py-1.5 rounded-md text-white"
+                style={{ backgroundColor: '#71A9F7' }}
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
           <div className="flex gap-2">
             <button
-              onClick={() => { setIsAdding(false); setNewAssistance({ name: '', displayAbbreviation: '' }) }}
-              className="flex-1 py-2 rounded-lg text-sm font-medium"
+              onClick={() => { setIsAdding(false); setNewAssistance({ name: '', displayAbbreviation: '', insuranceCompanies: [] }); setNewAddCompanyInput('') }}
+              className="flex-1 py-2 rounded-md text-sm font-medium"
               style={{ backgroundColor: '#9CA3AF', color: 'white' }}
             >
               キャンセル
@@ -294,7 +351,7 @@ export default function AssistanceTab() {
             <button
               onClick={addAssistance}
               disabled={!canSubmitNewAssistance}
-              className="flex-1 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2.5 disabled:opacity-50"
+              className="flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2.5 disabled:opacity-50"
               style={{ backgroundColor: '#1C2948', color: 'white' }}
             >
               <FaSave className="w-4 h-4" />
@@ -307,7 +364,7 @@ export default function AssistanceTab() {
       <button
         onClick={() => setIsAdding(true)}
         disabled={isAdding}
-        className="w-full mt-4 py-3 rounded-xl border-2 border-dashed border-gray-300 text-gray-500 text-sm flex items-center justify-center gap-2 hover:bg-white/50 disabled:opacity-50"
+        className="w-full mt-4 py-3 rounded-lg border-2 border-dashed border-gray-300 text-gray-500 text-sm flex items-center justify-center gap-2 hover:bg-white/50 disabled:opacity-50"
       >
         <Plus className="w-4 h-4" />
         アシスタンスを追加

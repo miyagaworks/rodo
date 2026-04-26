@@ -167,7 +167,7 @@ function ActionButton({
       <div className="flex gap-2 w-full" style={{ height: '7rem' }}>
         {/* 左50%: アイコン + ラベル（底揃え） */}
         <div
-          className="flex-1 flex flex-col items-center justify-end gap-1 rounded-xl pb-3"
+          className="flex-1 flex flex-col items-center justify-end gap-1 rounded-lg pb-3"
           style={{ backgroundColor: '#1C2948' }}
         >
           {iconSrc && (
@@ -187,7 +187,7 @@ function ActionButton({
           <div className="flex gap-2 w-full">
             {onCorrect && (
               <button
-                className="flex-1 bg-white rounded-lg py-2 text-center font-bold text-lg shadow-sm border-2 border-gray-200 active:bg-gray-100"
+                className="flex-1 bg-white rounded-md py-2 text-center font-bold text-lg shadow-sm border-2 border-gray-200 active:bg-gray-100"
                 style={{ color: '#1C2948', letterSpacing: '0.25em', paddingLeft: '0.25em' }}
                 onClick={onCorrect}
               >
@@ -196,7 +196,7 @@ function ActionButton({
             )}
             {onCancel && (
               <button
-                className="flex-1 bg-white rounded-lg py-2 text-center font-bold text-lg shadow-sm border-2 border-red-300 active:bg-red-50"
+                className="flex-1 bg-white rounded-md py-2 text-center font-bold text-lg shadow-sm border-2 border-red-300 active:bg-red-50"
                 style={{ color: '#D3170A', letterSpacing: '0.25em', paddingLeft: '0.25em' }}
                 onClick={onCancel}
               >
@@ -214,7 +214,7 @@ function ActionButton({
     <button
       onClick={!isDisabled && !loading ? onPress : undefined}
       disabled={isDisabled || loading}
-      className="w-full h-[72px] flex items-center justify-center gap-4 rounded-xl font-bold text-3xl transition-all active:scale-[0.97]"
+      className="w-full h-[72px] flex items-center justify-center gap-4 rounded-lg font-bold text-3xl transition-all active:scale-[0.97]"
       style={{ backgroundColor: bgColorFinal, opacity: buttonOpacity }}
     >
       {iconSrc && (
@@ -889,7 +889,7 @@ export default function DispatchClient({
       >
         <button
           onClick={() => router.push('/')}
-          className="text-white p-1 -ml-1 rounded-lg active:opacity-60"
+          className="text-white p-1 -ml-1 rounded-md active:opacity-60"
         >
           <IoIosArrowBack className="w-6 h-6" />
         </button>
@@ -974,7 +974,7 @@ export default function DispatchClient({
                 }
               }
             }}
-            className="flex-1 py-3 rounded-lg font-bold text-base text-white"
+            className="flex-1 py-3 rounded-md font-bold text-base text-white"
             style={{
               backgroundColor: mode === 'onsite' ? '#ea7600' : '#71A9F7',
               opacity: 1,
@@ -1017,7 +1017,7 @@ export default function DispatchClient({
                 }
               }
             }}
-            className="flex-1 py-3 rounded-lg font-bold text-base text-white"
+            className="flex-1 py-3 rounded-md font-bold text-base text-white"
             style={{
               backgroundColor: mode === 'transport' ? '#1C2948' : '#71A9F7',
               opacity: 1,
@@ -1098,7 +1098,7 @@ export default function DispatchClient({
           /* 振替待ち中 */
           transferCompleted ? (
             <div
-              className="w-full h-[72px] flex items-center justify-center gap-4 rounded-xl font-bold text-3xl"
+              className="w-full h-[72px] flex items-center justify-center gap-4 rounded-lg font-bold text-3xl"
               style={{ backgroundColor: '#2FBF71' }}
             >
               <MdPeopleAlt className="w-12 h-12 text-white scale-x-[-1]" />
@@ -1107,7 +1107,7 @@ export default function DispatchClient({
           ) : (
             <div className="space-y-2">
               <div
-                className="w-full h-[72px] flex items-center justify-center gap-4 rounded-xl font-bold text-3xl"
+                className="w-full h-[72px] flex items-center justify-center gap-4 rounded-lg font-bold text-3xl"
                 style={{ backgroundColor: '#2FBF71' }}
               >
                 <MdPeopleAlt className="w-12 h-12 text-white scale-x-[-1]" />
@@ -1125,7 +1125,7 @@ export default function DispatchClient({
                     if (res.ok) setTransferPending(false)
                   } catch (e) { console.error(e) }
                 }}
-                className="w-full py-3 rounded-lg font-bold text-lg text-center bg-white border-2 border-red-300 active:bg-red-50"
+                className="w-full py-3 rounded-md font-bold text-lg text-center bg-white border-2 border-red-300 active:bg-red-50"
                 style={{ color: '#D3170A' }}
               >
                 振替キャンセル
@@ -1147,7 +1147,7 @@ export default function DispatchClient({
                 if (res.ok) setTransferPending(true)
               } catch (e) { console.error(e) }
             }}
-            className={`w-full h-[72px] flex items-center justify-center gap-4 rounded-xl font-bold text-3xl transition-opacity ${step < 2 || isTransferred ? 'opacity-35' : 'active:brightness-90'}`}
+            className={`w-full h-[72px] flex items-center justify-center gap-4 rounded-lg font-bold text-3xl transition-opacity ${step < 2 || isTransferred ? 'opacity-35' : 'active:brightness-90'}`}
             style={{ backgroundColor: '#2FBF71', cursor: step < 2 || isTransferred ? 'not-allowed' : 'pointer' }}
           >
             <MdPeopleAlt className="w-12 h-12 text-white scale-x-[-1]" />
@@ -1159,7 +1159,7 @@ export default function DispatchClient({
         <button
           disabled={step < 2 || isTransferred}
           onClick={() => { if (step >= 2 && !isTransferred) router.push(`/dispatch/${dispatchId}/confirmation`) }}
-          className="w-full h-[72px] flex items-center justify-center gap-4 rounded-xl font-bold text-3xl active:brightness-90 transition-all"
+          className="w-full h-[72px] flex items-center justify-center gap-4 rounded-lg font-bold text-3xl active:brightness-90 transition-all"
           style={{
             backgroundColor: '#71A9F7',
             opacity: step < 2 || isTransferred ? 0.35 : 1,
@@ -1174,7 +1174,7 @@ export default function DispatchClient({
         <button
           disabled={step < 2 || isTransferred}
           onClick={() => { if (!isTransferred) openCamera() }}
-          className="w-full h-[72px] flex items-center justify-center gap-4 rounded-xl font-bold text-3xl active:brightness-90 transition-all"
+          className="w-full h-[72px] flex items-center justify-center gap-4 rounded-lg font-bold text-3xl active:brightness-90 transition-all"
           style={{
             backgroundColor: '#71A9F7',
             opacity: step < 2 || isTransferred ? 0.35 : 1,
@@ -1308,7 +1308,7 @@ export default function DispatchClient({
                 /* 完了済み表示 */
                 <div className="flex gap-2 w-full" style={{ height: '7rem' }}>
                   <div
-                    className="flex-1 flex flex-col items-center justify-end gap-1 rounded-xl pb-3"
+                    className="flex-1 flex flex-col items-center justify-end gap-1 rounded-lg pb-3"
                     style={{ backgroundColor: '#1C2948' }}
                   >
                     <img src="/icons/completion.svg" alt="" className="w-10 h-10 object-contain" />
@@ -1320,14 +1320,14 @@ export default function DispatchClient({
                     </span>
                     <div className="flex gap-2 w-full">
                       <button
-                        className="flex-1 bg-white rounded-lg py-2 text-center font-bold text-lg shadow-sm border-2 border-gray-200 active:bg-gray-100"
+                        className="flex-1 bg-white rounded-md py-2 text-center font-bold text-lg shadow-sm border-2 border-gray-200 active:bg-gray-100"
                         style={{ color: '#1C2948', letterSpacing: '0.25em', paddingLeft: '0.25em' }}
                         onClick={() => setClockTarget('completion')}
                       >
                         修正
                       </button>
                       <button
-                        className="flex-1 bg-white rounded-lg py-2 text-center font-bold text-lg shadow-sm border-2 border-red-300 active:bg-red-50"
+                        className="flex-1 bg-white rounded-md py-2 text-center font-bold text-lg shadow-sm border-2 border-red-300 active:bg-red-50"
                         style={{ color: '#D3170A', letterSpacing: '0.25em', paddingLeft: '0.25em' }}
                         onClick={() => handleCancelStep('completion')}
                       >
@@ -1340,7 +1340,7 @@ export default function DispatchClient({
                 /* 保管済み表示 */
                 <div className="flex gap-2 w-full" style={{ height: '7rem' }}>
                   <div
-                    className="flex-1 flex flex-col items-center justify-end gap-1 rounded-xl pb-3"
+                    className="flex-1 flex flex-col items-center justify-end gap-1 rounded-lg pb-3"
                     style={{ backgroundColor: '#1C2948' }}
                   >
                     <img src="/icons/storage.svg" alt="" className="w-12 h-12 object-contain" />
@@ -1352,14 +1352,14 @@ export default function DispatchClient({
                     </span>
                     <div className="flex gap-2 w-full">
                       <button
-                        className="flex-1 bg-white rounded-lg py-2 text-center font-bold text-lg shadow-sm border-2 border-gray-200 active:bg-gray-100"
+                        className="flex-1 bg-white rounded-md py-2 text-center font-bold text-lg shadow-sm border-2 border-gray-200 active:bg-gray-100"
                         style={{ color: '#1C2948', letterSpacing: '0.25em', paddingLeft: '0.25em' }}
                         onClick={() => setClockTarget('completion')}
                       >
                         修正
                       </button>
                       <button
-                        className="flex-1 bg-white rounded-lg py-2 text-center font-bold text-lg shadow-sm border-2 border-red-300 active:bg-red-50"
+                        className="flex-1 bg-white rounded-md py-2 text-center font-bold text-lg shadow-sm border-2 border-red-300 active:bg-red-50"
                         style={{ color: '#D3170A', letterSpacing: '0.25em', paddingLeft: '0.25em' }}
                         onClick={() => handleCancelStep('completion')}
                       >
@@ -1372,7 +1372,7 @@ export default function DispatchClient({
                 <button
                   onClick={step === 3 && completionOdo !== null ? handleTransportComplete : undefined}
                   disabled={step !== 3 || loading || completionOdo === null}
-                  className="w-full h-[72px] flex items-center justify-center gap-4 rounded-xl font-bold text-3xl transition-all active:scale-[0.97]"
+                  className="w-full h-[72px] flex items-center justify-center gap-4 rounded-lg font-bold text-3xl transition-all active:scale-[0.97]"
                   style={{
                     backgroundColor: '#71A9F7',
                     opacity: step !== 3 || completionOdo === null ? 0.35 : 1,
@@ -1427,7 +1427,7 @@ export default function DispatchClient({
                 <button
                   onClick={returnOdo !== null ? handleReturn : undefined}
                   disabled={loading || returnOdo === null}
-                  className="flex-1 flex flex-col items-center justify-center gap-1 rounded-xl py-5 font-bold text-xl"
+                  className="flex-1 flex flex-col items-center justify-center gap-1 rounded-lg py-5 font-bold text-xl"
                   style={{ backgroundColor: '#71A9F7' }}
                 >
                   <img src="/icons/return-truck.svg" alt="" className="w-12 h-12 object-contain" />
@@ -1436,7 +1436,7 @@ export default function DispatchClient({
                 <button
                   onClick={returnOdo !== null ? handleStorageAtReturn : undefined}
                   disabled={loading || returnOdo === null}
-                  className="flex-1 flex flex-col items-center justify-center gap-1 rounded-xl py-5 font-bold text-xl"
+                  className="flex-1 flex flex-col items-center justify-center gap-1 rounded-lg py-5 font-bold text-xl"
                   style={{ backgroundColor: '#71A9F7' }}
                 >
                   <img src="/icons/storage.svg" alt="" className="w-12 h-12 object-contain" />
@@ -1466,7 +1466,7 @@ export default function DispatchClient({
             <button
               onClick={recordReady ? () => router.push(`/dispatch/${dispatchId}/record`) : undefined}
               disabled={!recordReady}
-              className="w-full flex items-center justify-center gap-3 rounded-xl py-5 font-bold text-2xl transition-opacity"
+              className="w-full flex items-center justify-center gap-3 rounded-lg py-5 font-bold text-2xl transition-opacity"
               style={{
                 backgroundColor: '#D7AF70',
                 color: '#1C2948',

@@ -114,7 +114,7 @@ export default function NumberPlateInput({ value, onChange, onClose }: Props) {
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-t-2xl shadow-2xl overflow-hidden"
+        className="w-full max-w-md rounded-t-xl shadow-2xl overflow-hidden"
         style={{ backgroundColor: PLATE_GREEN_LIGHT }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -235,14 +235,14 @@ export default function NumberPlateInput({ value, onChange, onClose }: Props) {
         <div className="flex gap-3 px-4 pb-10 pt-2">
           <button
             onClick={onClose}
-            className="flex-1 py-3.5 border-2 rounded-lg font-bold text-base transition-colors"
+            className="flex-1 py-3.5 border-2 rounded-md font-bold text-base transition-colors"
             style={{ borderColor: PLATE_GREEN, color: PLATE_GREEN, backgroundColor: 'white' }}
           >
             キャンセル
           </button>
           <button
             onClick={handleConfirm}
-            className="flex-1 py-3.5 rounded-lg font-bold text-white text-base active:opacity-80 transition-opacity"
+            className="flex-1 py-3.5 rounded-md font-bold text-white text-base active:opacity-80 transition-opacity"
             style={{ backgroundColor: PLATE_GREEN }}
           >
             確定

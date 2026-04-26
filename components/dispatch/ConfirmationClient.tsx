@@ -436,7 +436,7 @@ export default function ConfirmationClient({ dispatchId, confirmation, userName 
         {/* ═══════════════════════════════════════════ */}
         {/* 作業前承認欄 */}
         {/* ═══════════════════════════════════════════ */}
-        <section className="rounded-xl shadow-sm p-4" style={{ backgroundColor: '#fff' }}>
+        <section className="rounded-lg shadow-sm p-4" style={{ backgroundColor: '#fff' }}>
           <h2 className="font-bold text-base mb-2" style={{ color: MAIN }}>
             作業前承認欄（お客様ご署名欄）
           </h2>
@@ -479,7 +479,7 @@ export default function ConfirmationClient({ dispatchId, confirmation, userName 
         {/* ═══════════════════════════════════════════ */}
         {/* 車両情報 */}
         {/* ═══════════════════════════════════════════ */}
-        <section className="rounded-xl shadow-sm p-4" style={{ backgroundColor: '#fff' }}>
+        <section className="rounded-lg shadow-sm p-4" style={{ backgroundColor: '#fff' }}>
           <h2 className="font-bold text-base mb-3" style={{ color: MAIN }}>車両情報</h2>
           <div className="space-y-3">
             <div>
@@ -510,7 +510,7 @@ export default function ConfirmationClient({ dispatchId, confirmation, userName 
         {/* ═══════════════════════════════════════════ */}
         {/* 作業内容 */}
         {/* ═══════════════════════════════════════════ */}
-        <section className="rounded-xl shadow-sm p-4" style={{ backgroundColor: '#fff' }}>
+        <section className="rounded-lg shadow-sm p-4" style={{ backgroundColor: '#fff' }}>
           <h2 className="font-bold text-base mb-3" style={{ color: MAIN }}>作業内容</h2>
           <textarea
             value={workContent}
@@ -525,7 +525,7 @@ export default function ConfirmationClient({ dispatchId, confirmation, userName 
         {/* ═══════════════════════════════════════════ */}
         {/* 入庫先ご担当者様記入欄 */}
         {/* ═══════════════════════════════════════════ */}
-        <section className="rounded-xl shadow-sm p-4" style={{ backgroundColor: '#fff' }}>
+        <section className="rounded-lg shadow-sm p-4" style={{ backgroundColor: '#fff' }}>
           <h2 className="font-bold text-base mb-2" style={{ color: MAIN }}>入庫先ご担当者様記入欄</h2>
           <p className="text-xs mb-3 text-justify" style={{ color: '#555' }}>
             本紙の内容を確認の上、車両をお預かりいたしました。
@@ -554,7 +554,7 @@ export default function ConfirmationClient({ dispatchId, confirmation, userName 
         {/* ═══════════════════════════════════════════ */}
         {/* 作業完了後承認欄 */}
         {/* ═══════════════════════════════════════════ */}
-        <section className="rounded-xl shadow-sm p-4" style={{ backgroundColor: '#fff' }}>
+        <section className="rounded-lg shadow-sm p-4" style={{ backgroundColor: '#fff' }}>
           <h2 className="font-bold text-base mb-2" style={{ color: MAIN }}>作業完了後承認欄（お客様ご署名欄）</h2>
           <p className="text-xs mb-3 text-justify" style={{ color: '#555' }}>
             今回の作業はあくまで応急処置です。早急に修理工場での点検・整備をお勧めいたします。（点検・整備費用はロードサービス対象外となります）
@@ -591,7 +591,7 @@ export default function ConfirmationClient({ dispatchId, confirmation, userName 
         {/* ═══════════════════════════════════════════ */}
         {/* バッテリー作業明細（折りたたみ） */}
         {/* ═══════════════════════════════════════════ */}
-        <section className="rounded-xl shadow-sm overflow-hidden" style={{ backgroundColor: '#fff' }}>
+        <section className="rounded-lg shadow-sm overflow-hidden" style={{ backgroundColor: '#fff' }}>
           <button
             type="button"
             className="w-full flex items-center justify-between p-4"
@@ -694,7 +694,7 @@ export default function ConfirmationClient({ dispatchId, confirmation, userName 
         {/* ═══════════════════════════════════════════ */}
         {/* 注意事項・その他 */}
         {/* ═══════════════════════════════════════════ */}
-        <section className="rounded-xl shadow-sm p-4" style={{ backgroundColor: '#fff' }}>
+        <section className="rounded-lg shadow-sm p-4" style={{ backgroundColor: '#fff' }}>
           <h2 className="font-bold text-base mb-3" style={{ color: MAIN }}>注意事項・その他</h2>
           <textarea
             value={notes}
@@ -709,7 +709,7 @@ export default function ConfirmationClient({ dispatchId, confirmation, userName 
         {/* ═══════════════════════════════════════════ */}
         {/* 担当者氏名（自動表示） */}
         {/* ═══════════════════════════════════════════ */}
-        <section className="rounded-xl shadow-sm p-4" style={{ backgroundColor: '#fff' }}>
+        <section className="rounded-lg shadow-sm p-4" style={{ backgroundColor: '#fff' }}>
           <h2 className="font-bold text-base mb-2" style={{ color: MAIN }}>担当者氏名</h2>
           <p className="text-sm px-1" style={{ color: '#333' }}>{userName}</p>
         </section>
@@ -723,7 +723,7 @@ export default function ConfirmationClient({ dispatchId, confirmation, userName 
         <button
           type="button"
           onClick={handleCancel}
-          className="flex-1 py-3.5 rounded-xl font-bold text-base"
+          className="flex-1 py-3.5 rounded-lg font-bold text-base"
           style={{
             backgroundColor: '#fff',
             color: MAIN,
@@ -736,7 +736,7 @@ export default function ConfirmationClient({ dispatchId, confirmation, userName 
           type="button"
           onClick={handleSave}
           disabled={saving}
-          className="flex-1 py-3.5 rounded-xl font-bold text-base text-white"
+          className="flex-1 py-3.5 rounded-lg font-bold text-base text-white"
           style={{
             backgroundColor: saving ? '#999' : MAIN,
           }}

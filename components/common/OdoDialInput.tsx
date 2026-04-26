@@ -441,7 +441,7 @@ function BottomSheet({
       data-testid="odo-bottom-sheet-overlay"
     >
       <div
-        className="absolute inset-x-0 bottom-0 rounded-t-3xl shadow-2xl"
+        className="absolute inset-x-0 bottom-0 rounded-t-2xl shadow-2xl"
         style={{
           backgroundColor: '#1c1c1e',
           transform: entered ? 'translateY(0)' : 'translateY(100%)',
@@ -509,7 +509,7 @@ function BottomSheet({
         <div
           role="group"
           aria-label={`${label}ODO ダイヤル`}
-          className="mx-4 mb-4 rounded-2xl"
+          className="mx-4 mb-4 rounded-xl"
           style={{
             background: cylinderBg,
             boxShadow:
@@ -729,7 +729,7 @@ export default function OdoDialInput({
               handleCompactActivate()
             }
           }}
-          className="flex-1 bg-white rounded-lg border-2 border-gray-200 h-12 px-4 flex items-center justify-end gap-2 relative"
+          className="flex-1 bg-white rounded-md border-2 border-gray-200 h-12 px-4 flex items-center justify-end gap-2 relative"
           style={{
             cursor: disabled ? 'not-allowed' : 'pointer',
           }}

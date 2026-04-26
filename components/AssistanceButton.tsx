@@ -26,7 +26,7 @@ export default function AssistanceButton({ assistance }: AssistanceButtonProps) 
 
   return (
     <button
-      className="bg-white rounded-2xl shadow-md p-4 flex flex-col items-center justify-center gap-3 hover:shadow-lg active:scale-95 transition-all"
+      className="bg-white rounded-lg shadow-md p-4 flex flex-col items-center justify-center gap-3 hover:shadow-lg active:scale-95 transition-all"
       style={{ aspectRatio: '1 / 0.8' }}
       onClick={handleClick}
     >
