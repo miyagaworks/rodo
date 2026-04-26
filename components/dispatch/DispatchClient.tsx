@@ -376,6 +376,7 @@ export default function DispatchClient({
   // ── 自動スクロール用 ref ──
   const dispatchBtnRef  = useRef<HTMLDivElement>(null)
   const arrivalBtnRef   = useRef<HTMLDivElement>(null)
+  const transferBtnRef  = useRef<HTMLDivElement>(null)
   const completionBtnRef = useRef<HTMLDivElement>(null)
   const returnBtnRef    = useRef<HTMLDivElement>(null)
   const recordBtnRef    = useRef<HTMLDivElement>(null)
@@ -385,7 +386,7 @@ export default function DispatchClient({
       const refs = [
         dispatchBtnRef,    // step 0
         arrivalBtnRef,     // step 1
-        completionBtnRef,  // step 2
+        transferBtnRef,    // step 2 (現着後 → 振替/作業確認書/写真ボタンを表示)
         completionBtnRef,  // step 3 (搬送開始後 → 完了付近)
         returnBtnRef,      // step 4
         recordBtnRef,      // step 5
@@ -395,7 +396,7 @@ export default function DispatchClient({
       const refs = [
         dispatchBtnRef,    // step 0
         arrivalBtnRef,     // step 1
-        completionBtnRef,  // step 2
+        transferBtnRef,    // step 2 (現着後 → 振替/作業確認書/写真ボタンを表示)
         returnBtnRef,      // step 3
         recordBtnRef,      // step 4
       ]
@@ -1094,66 +1095,68 @@ export default function DispatchClient({
         </div>
 
         {/* ─── 振替ボタン（現着後に表示・共通） ─── */}
-        {transferPending ? (
-          /* 振替待ち中 */
-          transferCompleted ? (
-            <div
-              className="w-full h-[72px] flex items-center justify-center gap-4 rounded-lg font-bold text-3xl"
-              style={{ backgroundColor: '#2FBF71' }}
-            >
-              <MdPeopleAlt className="w-12 h-12 text-white scale-x-[-1]" />
-              <span className="text-white">振替が完了しました</span>
-            </div>
-          ) : (
-            <div className="space-y-2">
+        <div ref={transferBtnRef}>
+          {transferPending ? (
+            /* 振替待ち中 */
+            transferCompleted ? (
               <div
                 className="w-full h-[72px] flex items-center justify-center gap-4 rounded-lg font-bold text-3xl"
                 style={{ backgroundColor: '#2FBF71' }}
               >
                 <MdPeopleAlt className="w-12 h-12 text-white scale-x-[-1]" />
-                <span className="text-white">振替待ち中...</span>
+                <span className="text-white">振替が完了しました</span>
               </div>
-              <button
-                onClick={async () => {
-                  if (!dispatchId) return
-                  try {
-                    const res = await offlineFetch(`/api/dispatches/${dispatchId}/transfer/cancel`, {
-                      method: 'POST',
-                      offlineActionType: 'transfer_cancel',
-                      offlineDispatchId: dispatchId,
-                    })
-                    if (res.ok) setTransferPending(false)
-                  } catch (e) { console.error(e) }
-                }}
-                className="w-full py-3 rounded-md font-bold text-lg text-center bg-white border-2 border-red-300 active:bg-red-50"
-                style={{ color: '#D3170A' }}
-              >
-                振替キャンセル
-              </button>
-            </div>
-          )
-        ) : (
-          <button
-            disabled={step < 2 || isTransferred}
-            onClick={async () => {
-              if (!dispatchId || step < 2) return
-              if (!window.confirm('この案件を他の隊員に振り替えますか？')) return
-              try {
-                const res = await offlineFetch(`/api/dispatches/${dispatchId}/transfer`, {
-                  method: 'POST',
-                  offlineActionType: 'transfer_request',
-                  offlineDispatchId: dispatchId,
-                })
-                if (res.ok) setTransferPending(true)
-              } catch (e) { console.error(e) }
-            }}
-            className={`w-full h-[72px] flex items-center justify-center gap-4 rounded-lg font-bold text-3xl transition-opacity ${step < 2 || isTransferred ? 'opacity-35' : 'active:brightness-90'}`}
-            style={{ backgroundColor: '#2FBF71', cursor: step < 2 || isTransferred ? 'not-allowed' : 'pointer' }}
-          >
-            <MdPeopleAlt className="w-12 h-12 text-white scale-x-[-1]" />
-            <span className="text-white" style={{ letterSpacing: '0.25em', paddingLeft: '0.25em' }}>振替</span>
-          </button>
-        )}
+            ) : (
+              <div className="space-y-2">
+                <div
+                  className="w-full h-[72px] flex items-center justify-center gap-4 rounded-lg font-bold text-3xl"
+                  style={{ backgroundColor: '#2FBF71' }}
+                >
+                  <MdPeopleAlt className="w-12 h-12 text-white scale-x-[-1]" />
+                  <span className="text-white">振替待ち中...</span>
+                </div>
+                <button
+                  onClick={async () => {
+                    if (!dispatchId) return
+                    try {
+                      const res = await offlineFetch(`/api/dispatches/${dispatchId}/transfer/cancel`, {
+                        method: 'POST',
+                        offlineActionType: 'transfer_cancel',
+                        offlineDispatchId: dispatchId,
+                      })
+                      if (res.ok) setTransferPending(false)
+                    } catch (e) { console.error(e) }
+                  }}
+                  className="w-full py-3 rounded-md font-bold text-lg text-center bg-white border-2 border-red-300 active:bg-red-50"
+                  style={{ color: '#D3170A' }}
+                >
+                  振替キャンセル
+                </button>
+              </div>
+            )
+          ) : (
+            <button
+              disabled={step < 2 || isTransferred}
+              onClick={async () => {
+                if (!dispatchId || step < 2) return
+                if (!window.confirm('この案件を他の隊員に振り替えますか？')) return
+                try {
+                  const res = await offlineFetch(`/api/dispatches/${dispatchId}/transfer`, {
+                    method: 'POST',
+                    offlineActionType: 'transfer_request',
+                    offlineDispatchId: dispatchId,
+                  })
+                  if (res.ok) setTransferPending(true)
+                } catch (e) { console.error(e) }
+              }}
+              className={`w-full h-[72px] flex items-center justify-center gap-4 rounded-lg font-bold text-3xl transition-opacity ${step < 2 || isTransferred ? 'opacity-35' : 'active:brightness-90'}`}
+              style={{ backgroundColor: '#2FBF71', cursor: step < 2 || isTransferred ? 'not-allowed' : 'pointer' }}
+            >
+              <MdPeopleAlt className="w-12 h-12 text-white scale-x-[-1]" />
+              <span className="text-white" style={{ letterSpacing: '0.25em', paddingLeft: '0.25em' }}>振替</span>
+            </button>
+          )}
+        </div>
 
         {/* ─── 作業確認書（Phase 6） ─── */}
         <button
