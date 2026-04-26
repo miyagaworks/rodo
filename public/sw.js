@@ -1,8 +1,8 @@
 /// <reference lib="webworker" />
 
-const CACHE_NAME = 'rodo-v4'
-const STATIC_CACHE = 'rodo-static-v4'
-const IMAGE_CACHE = 'rodo-images-v4'
+const CACHE_NAME = 'rodo-v5'
+const STATIC_CACHE = 'rodo-static-v5'
+const IMAGE_CACHE = 'rodo-images-v5'
 
 // 静的アセット（Cache First）
 // 注意: '/' は動的ページ（セッション依存）なのでプリキャッシュしない
@@ -45,6 +45,10 @@ self.addEventListener('fetch', (event) => {
 
   // 外部ドメインのリクエストはSWで処理しない（CSP競合・キャッシュ汚染の防止）
   if (url.origin !== self.location.origin) return
+
+  // 作業確認書の公開ページ・公開API → SW 介入なし
+  // （認証不要・PWAキャッシュ不要）
+  if (url.pathname.startsWith('/c/') || url.pathname.startsWith('/api/c/')) return
 
   // POST/PATCH はキャッシュしない
   if (request.method !== 'GET') return
