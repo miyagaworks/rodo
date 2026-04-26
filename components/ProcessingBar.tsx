@@ -248,7 +248,7 @@ export default function ProcessingBar() {
       {showDraftMenu && drafts.length > 1 && (
         <div
           ref={draftMenuRef}
-          className="absolute bottom-full left-3 right-3 mb-1 rounded-xl overflow-hidden shadow-lg py-2"
+          className="absolute bottom-full left-3 right-3 mb-1 rounded-lg overflow-hidden shadow-lg py-2"
           style={{ backgroundColor: '#D3170A' }}
         >
           {orderedDrafts.map((draft) => (
@@ -271,7 +271,7 @@ export default function ProcessingBar() {
       {showStoredMenu && storedDispatches.length > 1 && (
         <div
           ref={storedMenuRef}
-          className="absolute bottom-full left-3 right-3 mb-1 rounded-xl overflow-hidden shadow-lg py-2"
+          className="absolute bottom-full left-3 right-3 mb-1 rounded-lg overflow-hidden shadow-lg py-2"
           style={{ backgroundColor: '#71A9F7' }}
         >
           {orderedStored.map((stored) => (
@@ -295,7 +295,7 @@ export default function ProcessingBar() {
       {showCompletedMenu && completedDispatches.length > 1 && (
         <div
           ref={completedMenuRef}
-          className="absolute bottom-full left-3 right-3 mb-1 rounded-xl overflow-hidden shadow-lg py-2"
+          className="absolute bottom-full left-3 right-3 mb-1 rounded-lg overflow-hidden shadow-lg py-2"
           style={{ backgroundColor: '#D7AF70' }}
         >
           {orderedCompleted.map((item) => (
@@ -319,7 +319,7 @@ export default function ProcessingBar() {
       {showTransferMenu && transfers.length > 0 && (
         <div
           ref={transferMenuRef}
-          className="absolute bottom-full left-3 right-3 mb-1 rounded-xl overflow-hidden shadow-lg py-2"
+          className="absolute bottom-full left-3 right-3 mb-1 rounded-lg overflow-hidden shadow-lg py-2"
           style={{ backgroundColor: '#2FBF71' }}
         >
           {transfers.map((t) => {
@@ -375,7 +375,7 @@ export default function ProcessingBar() {
         <button
           ref={draftBtnRef}
           disabled={drafts.length === 0}
-          className={`flex-1 min-w-0 flex items-center justify-center gap-1.5 h-11 rounded-lg text-white text-sm font-bold whitespace-nowrap transition-opacity ${drafts.length === 0 ? 'opacity-35 cursor-not-allowed' : 'active:opacity-80'}`}
+          className={`flex-1 min-w-0 flex items-center justify-center gap-1.5 h-11 rounded-md text-white text-sm font-bold whitespace-nowrap transition-opacity ${drafts.length === 0 ? 'opacity-35 cursor-not-allowed' : 'active:opacity-80'}`}
           style={{ backgroundColor: '#D3170A' }}
           onClick={handleDraftTap}
         >
@@ -395,7 +395,7 @@ export default function ProcessingBar() {
         <button
           ref={completedBtnRef}
           disabled={completedDispatches.length === 0}
-          className={`flex-1 min-w-0 flex items-center justify-center gap-1.5 h-11 rounded-lg text-sm font-bold whitespace-nowrap transition-opacity ${completedDispatches.length === 0 ? 'opacity-35 cursor-not-allowed' : 'active:opacity-80'}`}
+          className={`flex-1 min-w-0 flex items-center justify-center gap-1.5 h-11 rounded-md text-sm font-bold whitespace-nowrap transition-opacity ${completedDispatches.length === 0 ? 'opacity-35 cursor-not-allowed' : 'active:opacity-80'}`}
           style={{ backgroundColor: '#D7AF70', color: '#1C2948' }}
           onClick={handleCompletedTap}
         >
@@ -421,7 +421,7 @@ export default function ProcessingBar() {
         <button
           ref={storedBtnRef}
           disabled={storedDispatches.length === 0}
-          className={`flex-1 min-w-0 flex items-center justify-center gap-1.5 h-11 rounded-lg text-white text-sm font-bold whitespace-nowrap transition-opacity ${storedDispatches.length === 0 ? 'opacity-35 cursor-not-allowed' : 'active:opacity-80'}`}
+          className={`flex-1 min-w-0 flex items-center justify-center gap-1.5 h-11 rounded-md text-white text-sm font-bold whitespace-nowrap transition-opacity ${storedDispatches.length === 0 ? 'opacity-35 cursor-not-allowed' : 'active:opacity-80'}`}
           style={{ backgroundColor: '#71A9F7' }}
           onClick={handleStoredTap}
         >
@@ -442,7 +442,7 @@ export default function ProcessingBar() {
         <button
           ref={transferBtnRef}
           disabled={transfers.length === 0}
-          className={`flex-shrink-0 flex items-center justify-center w-11 h-11 rounded-lg text-white relative transition-opacity ${transfers.length === 0 ? 'opacity-35 cursor-not-allowed' : 'active:opacity-80'}`}
+          className={`flex-shrink-0 flex items-center justify-center w-11 h-11 rounded-md text-white relative transition-opacity ${transfers.length === 0 ? 'opacity-35 cursor-not-allowed' : 'active:opacity-80'}`}
           style={{ backgroundColor: '#2FBF71' }}
           onClick={transfers.length > 0 ? handleTransferTap : undefined}
         >

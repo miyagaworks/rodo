@@ -430,7 +430,7 @@ export default function ReportOnsiteClient({ dispatch, report, userName }: Props
       <div className="flex-1 overflow-y-auto px-3 py-3 pb-44 space-y-3">
 
         {/* ── 時間セクション ── */}
-        <div className="bg-white rounded-xl shadow-sm p-4">
+        <div className="bg-white rounded-lg shadow-sm p-4">
           <div className="flex gap-3">
             {/* 左カラム: 赤丸 + 縦線 + 時計アイコン */}
             <div className="flex flex-col items-center flex-shrink-0" style={{ width: 36 }}>
@@ -476,7 +476,7 @@ export default function ReportOnsiteClient({ dispatch, report, userName }: Props
         </div>
 
         {/* ── 距離セクション ── */}
-        <div className="bg-white rounded-xl shadow-sm p-4">
+        <div className="bg-white rounded-lg shadow-sm p-4">
           <div className="flex gap-3">
             {/* 左カラム: 赤丸 + 縦線 + 距離アイコン */}
             <div className="flex flex-col items-center flex-shrink-0" style={{ width: 36 }}>
@@ -560,7 +560,7 @@ export default function ReportOnsiteClient({ dispatch, report, userName }: Props
         </div>
 
         {/* ── 高速代セクション ── */}
-        <div className="bg-white rounded-xl shadow-sm p-4">
+        <div className="bg-white rounded-lg shadow-sm p-4">
           <div className="flex gap-3">
             {/* ETCアイコン */}
             <div className="flex flex-col items-center justify-center flex-shrink-0" style={{ width: 36 }}>
@@ -623,7 +623,7 @@ export default function ReportOnsiteClient({ dispatch, report, userName }: Props
         </div>
 
         {/* ── 出動場所 ── */}
-        <div className="bg-white rounded-xl shadow-sm p-4">
+        <div className="bg-white rounded-lg shadow-sm p-4">
           <div className="flex items-center gap-2 mb-3">
             <span
               className="w-3.5 h-3.5 rounded-full flex-shrink-0"
@@ -661,7 +661,7 @@ export default function ReportOnsiteClient({ dispatch, report, userName }: Props
         <div className="border-t-2 border-white/60 mx-1" />
 
         {/* ── 1次完了・協定金額 ── */}
-        <div className="bg-white rounded-xl shadow-sm p-4 space-y-3">
+        <div className="bg-white rounded-lg shadow-sm p-4 space-y-3">
           <p className="text-sm font-bold" style={{ color: '#1C2948' }}>
             1次完了・協定金額
           </p>
@@ -700,7 +700,7 @@ export default function ReportOnsiteClient({ dispatch, report, userName }: Props
         </div>
 
         {/* ── 1次金額 ── */}
-        <div className="bg-white rounded-xl shadow-sm p-4">
+        <div className="bg-white rounded-lg shadow-sm p-4">
           <div className="flex items-center gap-3">
             <span className="text-sm font-bold flex-shrink-0" style={{ color: '#1C2948' }}>
               1次金額
@@ -721,7 +721,7 @@ export default function ReportOnsiteClient({ dispatch, report, userName }: Props
         </div>
 
         {/* ── 請求合計確定金額 ── */}
-        <div className="bg-white rounded-xl shadow-sm p-4">
+        <div className="bg-white rounded-lg shadow-sm p-4">
           <div className="flex items-center justify-between">
             <span className="text-sm font-bold" style={{ color: '#1C2948' }}>
               請求合計確定金額
@@ -738,7 +738,7 @@ export default function ReportOnsiteClient({ dispatch, report, userName }: Props
         </div>
 
         {/* ── 請求担当者への連絡事項 ── */}
-        <div className="bg-white rounded-xl shadow-sm p-4">
+        <div className="bg-white rounded-lg shadow-sm p-4">
           <p className="text-sm font-bold mb-2" style={{ color: '#1C2948' }}>
             請求担当者への連絡事項
           </p>
@@ -763,7 +763,7 @@ export default function ReportOnsiteClient({ dispatch, report, userName }: Props
             type="button"
             onClick={() => handleSave(true)}
             disabled={loading}
-            className="flex-none flex items-center gap-2 px-5 py-3.5 rounded-lg font-bold text-white text-sm active:opacity-80 transition-opacity"
+            className="flex-none flex items-center gap-2 px-5 py-3.5 rounded-md font-bold text-white text-sm active:opacity-80 transition-opacity"
             style={{ backgroundColor: '#D3170A' }}
           >
             <FaPen />
@@ -774,7 +774,7 @@ export default function ReportOnsiteClient({ dispatch, report, userName }: Props
             type="button"
             onClick={() => handleSave(false)}
             disabled={!isComplete || loading}
-            className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-lg font-bold text-sm transition-all active:opacity-80"
+            className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-md font-bold text-sm transition-all active:opacity-80"
             style={{
               backgroundColor: isComplete ? '#1C2948' : '#9CA3AF',
               color: isComplete ? '#D7AF70' : 'white',
@@ -790,7 +790,7 @@ export default function ReportOnsiteClient({ dispatch, report, userName }: Props
         <button
           type="button"
           onClick={() => router.push(`/dispatch/${dispatch.id}/record`)}
-          className="w-full flex items-center gap-2 px-4 py-3 rounded-lg font-bold text-white text-sm active:opacity-80"
+          className="w-full flex items-center gap-2 px-4 py-3 rounded-md font-bold text-white text-sm active:opacity-80"
           style={{ backgroundColor: '#1C2948' }}
         >
           <IoIosArrowBack className="text-lg" />

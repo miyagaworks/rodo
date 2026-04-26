@@ -163,7 +163,7 @@ export default function HomeClient({ session }: HomeClientProps) {
             <p className="text-gray-600 text-sm">{fetchError}</p>
             <button
               onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-white rounded-lg shadow text-sm font-medium text-gray-700 hover:bg-gray-50"
+              className="px-4 py-2 bg-white rounded-md shadow text-sm font-medium text-gray-700 hover:bg-gray-50"
             >
               再読み込み
             </button>
@@ -174,7 +174,7 @@ export default function HomeClient({ session }: HomeClientProps) {
             {Array.from({ length: 6 }).map((_, i) => (
               <div
                 key={i}
-                className="bg-white rounded-2xl shadow-md animate-pulse"
+                className="bg-white rounded-xl shadow-md animate-pulse"
                 style={{ aspectRatio: '1 / 0.8' }}
               />
             ))}
@@ -194,7 +194,7 @@ export default function HomeClient({ session }: HomeClientProps) {
         {/* 休憩ボタン（ポーズ中 / 取得中 / 消化済みは非表示） */}
         {breakState.status !== 'paused' && canStartBreak === true && (
           <button
-            className="w-full flex items-center justify-center gap-3 py-5 rounded-xl text-white text-xl font-bold"
+            className="w-full flex items-center justify-center gap-3 py-5 rounded-lg text-white text-xl font-bold"
             style={{ backgroundColor: '#888888' }}
             onClick={() => router.push('/break')}
           >

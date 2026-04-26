@@ -185,7 +185,7 @@ export default function ClockPicker({ value, onChange, onClose, minTime, maxTime
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl overflow-hidden shadow-2xl"
+        className="bg-white rounded-xl overflow-hidden shadow-2xl"
         style={{ width: 320 }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -375,14 +375,14 @@ export default function ClockPicker({ value, onChange, onClose, minTime, maxTime
         {/* ─── フッター ─── */}
         <div className="flex gap-3 px-6 py-4">
           <button
-            className="flex-1 py-3 rounded-lg font-bold text-base"
+            className="flex-1 py-3 rounded-md font-bold text-base"
             style={{ backgroundColor: '#E5E7EB', color: '#374151' }}
             onClick={onClose}
           >
             キャンセル
           </button>
           <button
-            className="flex-1 py-3 rounded-lg font-bold text-base text-white"
+            className="flex-1 py-3 rounded-md font-bold text-base text-white"
             style={{ backgroundColor: '#2FBF71' }}
             onClick={handleOK}
           >

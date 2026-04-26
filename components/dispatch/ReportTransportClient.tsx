@@ -584,7 +584,7 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
         {isStored ? (
           <>
             {/* 1次 時間 */}
-            <div className="bg-white rounded-xl shadow-sm p-4">
+            <div className="bg-white rounded-lg shadow-sm p-4">
               <p className="text-xs font-bold mb-3 px-1" style={{ color: '#71A9F7' }}>1次</p>
               <div className="flex gap-3">
                 <div className="flex flex-col items-center flex-shrink-0" style={{ width: 36 }}>
@@ -618,7 +618,7 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
               </div>
             </div>
             {/* 2次 時間 */}
-            <div className="bg-white rounded-xl shadow-sm p-4">
+            <div className="bg-white rounded-lg shadow-sm p-4">
               <p className="text-xs font-bold mb-3 px-1" style={{ color: '#71A9F7' }}>2次</p>
               <div className="flex gap-3">
                 <div className="flex flex-col items-center flex-shrink-0" style={{ width: 36 }}>
@@ -651,7 +651,7 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
             </div>
           </>
         ) : (
-          <div className="bg-white rounded-xl shadow-sm p-4">
+          <div className="bg-white rounded-lg shadow-sm p-4">
             <div className="flex gap-3">
               <div className="flex flex-col items-center flex-shrink-0" style={{ width: 36 }}>
                 <span className="w-3.5 h-3.5 rounded-full flex-shrink-0" style={{ backgroundColor: '#D3170A' }} />
@@ -691,7 +691,7 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
         {isStored ? (
           <>
             {/* 1次 距離 */}
-            <div className="bg-white rounded-xl shadow-sm p-4">
+            <div className="bg-white rounded-lg shadow-sm p-4">
               <p className="text-xs font-bold mb-3 px-1" style={{ color: '#71A9F7' }}>1次</p>
               <div className="flex gap-3">
                 <div className="flex flex-col items-center flex-shrink-0" style={{ width: 36 }}>
@@ -724,7 +724,7 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
               </div>
             </div>
             {/* 2次 距離 */}
-            <div className="bg-white rounded-xl shadow-sm p-4">
+            <div className="bg-white rounded-lg shadow-sm p-4">
               <p className="text-xs font-bold mb-3 px-1" style={{ color: '#71A9F7' }}>2次</p>
               <div className="flex gap-3">
                 <div className="flex flex-col items-center flex-shrink-0" style={{ width: 36 }}>
@@ -757,7 +757,7 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
             </div>
           </>
         ) : (
-          <div className="bg-white rounded-xl shadow-sm p-4">
+          <div className="bg-white rounded-lg shadow-sm p-4">
             <div className="flex gap-3">
               <div className="flex flex-col items-center flex-shrink-0" style={{ width: 36 }}>
                 <span className="w-3.5 h-3.5 rounded-full flex-shrink-0" style={{ backgroundColor: '#D3170A' }} />
@@ -794,7 +794,7 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
         {isStored ? (
           <>
             {/* 1次 高速代 */}
-            <div className="bg-white rounded-xl shadow-sm p-4">
+            <div className="bg-white rounded-lg shadow-sm p-4">
               <p className="text-xs font-bold mb-3 px-1" style={{ color: '#71A9F7' }}>1次</p>
               <div className="flex gap-3">
                 <div className="flex flex-col items-center justify-center flex-shrink-0" style={{ width: 36 }}>
@@ -821,7 +821,7 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
               </div>
             </div>
             {/* 2次 高速代 */}
-            <div className="bg-white rounded-xl shadow-sm p-4">
+            <div className="bg-white rounded-lg shadow-sm p-4">
               <p className="text-xs font-bold mb-3 px-1" style={{ color: '#71A9F7' }}>2次</p>
               <div className="flex gap-3">
                 <div className="flex flex-col items-center justify-center flex-shrink-0" style={{ width: 36 }}>
@@ -847,7 +847,7 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
               </div>
             </div>
             {/* 高速代 合計 */}
-            <div className="bg-white rounded-xl shadow-sm p-4">
+            <div className="bg-white rounded-lg shadow-sm p-4">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-bold flex-shrink-0" style={{ color: '#1C2948' }}>
                   高速代 合計金額
@@ -859,7 +859,7 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
             </div>
           </>
         ) : (
-          <div className="bg-white rounded-xl shadow-sm p-4">
+          <div className="bg-white rounded-lg shadow-sm p-4">
             <div className="flex gap-3">
               <div className="flex flex-col items-center justify-center flex-shrink-0" style={{ width: 36 }}>
                 <div className="w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center" style={{ backgroundColor: '#F3F4F6' }}>
@@ -896,7 +896,7 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
         )}
 
         {/* ── 出動場所（3箇所） ── */}
-        <div className="bg-white rounded-xl shadow-sm p-4">
+        <div className="bg-white rounded-lg shadow-sm p-4">
           <div className="flex items-center gap-2 mb-3">
             <RequiredDot />
             <span className="text-sm font-bold" style={{ color: '#1C2948' }}>
@@ -934,7 +934,7 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
         </div>
 
         {/* ── 搬送先情報 ── */}
-        <div className="bg-white rounded-xl shadow-sm p-4 space-y-3">
+        <div className="bg-white rounded-lg shadow-sm p-4 space-y-3">
           <div className="flex items-center gap-2">
             <RequiredDot />
             <span className="text-sm font-bold" style={{ color: '#1C2948' }}>搬送先情報</span>
@@ -1023,7 +1023,7 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
         <div className="border-t-2 border-white/60 mx-1" />
 
         {/* ── 1次完了・協定金額 ── */}
-        <div className="bg-white rounded-xl shadow-sm p-4 space-y-3">
+        <div className="bg-white rounded-lg shadow-sm p-4 space-y-3">
           <p className="text-sm font-bold" style={{ color: '#1C2948' }}>
             1次完了・協定金額
           </p>
@@ -1060,7 +1060,7 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
         </div>
 
         {/* ── 1次金額 ── */}
-        <div className="bg-white rounded-xl shadow-sm p-4">
+        <div className="bg-white rounded-lg shadow-sm p-4">
           <div className="flex items-center gap-3">
             <span className="text-sm font-bold flex-shrink-0" style={{ color: '#1C2948' }}>1次金額</span>
             <input
@@ -1080,7 +1080,7 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
         {isStored && (
           <>
             <div className="border-t-2 border-white/60 mx-1" />
-            <div className="bg-white rounded-xl shadow-sm p-4 space-y-3">
+            <div className="bg-white rounded-lg shadow-sm p-4 space-y-3">
               <p className="text-sm font-bold" style={{ color: '#1C2948' }}>
                 2次完了・協定金額
               </p>
@@ -1118,7 +1118,7 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
                       key={label}
                       type="button"
                       onClick={() => setStorageRequired(value)}
-                      className="px-4 py-1.5 rounded-lg text-sm font-bold transition-all"
+                      className="px-4 py-1.5 rounded-md text-sm font-bold transition-all"
                       style={{
                         backgroundColor: storageRequired === value ? '#1C2948' : '#F3F4F6',
                         color: storageRequired === value ? 'white' : '#1C2948',
@@ -1141,7 +1141,7 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
             </div>
 
             {/* ── 2次金額（協定金額） ── */}
-            <div className="bg-white rounded-xl shadow-sm p-4">
+            <div className="bg-white rounded-lg shadow-sm p-4">
               <div className="flex items-center gap-3">
                 <span className="text-sm font-bold flex-shrink-0" style={{ color: '#1C2948' }}>2次金額</span>
                 <input
@@ -1160,7 +1160,7 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
         )}
 
         {/* ── 請求合計確定金額 ── */}
-        <div className="bg-white rounded-xl shadow-sm p-4">
+        <div className="bg-white rounded-lg shadow-sm p-4">
           <div className="flex items-center justify-between">
             <span className="text-sm font-bold" style={{ color: '#1C2948' }}>請求合計確定金額</span>
             <div className="flex items-center gap-1">
@@ -1178,7 +1178,7 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
         </div>
 
         {/* ── 請求担当者への連絡事項 ── */}
-        <div className="bg-white rounded-xl shadow-sm p-4">
+        <div className="bg-white rounded-lg shadow-sm p-4">
           <p className="text-sm font-bold mb-2" style={{ color: '#1C2948' }}>請求担当者への連絡事項</p>
           <textarea
             value={billingContactMemo}
@@ -1198,7 +1198,7 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
             type="button"
             onClick={() => handleSave(true)}
             disabled={loading}
-            className="flex-none flex items-center gap-2 px-5 py-3.5 rounded-lg font-bold text-white text-sm active:opacity-80 transition-opacity"
+            className="flex-none flex items-center gap-2 px-5 py-3.5 rounded-md font-bold text-white text-sm active:opacity-80 transition-opacity"
             style={{ backgroundColor: '#D3170A' }}
           >
             <FaPen />
@@ -1209,7 +1209,7 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
             type="button"
             onClick={() => handleSave(false)}
             disabled={!isComplete || loading}
-            className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-lg font-bold text-sm transition-all active:opacity-80"
+            className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-md font-bold text-sm transition-all active:opacity-80"
             style={{
               backgroundColor: isComplete ? '#1C2948' : '#9CA3AF',
               color: isComplete ? '#D7AF70' : 'white',
@@ -1225,7 +1225,7 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
         <button
           type="button"
           onClick={() => router.push(`/dispatch/${dispatch.id}/record`)}
-          className="w-full flex items-center gap-2 px-4 py-3 rounded-lg font-bold text-white text-sm active:opacity-80"
+          className="w-full flex items-center gap-2 px-4 py-3 rounded-md font-bold text-white text-sm active:opacity-80"
           style={{ backgroundColor: '#1C2948' }}
         >
           <IoIosArrowBack className="text-lg" />

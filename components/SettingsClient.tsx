@@ -20,25 +20,28 @@ export default function SettingsClient() {
         <Tabs.List className="flex" style={{ backgroundColor: '#374151' }}>
           <Tabs.Trigger
             value="assistances"
-            className="flex-1 py-3 text-xs font-medium text-gray-300 data-[state=active]:text-white data-[state=active]:bg-gray-600 transition-colors"
+            className="flex-auto py-3 text-sm font-medium text-gray-300 data-[state=active]:text-white data-[state=active]:bg-gray-600 transition-colors"
           >
             アシスタンス
           </Tabs.Trigger>
+          <div className="w-px self-stretch my-2.5 bg-gray-500" />
           <Tabs.Trigger
             value="members"
-            className="flex-1 py-3 text-xs font-medium text-gray-300 data-[state=active]:text-white data-[state=active]:bg-gray-600 transition-colors"
+            className="flex-auto py-3 text-sm font-medium text-gray-300 data-[state=active]:text-white data-[state=active]:bg-gray-600 transition-colors"
           >
             隊員登録
           </Tabs.Trigger>
+          <div className="w-px self-stretch my-2.5 bg-gray-500" />
           <Tabs.Trigger
             value="vehicles"
-            className="flex-1 py-3 text-xs font-medium text-gray-300 data-[state=active]:text-white data-[state=active]:bg-gray-600 transition-colors"
+            className="flex-auto py-3 text-sm font-medium text-gray-300 data-[state=active]:text-white data-[state=active]:bg-gray-600 transition-colors"
           >
             車両管理
           </Tabs.Trigger>
+          <div className="w-px self-stretch my-2.5 bg-gray-500" />
           <Tabs.Trigger
             value="tenant"
-            className="flex-1 py-3 text-xs font-medium text-gray-300 data-[state=active]:text-white data-[state=active]:bg-gray-600 transition-colors"
+            className="flex-auto py-3 text-sm font-medium text-gray-300 data-[state=active]:text-white data-[state=active]:bg-gray-600 transition-colors"
           >
             テナント設定
           </Tabs.Trigger>

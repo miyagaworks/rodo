@@ -47,8 +47,17 @@ export async function POST(req: Request) {
       name: body.name,
       displayAbbreviation: body.displayAbbreviation,
       sortOrder: nextSortOrder,
+      insuranceCompanies: body.insuranceCompanies?.length
+        ? {
+            create: body.insuranceCompanies.map((name, i) => ({
+              tenantId: session.user.tenantId,
+              name,
+              sortOrder: i,
+            })),
+          }
+        : undefined,
     },
-    include: { insuranceCompanies: true },
+    include: { insuranceCompanies: { orderBy: { sortOrder: 'asc' } } },
   })
 
   return NextResponse.json(assistance, { status: 201 })

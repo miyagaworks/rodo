@@ -102,9 +102,9 @@ export default function TenantTab() {
 
   return (
     <div>
-      <div className="bg-white rounded-xl shadow-sm p-4">
+      <div className="bg-white rounded-lg shadow-sm p-4">
         <h2 className="font-medium text-gray-800 mb-1">運営日の開始時刻</h2>
-        <p className="text-xs text-gray-500 mb-4 leading-relaxed">
+        <p className="text-xs text-gray-500 mb-4 leading-relaxed text-justify">
           出動番号の日付計算に使用されます。休憩時間制御には影響しません。
           夜勤を含む運用では、シフト開始前の時刻に設定してください。
         </p>
@@ -152,7 +152,7 @@ export default function TenantTab() {
         <button
           onClick={handleSave}
           disabled={saving}
-          className="w-full py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2.5 disabled:opacity-60"
+          className="w-full py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2.5 disabled:opacity-60"
           style={{ backgroundColor: '#1C2948', color: 'white' }}
         >
           <FaSave className="w-4 h-4" />

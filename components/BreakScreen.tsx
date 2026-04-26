@@ -202,7 +202,7 @@ export default function BreakScreen() {
       {/* 出動対応ボタン */}
       <button
         onClick={handleDispatch}
-        className="flex items-center gap-3 px-8 py-4 rounded-lg text-white text-xl font-bold"
+        className="flex items-center gap-3 px-8 py-4 rounded-md text-white text-xl font-bold"
         style={{ backgroundColor: '#D3170A' }}
       >
         <img src="/icons/dispatch-truck.svg" alt="出動" className="w-8 h-8" />

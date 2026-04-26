@@ -55,7 +55,7 @@ export default function PhotoModal({ photo, onClose, onDelete }: PhotoModalProps
             e.stopPropagation()
             onDelete(photo.id, photo.isLocal)
           }}
-          className="w-full flex items-center justify-center gap-2 py-3 rounded-lg font-bold text-sm text-white active:opacity-80"
+          className="w-full flex items-center justify-center gap-2 py-3 rounded-md font-bold text-sm text-white active:opacity-80"
           style={{ backgroundColor: '#D3170A' }}
         >
           <Trash2 className="w-4 h-4" />

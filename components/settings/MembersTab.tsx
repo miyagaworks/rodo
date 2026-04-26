@@ -170,7 +170,7 @@ export default function MembersTab() {
             <Accordion.Item
               key={member.id}
               value={member.id}
-              className="bg-white rounded-xl shadow-sm overflow-hidden"
+              className="bg-white rounded-lg shadow-sm overflow-hidden"
             >
               <Accordion.Header>
                 <Accordion.Trigger className="w-full flex items-center justify-between px-4 py-3 text-left group">
@@ -203,7 +203,7 @@ export default function MembersTab() {
                     <p className="text-sm text-gray-600 mb-3">交通費/月: {formatCurrency(member.transportationAllowance)}</p>
                     <button
                       onClick={() => startEditing(member)}
-                      className="text-sm px-3 py-1 rounded-lg border border-gray-300"
+                      className="text-sm px-3 py-1 rounded-md border border-gray-300"
                     >
                       編集
                     </button>
@@ -266,14 +266,14 @@ export default function MembersTab() {
                     <div className="flex gap-2 mt-3">
                       <button
                         onClick={() => setEditingId(null)}
-                        className="flex-1 py-2 rounded-lg text-sm font-medium"
+                        className="flex-1 py-2 rounded-md text-sm font-medium"
                         style={{ backgroundColor: '#9CA3AF', color: 'white' }}
                       >
                         キャンセル
                       </button>
                       <button
                         onClick={() => saveMember(member.id)}
-                        className="flex-1 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2.5"
+                        className="flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2.5"
                         style={{ backgroundColor: '#1C2948', color: 'white' }}
                       >
                         <FaSave className="w-4 h-4" />
@@ -289,7 +289,7 @@ export default function MembersTab() {
       </Accordion.Root>
 
       {isAdding && (
-        <div className="bg-white rounded-xl shadow-sm p-4 mt-2">
+        <div className="bg-white rounded-lg shadow-sm p-4 mt-2">
           <div className="mb-3">
             <label className="block text-xs text-gray-500 mb-1">氏名 (必須)</label>
             <input
@@ -378,7 +378,7 @@ export default function MembersTab() {
           <div className="flex gap-2">
             <button
               onClick={() => { setIsAdding(false); setNewMember({ name: '', email: '', password: '', role: 'MEMBER', vehicleId: null, monthlySalary: null, overtimeRate: null, transportationAllowance: null }) }}
-              className="flex-1 py-2 rounded-lg text-sm font-medium"
+              className="flex-1 py-2 rounded-md text-sm font-medium"
               style={{ backgroundColor: '#9CA3AF', color: 'white' }}
             >
               キャンセル
@@ -386,7 +386,7 @@ export default function MembersTab() {
             <button
               onClick={addMember}
               disabled={!canSubmitNewMember}
-              className="flex-1 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2.5 disabled:opacity-50"
+              className="flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2.5 disabled:opacity-50"
               style={{ backgroundColor: '#1C2948', color: 'white' }}
             >
               <FaSave className="w-4 h-4" />
@@ -399,7 +399,7 @@ export default function MembersTab() {
       <button
         onClick={() => setIsAdding(true)}
         disabled={isAdding}
-        className="w-full mt-4 py-3 rounded-xl border-2 border-dashed border-gray-300 text-gray-500 text-sm flex items-center justify-center gap-2 disabled:opacity-50"
+        className="w-full mt-4 py-3 rounded-lg border-2 border-dashed border-gray-300 text-gray-500 text-sm flex items-center justify-center gap-2 disabled:opacity-50"
       >
         <Plus className="w-4 h-4" />
         隊員を追加

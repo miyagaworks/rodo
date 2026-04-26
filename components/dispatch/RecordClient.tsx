@@ -143,7 +143,7 @@ function plateSummary(plate: PlateValue): string {
 
 function Section({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`bg-white rounded-xl shadow-sm p-4 ${className}`}>
+    <div className={`bg-white rounded-lg shadow-sm p-4 ${className}`}>
       {children}
     </div>
   )
@@ -409,7 +409,7 @@ export default function RecordClient({ dispatch, userName }: RecordClientProps) 
           <div className="flex-1" />
           <button
             onClick={() => setShowBackConfirm(true)}
-            className="px-3 py-1.5 rounded-lg text-xs font-bold active:opacity-60 whitespace-nowrap"
+            className="px-3 py-1.5 rounded-md text-xs font-bold active:opacity-60 whitespace-nowrap"
             style={{ backgroundColor: '#1C2948', color: '#FFFFFF' }}
           >
             出動画面に戻る
@@ -515,7 +515,7 @@ export default function RecordClient({ dispatch, userName }: RecordClientProps) 
                     <button
                       key={dir}
                       onClick={() => setHighwayDirection(dir)}
-                      className="flex-1 py-2.5 rounded-lg text-sm font-bold"
+                      className="flex-1 py-2.5 rounded-md text-sm font-bold"
                       style={{
                         backgroundColor: highwayDirection === dir ? '#1C2948' : '#E8EDF5',
                         color: highwayDirection === dir ? 'white' : '#9CA3AF',
@@ -887,7 +887,7 @@ export default function RecordClient({ dispatch, userName }: RecordClientProps) 
         <button
           onClick={handleDraftSave}
           disabled={loading}
-          className="flex-none flex items-center gap-2 px-5 py-4 rounded-lg font-bold text-white text-sm active:opacity-80 transition-opacity"
+          className="flex-none flex items-center gap-2 px-5 py-4 rounded-md font-bold text-white text-sm active:opacity-80 transition-opacity"
           style={{ backgroundColor: '#D3170A' }}
         >
           <FaPen className="text-base" />
@@ -898,7 +898,7 @@ export default function RecordClient({ dispatch, userName }: RecordClientProps) 
         <button
           onClick={handleProceed}
           disabled={!isComplete || loading}
-          className="flex-1 flex items-center justify-center gap-2 py-4 rounded-lg font-bold text-sm transition-all"
+          className="flex-1 flex items-center justify-center gap-2 py-4 rounded-md font-bold text-sm transition-all"
           style={{
             backgroundColor: isComplete ? '#1C2948' : '#9CA3AF',
             color: 'white',
@@ -983,7 +983,7 @@ export default function RecordClient({ dispatch, userName }: RecordClientProps) 
           onClick={() => setShowBackConfirm(false)}
         >
           <div
-            className="mx-6 w-full max-w-sm rounded-2xl p-5 space-y-4"
+            className="mx-6 w-full max-w-sm rounded-xl p-5 space-y-4"
             style={{ backgroundColor: '#FFFFFF' }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -1015,7 +1015,7 @@ export default function RecordClient({ dispatch, userName }: RecordClientProps) 
                   }
                 }}
                 disabled={loading}
-                className="w-full py-3 rounded-lg font-bold text-sm text-white active:opacity-80"
+                className="w-full py-3 rounded-md font-bold text-sm text-white active:opacity-80"
                 style={{ backgroundColor: '#1C2948' }}
               >
                 {loading ? '保存中...' : '下書き保存して戻る'}
@@ -1026,7 +1026,7 @@ export default function RecordClient({ dispatch, userName }: RecordClientProps) 
                   router.push(`/dispatch/${dispatch.id}`)
                 }}
                 disabled={loading}
-                className="w-full py-3 rounded-lg font-bold text-sm active:opacity-80 border"
+                className="w-full py-3 rounded-md font-bold text-sm active:opacity-80 border"
                 style={{ color: '#D3170A', borderColor: '#D3170A' }}
               >
                 保存せずに戻る
@@ -1034,7 +1034,7 @@ export default function RecordClient({ dispatch, userName }: RecordClientProps) 
               <button
                 onClick={() => setShowBackConfirm(false)}
                 disabled={loading}
-                className="w-full py-3 rounded-lg font-bold text-sm active:opacity-80"
+                className="w-full py-3 rounded-md font-bold text-sm active:opacity-80"
                 style={{ color: '#6B7280' }}
               >
                 キャンセル
