@@ -6,7 +6,7 @@ const PUBLIC_FILE_EXTENSIONS =
   /\.(ico|png|jpg|jpeg|svg|gif|webp|woff|woff2|ttf|eot|css|js|map|json|txt|xml|webmanifest)$/
 
 // #6 修正: 認証不要なAPIルートをホワイトリストで明示
-const PUBLIC_API_PREFIXES = ['/api/auth']
+const PUBLIC_API_PREFIXES = ['/api/auth', '/api/c']
 
 export default auth((req) => {
   const { pathname } = req.nextUrl
@@ -24,6 +24,9 @@ export default auth((req) => {
   )
 
   if (isPublicAsset || isPublicApiRoute) return NextResponse.next()
+
+  // 作業確認書の公開ページ（認証不要）
+  if (pathname.startsWith('/c/')) return NextResponse.next()
 
   // 認証が必要なAPIルート: 未認証なら401
   if (pathname.startsWith('/api')) {
