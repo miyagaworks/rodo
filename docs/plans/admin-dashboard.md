@@ -51,12 +51,38 @@
 - 不採用: Pusher / SSE / WebSocket（20 名以下想定で過剰）。
 
 ### 2.4 UI 構造
-- 管理者専用ハンバーガーメニュー（☰）。
-  - スマホ: スライドメニュー（左から）。
-  - PC: 常時表示サイドバー（`md:` ブレークポイント）。
+
+> **更新履歴**: 2026-04-28 に「PC 常時表示サイドバー」案を破棄。PC でロゴ重複・操作テンポ低下が判明したため、PC は上部水平メニュー、SP はハンバーガー（右）+ 右スライドインドロワーに刷新。
+
+#### レイアウト基本方針
+- 管理者ナビゲーションは画面サイズで切り替える。
+  - **PC（`md:` 以上）**: `AppHeader` 内に上部水平メニューを統合。左にロゴ／中央〜右に nav（ホーム / ダッシュボード / 案件管理 / 設定）／最右に管理者名 + ログアウトアイコン。サイドバーは持たない。
+  - **SP（`md:` 未満）**: `AppHeader` は左にロゴ・右にハンバーガー（☰）のみ。☰ タップで **右から**スライドインのドロワー（`AdminShell`）。SP では「管理者」表示と単独ログアウトアイコンは AppHeader から外し、**ドロワー最下部に区切り線付きで管理者名 + ログアウト**を表示。
 - メニュー項目: ホーム / ダッシュボード / 案件管理 / 設定 / ログアウト。
-- 既存ホーム（`HomeClient.tsx` のアシスタンスボタン）は管理者でも維持（管理者も出動するため）。`HomeClient.tsx` 内の `<a href="/settings">設定</a>` リンクはハンバーガー化に伴い削除。
-- 設定画面（`SettingsClient.tsx`）は既存のまま、ハンバーガーから遷移する。
+
+#### 表示制御の責務分離
+- `AppHeader` に `showAdminNav?: boolean` prop（default `false`）を導入し、これで PC nav / SP ☰ の表示を切り替える。
+  - **`usePathname()` で `/admin` を内部判定しない**（命名規約への密結合・テスト容易性低下を避けるため）。
+  - `AdminLayoutShell` が `session.user.role === 'ADMIN'` を検証した結果のみ `showAdminNav={true}` を渡す。
+  - `HomeClient` / `SettingsClient` は明示的に `showAdminNav={false}`（または default false に依存）。
+  - 隊員（MEMBER）が `/admin` に直接アクセスした場合の防御は **middleware / page guard の責務**とし、`AppHeader` では扱わない。
+
+#### アクティブ表示
+- アクティブメニュー判定は `usePathname()` を利用。
+- active 時は下線（金色 `#C9A961` 系の既存トークン）+ `transition` でスタイリッシュに切り替える。
+
+#### 既存画面への影響
+- 既存ホーム（`HomeClient.tsx` のアシスタンスボタン）は管理者でも維持（管理者も出動するため）。`HomeClient.tsx` 内の `<a href="/settings">設定</a>` リンクは Phase 2 で削除済み。`HomeClient` は `max-w-md` を維持（出動ボタンはスマホ前提）。
+- 設定画面（`SettingsClient.tsx`）は既存のまま、PC 水平メニュー or SP ドロワーから遷移する。情報量はロール非依存のため幅は **`max-w-2xl` を ADMIN/MEMBER 共通**で適用。
+- ダッシュボード / 案件管理は情報密度が高いため `max-w-6xl` を採用。
+
+#### コンポーネント責務（決定）
+| コンポーネント | PC 時 | SP 時 |
+|---|---|---|
+| `AppHeader` | ロゴ + 水平 nav + 管理者名/ログアウト | ロゴ + ☰ |
+| `AdminMenu` | `orientation="horizontal"`（リンクのみ） | `orientation="vertical"`（リンク + 管理者名 + ログアウト） |
+| `AdminShell` | DOM 出力なし（`md:hidden`） | 右スライドインのドロワー本体 |
+| `AdminLayoutShell` | `AppHeader` → `main` の縦積み（flex 左右分割は撤廃、`isAdminPage` prop 廃止） | 同左 |
 
 ### 2.5 請求画面
 - PC 左右分割: 左に「報告兼請求項目」、右に「各会社の請求画面」。
@@ -283,7 +309,7 @@ if (session.user.role !== 'ADMIN') return NextResponse.json({ error: 'Forbidden'
 - `app/admin/billing/[id]/page.tsx`（Phase 5）
 
 #### コンポーネント
-- `components/admin/AdminShell.tsx`（ハンバーガー + サイドバー枠）
+- `components/admin/AdminShell.tsx`（SP 専用ドロワー。右からスライドイン。`AdminMenu orientation="vertical"` を内包。md 以上では DOM 非出力）
 - `components/admin/AdminMenu.tsx`（メニュー項目定義）
 - `components/admin/MemberStatusCard.tsx`
 - `components/admin/MemberStatusGrid.tsx`（ポーリング含む）
@@ -313,51 +339,91 @@ if (session.user.role !== 'ADMIN') return NextResponse.json({ error: 'Forbidden'
 |---|---|
 | `prisma/schema.prisma` | `Dispatch.billedAt` 追加、`@@index([tenantId, billedAt])` 追加 |
 | `lib/validations.ts` | `updateAdminDispatchSchema` / `billingSchema` を追加 |
-| `components/HomeClient.tsx` | line 133-135 の `<a href="/settings">設定</a>` を削除（ハンバーガーに統合） |
+| `components/HomeClient.tsx` | line 133-135 の `<a href="/settings">設定</a>` を削除（Phase 2 で対応済み）。`max-w-md` は維持。Phase 2.5 では `showAdminNav` を渡さない（default false） |
+| `components/SettingsClient.tsx` | コンテンツ幅を `max-w-2xl` に変更（ADMIN/MEMBER 共通）。Phase 2.5 では `showAdminNav` を渡さない（default false） |
 | `app/page.tsx` | ADMIN ログイン時の遷移先を `/admin/dashboard` に変更するか検討。**初期版は維持（ホーム=出動画面のまま、ハンバーガーから管理者ページへ）** とし、業務運用に合わせて後日調整 |
 | `app/settings/page.tsx` | 既存維持。`/admin/settings` にエイリアスを張るかは Phase 2 で判断 |
+| `components/common/AppHeader.tsx` | **Phase 2.5**: `showAdminNav?: boolean` prop（default `false`）を追加。PC 時は内部に `<nav>` 水平メニューを統合（左ロゴ／中央 nav／右に管理者名 + ログアウト）。SP 時は左ロゴ + 右ハンバーガー（☰）。active 判定は `usePathname()`、active 時は金色 `#C9A961` 系下線 + transition |
+| `components/admin/AdminMenu.tsx` | **Phase 2.5**: `orientation: "horizontal" \| "vertical"` prop を追加。horizontal はリンクのみ、vertical は最下部に区切り線 + 管理者名 + ログアウトを描画 |
+| `components/admin/AdminShell.tsx` | **Phase 2.5**: SP 専用ドロワーに縮小（PC では DOM 非出力 = `md:hidden`）。**右スライドイン**（`right-0` 起点 + `transform translate-x-full → translate-x-0`）。中身は `AdminMenu orientation="vertical"`。ロゴ／ヘッダー機能は `AppHeader` へ移譲 |
+| `components/admin/AdminLayoutShell.tsx` | **Phase 2.5**: flex 左右分割を撤廃し、`AppHeader` → `main` の縦積みに簡略化。`isAdminPage` prop を廃止。`session.user.role === 'ADMIN'` を検証した結果のみ `AppHeader` に `showAdminNav={true}` を渡す |
+| `app/admin/dashboard/page.tsx` | **Phase 2.5**: コンテンツ幅を `max-w-6xl` に変更 |
+| `app/admin/dispatches/page.tsx` | **Phase 2.5**: コンテンツ幅を `max-w-6xl` に変更 |
+| `__tests__/components/common/AppHeader.test.tsx` | **Phase 2.5**: `showAdminNav` prop による分岐テスト、PC で nav 表示 / SP で hidden、ハンバーガー右配置のアサーション |
+| `__tests__/components/admin/AdminMenu.test.tsx` | **Phase 2.5**: `orientation` prop による分岐テスト |
+| `__tests__/components/admin/AdminShell.test.tsx` | **Phase 2.5**: SP 専用化、右スライドイン方向のクラス確認 |
 
 ---
 
 ## 6. 画面ワイヤーフレーム
 
-### 6.1 ハンバーガーメニュー（PC: サイドバー / SP: スライドメニュー）
+### 6.1 管理者ナビゲーション（PC: 上部水平メニュー / SP: 右ハンバーガー + 右スライドイン）
+
+> **更新（2026-04-28）**: 旧「PC サイドバー」「SP 左スライド」案を破棄。PC ロゴ重複・操作テンポ低下のため。
+
+#### PC レイアウト（1440 × 900 想定）
 
 ```
-PC (md以上):
-┌────────┬────────────────────────────┐
-│ RODO   │ ヘッダー（ページタイトル / ユーザー名）   │
-│        ├────────────────────────────┤
-│ ホーム   │                              │
-│ ダッシュ │                              │
-│ ボード   │     コンテンツ                  │
-│ 案件管理 │                              │
-│ 設定    │                              │
-│ ─────  │                              │
-│ ログアウト│                              │
-└────────┴────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────┐
+│ [RODO]   ホーム   ダッシュボード   案件管理   設定           山田 ⏻        │  ← AppHeader（h-14〜16）
+│                  ━━━━━━━━━━                                              │  ← active 時のみ金色 #C9A961 下線
+├──────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│                                                                          │
+│                  ┌────────────────────────────────────┐                 │
+│                  │       コンテンツ（max-w-6xl）        │                 │
+│                  │       管理者ダッシュボード等         │                 │
+│                  └────────────────────────────────────┘                 │
+│                                                                          │
+│                                                                          │
+└──────────────────────────────────────────────────────────────────────────┘
 
-SP (md未満):
-┌────────────────────────────────────┐
-│ ☰ RODO       管理者ダッシュボード       │
-├────────────────────────────────────┤
-│                                    │
-│        コンテンツ                    │
-│                                    │
-└────────────────────────────────────┘
+要件:
+- ロゴは AppHeader 内に 1 つだけ（左サイドバーは存在しない）
+- nav は中央〜右寄せ、メニュー間は適度な余白でメリハリ
+- 最右端に「管理者名 ⏻（ログアウト）」を配置
+- active メニューは金色 #C9A961 系の下線 + hover で transition
+- ダッシュボード / 案件管理は max-w-6xl、設定は max-w-2xl、ホーム（HomeClient）は max-w-md
+```
 
-☰ をタップ:
-┌─────────┐
-│ × 閉じる │
-├─────────┤
-│ ホーム    │
-│ ダッシュ  │
-│ ボード    │
-│ 案件管理  │
-│ 設定     │
-│ ─────   │
-│ ログアウト│
-└─────────┘
+#### SP レイアウト（375 × 812 想定）
+
+```
+ドロワー閉:
+┌──────────────────────────┐
+│ [RODO]                ☰ │  ← AppHeader: 左ロゴ・右ハンバーガー
+├──────────────────────────┤  「管理者」表示と単独ログアウトは SP では非表示
+│                          │
+│                          │
+│      コンテンツ          │
+│   （ページの max-w を    │
+│    そのまま縦積み）       │
+│                          │
+│                          │
+└──────────────────────────┘
+
+☰ タップ → ドロワー右からスライドイン:
+┌──────────────────────────┐
+│ [RODO]            × ☰    │
+├──────────────────────────┤
+│           ┌──────────────┤
+│           │  ホーム        │  ← AdminMenu orientation="vertical"
+│           │  ダッシュボード │
+│           │  案件管理      │
+│           │  設定          │
+│           ├──────────────┤  ← 区切り線
+│           │  山田          │
+│           │  ⏻ ログアウト  │
+│           └──────────────┘
+└──────────────────────────┘
+
+要件:
+- ハンバーガーは右配置（左ではない）
+- ドロワーは画面右からスライドイン（Tailwind: right-0 起点 + transform translate-x-full → translate-x-0）
+- ドロワー幅は w-72〜w-80 程度、背景はオーバーレイで暗転
+- ドロワー最下部に区切り線 + 管理者名 + ログアウト
+- 閉じるアクション: × ボタン or オーバーレイタップ or ESC キー
+- PC（md 以上）では AdminShell 自体を DOM 出力しない（md:hidden）
 ```
 
 ### 6.2 ダッシュボード（`/admin/dashboard`）
@@ -630,7 +696,7 @@ SP (md未満):
 | R6 | **10 秒ポーリングの帯域コスト** | `members-status` API は管理者 1 人あたり 10 秒間隔 = 6 req/min。隊員数 20 名はレスポンスの件数であり、リクエスト数とは無関係。同時にダッシュボードを開く管理者が N 人いる場合、テナント当たり 6N req/min。通常運用では管理者は 1〜2 人なので、テナント当たり最大 12 req/min 程度。レスポンスサイズ（隊員 20 名分）も小さく、Vercel の課金にもほぼ影響しない | 当面は問題なし。将来管理者が 5 人を超える / 隊員が 50 名超で 1 レスポンスが大きくなる場合は React Query の `refetchInterval` を可変化、もしくは SSE 切り替え検討 |
 | R7 | **ADMIN が誤って案件を破壊的に編集** | データ毀損 | (a) 編集画面に変更前 / 変更後の差分プレビュー、(b) 「保存」を 2 段確認に、(c) 監査ログは要件外のため Phase 4 では実装せず、運用ルールで対応 |
 | R8 | **既存 `lib/validations.ts` の updateDispatchSchema との衝突** | 隊員視点の制約が ADMIN 編集を妨げる | ADMIN 用に別 schema (`adminUpdateDispatchSchema`) を新設し、既存 schema には触れない |
-| R9 | **PWA + サイドバー UI のオフライン挙動** | オフライン時に管理画面の操作が中途半端に動く | ADMIN 機能はオフライン非対応として明示。Service Worker のキャッシュ対象外にする（`offlineFetch` を使わない方針） |
+| R9 | **PWA + ドロワー UI のオフライン挙動（z-index / overscroll-behavior / viewport の整合性）** | オフライン時に管理画面の操作が中途半端に動く。加えて、SP ドロワー（右スライドイン）が PWA の viewport / overscroll / 既存モーダルとの z-index で競合し描画破綻する可能性 | ADMIN 機能はオフライン非対応として明示。Service Worker のキャッシュ対象外にする（`offlineFetch` を使わない方針）。ドロワー実装時は `overscroll-behavior: contain`、明示的な z-index 階層、`viewport-fit=cover` 環境下でのセーフエリア検証を行う |
 | R10 | **マイグレーションのロールバック** | `billedAt` 追加後にロールバックすると過去データの請求済み状態が消える | リリース後の即時ロールバック計画を立てておく。`prisma migrate diff` で逆方向 SQL を事前確認 |
 
 ---
@@ -680,6 +746,68 @@ Phase 3       Phase 4
 2. `feature/admin-dashboard` ブランチを `main` から切る。
 3. Phase 1 を implementer に委任して着手（Q2 / Q3 / Q9 は事前確認済み・解消）。
 4. Phase 1 完了後、Phase 2 の `AdminShell` / `AdminMenu` 着手プロンプトを別途設計（ハンバーガーアイコンは `IoMenu from react-icons/io5` を使用）。
+5. **Phase 2.5（PC レイアウト是正）を Phase 3 着手前に必ず完了させる**（下記参照）。
+
+---
+
+### 11.1 Phase 2.5: PC レイアウト是正（最優先・Phase 3 前提条件）
+
+**経緯**: 2026-04-28 に Phase 2 完了後の実画面確認で、PC で AppHeader と AdminShell サイドバーがロゴを二重表示する不具合が判明。前任 super-agent がコードレベル確認だけで OK 判定し失敗。**実画面スクリーンショット必須**。
+
+**目的**: §2.4 の刷新後仕様（PC 上部水平メニュー / SP 右ハンバーガー）を既存コンポーネントに反映する。Phase 3（ダッシュボード実装）は本フェーズ完了後に着手する。
+
+**改修ファイル一覧**: §5.2 の「**Phase 2.5**」マーカー付きの行を参照（10 ファイル）。
+
+**確定済み設計判断**:
+- AppHeader の admin nav 表示は `showAdminNav?: boolean` prop で制御。`usePathname` での内部判定はしない。
+- `AdminLayoutShell` が `session.user.role === 'ADMIN'` を検証した上で `showAdminNav={true}` を渡す。
+- `HomeClient` / `SettingsClient` は明示的に `showAdminNav={false}`（または default false）。
+- `SettingsClient` の `max-w-2xl` は ADMIN/MEMBER 共通で適用。
+- ドロワーは右からスライドイン。Tailwind の `right-0` 起点 + `transform translate-x-full → translate-x-0`。
+
+**実行順序（依存ありのため並列不可）**:
+1. `AdminMenu` に `orientation` prop を追加（他コンポーネントの依存元）
+2. `AppHeader` に `showAdminNav` prop と PC nav / SP ☰ の出し分けを実装
+3. `AdminShell` を SP 専用に縮退（右スライドイン、PC では DOM 非出力）
+4. `AdminLayoutShell` を縦積みに簡略化、`isAdminPage` prop 廃止
+5. ページの `max-w` 調整 3 ファイル（dashboard / dispatches / SettingsClient）
+6. テスト 3 ファイル更新
+7. 検証ゲート A〜F を全通過
+
+**検証ゲート（implementer 必須・省略不可）**:
+
+| ID | 内容 | 合格条件 |
+|---|---|---|
+| A | baseline テスト件数を改修着手前に記録 | `npm test` 合格件数を変数 X として保存 |
+| B | 改修後の `npm test` | 合格件数 Y が **Y ≥ X** かつ全グリーン（追加された Phase 2.5 テストにより Y > X が想定値） |
+| C | `npm run lint` | エラー 0 |
+| D | `npm run build` | 成功 |
+| E | dev server 起動 + スクリーンショット 4 枚取得 | 解像度 PC 1440×900 / SP 375×812。下記 4 種<br>- PC `/admin/dashboard`<br>- PC `/admin/dispatches`<br>- SP `/admin/dashboard`（ドロワー閉）<br>- SP `/admin/dashboard`（ドロワー開） |
+| F | スクリーンショット目視確認 | PC: ロゴ 1 個・サイドバー消失・上部水平メニュー表示・active 下線<br>SP: ロゴ左／ハンバーガー右・右からスライドイン・ドロワー内に管理者名 + ログアウト<br>隊員画面（`/`）: nav 非表示で従来通り |
+
+> ⚠️ **コードレベル確認だけで OK 判定するのは禁止**。前任 super-agent がこれで失敗した経緯あり。スクリーンショット添付なき完了報告は受領しない。
+
+**禁止事項**:
+- `app/api/admin/*` / `lib/admin/status-derivation.ts` / `prisma/schema.prisma` / `prisma/migrations/` への変更
+- `HomeClient` のヘッダー以外のロジック変更（`max-w-md` は維持）
+- Phase 3 機能（ダッシュボードのカード等）の先行実装
+
+**成果物**:
+- 改修ファイル 10 件（実装 7 + テスト 3）
+- スクリーンショット 4 枚（コミット履歴に添付 or `docs/screenshots/phase-2.5/` に保存）
+- 完了報告（変更ファイル一覧 / baseline 件数 X / 改修後合格件数 Y / lint・build 結果 / スクショ パス / 残課題 / コミット要否確認）
+
+**完了条件**:
+- 検証ゲート A〜F を全通過。
+- ユーザーがスクリーンショットを目視で承認。
+- 承認後にコミット → push。
+
+**想定ファイル数**: 改修 10（新規 0）
+
+**リスク**:
+- AGENTS.md 警告: Next.js 16.x は破壊的変更あり。implementer は `node_modules/next/dist/docs/` の関連ガイド（`usePathname` / Client Components / `app/.../layout.tsx`）を **コードを書く前に必ず参照**する。
+- `AppHeader` を共有する `HomeClient` / `SettingsClient` で意図せぬ表示が起きないこと（`showAdminNav={false}` の明示で防御）。
+- ドロワー方向反転で z-index / overscroll / PWA viewport の整合性が崩れないこと。
 
 ---
 

@@ -63,15 +63,17 @@ vi.mock('@/components/admin/AdminShell', () => ({
 vi.mock('@/components/common/AppHeader', () => ({
   default: ({
     showMenuButton,
+    showAdminNav,
     onMenuClick,
     session,
   }: {
     showMenuButton?: boolean
+    showAdminNav?: boolean
     onMenuClick?: () => void
     session: { user: { name?: string | null } }
   }) => (
     <div data-testid="app-header">
-      {showMenuButton && (
+      {(showMenuButton || showAdminNav) && (
         <button aria-label="メニューを開く" onClick={onMenuClick}>
           menu
         </button>

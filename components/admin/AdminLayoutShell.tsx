@@ -11,12 +11,11 @@ interface AdminLayoutShellProps {
 }
 
 /**
- * /admin/* 配下のレイアウト
- * - PC (md 以上): 左サイドバー常時表示 + 右に main
- * - SP: ☰ ボタン付きヘッダー + ドロワー
+ * /admin/* 配下のレイアウト（Phase 2.5）
+ * - PC（md 以上）: AppHeader 内に水平 nav を統合し、main を縦積み
+ * - SP（md 未満）: AppHeader（ロゴ + ☰）+ 右からスライドインの AdminShell
  *
- * AdminShell の open/onClose 状態を保持するクライアントコンポーネント。
- * サーバーコンポーネントの app/admin/layout.tsx から呼び出される。
+ * AdminShell は md:hidden（SP 専用）。PC では AppHeader showAdminNav={true} の水平 nav が代替。
  */
 export default function AdminLayoutShell({
   children,
@@ -24,25 +23,27 @@ export default function AdminLayoutShell({
 }: AdminLayoutShellProps) {
   const [drawerOpen, setDrawerOpen] = useState(false)
 
+  // role 検証は app/admin/layout.tsx 側で完了済み。ここでは念のため二重防御
+  const isAdmin = session.user.role === 'ADMIN'
+
   return (
-    <div className="min-h-screen flex" style={{ backgroundColor: '#C6D8FF' }}>
-      {/* サイドバー / ドロワー */}
-      <AdminShell
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        isAdminPage
+    <div className="min-h-screen flex flex-col" style={{ backgroundColor: '#C6D8FF' }}>
+      <AppHeader
+        session={session}
+        showAdminNav={isAdmin}
+        onMenuClick={() => setDrawerOpen(true)}
       />
 
-      {/* メイン領域 */}
-      <div className="flex-1 flex flex-col min-w-0">
-        <AppHeader
-          session={session}
-          showMenuButton={true}
-          onMenuClick={() => setDrawerOpen(true)}
-          hasSidebar={true}
+      {/* SP 専用ドロワー（md:hidden） */}
+      {isAdmin && (
+        <AdminShell
+          open={drawerOpen}
+          onClose={() => setDrawerOpen(false)}
+          adminName={session.user.name}
         />
-        <main className="flex-1 p-4">{children}</main>
-      </div>
+      )}
+
+      <main className="flex-1 p-4">{children}</main>
     </div>
   )
 }

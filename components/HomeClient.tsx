@@ -132,17 +132,16 @@ export default function HomeClient({ session }: HomeClientProps) {
       {/* ヘッダー */}
       <AppHeader
         session={session}
-        showMenuButton={isAdmin}
+        showAdminNav={isAdmin}
         onMenuClick={() => setAdminDrawerOpen(true)}
-        hasSidebar={false}
       />
 
-      {/* 管理者用ドロワー（ADMIN のみ） */}
+      {/* 管理者用ドロワー（ADMIN のみ。SP のみ表示=md:hidden） */}
       {isAdmin && (
         <AdminShell
           open={adminDrawerOpen}
           onClose={() => setAdminDrawerOpen(false)}
-          isAdminPage={false}
+          adminName={session.user.name}
         />
       )}
 

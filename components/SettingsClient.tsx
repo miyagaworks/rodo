@@ -17,27 +17,29 @@ interface SettingsClientProps {
 
 export default function SettingsClient({ session }: SettingsClientProps) {
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const isAdmin = session.user.role === 'ADMIN'
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#C6D8FF' }}>
       <AppHeader
         session={session}
-        showMenuButton={true}
+        showAdminNav={isAdmin}
         onMenuClick={() => setDrawerOpen(true)}
-        hasSidebar={false}
       />
-      <AdminShell
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        isAdminPage={false}
-      />
+      {isAdmin && (
+        <AdminShell
+          open={drawerOpen}
+          onClose={() => setDrawerOpen(false)}
+          adminName={session.user.name}
+        />
+      )}
 
       {/* サブタイトル */}
-      <div className="max-w-md mx-auto w-full px-4 pt-3 pb-2">
+      <div className="max-w-2xl mx-auto w-full px-4 pt-3 pb-2">
         <h1 className="text-lg font-bold" style={{ color: '#1C2948' }}>設定</h1>
       </div>
 
-      <div className="max-w-md mx-auto w-full">
+      <div className="max-w-2xl mx-auto w-full">
         <Tabs.Root defaultValue="assistances" className="flex flex-col">
           <Tabs.List className="flex" style={{ backgroundColor: '#374151' }}>
             <Tabs.Trigger

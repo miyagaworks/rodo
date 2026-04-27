@@ -1,6 +1,6 @@
 export default function AdminDashboardPage() {
   return (
-    <div>
+    <div className="max-w-6xl mx-auto w-full">
       <h1 className="text-2xl font-bold mb-2" style={{ color: '#1C2948' }}>
         管理者ダッシュボード
       </h1>

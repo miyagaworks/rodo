@@ -1,6 +1,6 @@
 export default function AdminDispatchesPage() {
   return (
-    <div>
+    <div className="max-w-6xl mx-auto w-full">
       <h1 className="text-2xl font-bold mb-2" style={{ color: '#1C2948' }}>
         案件管理
       </h1>
