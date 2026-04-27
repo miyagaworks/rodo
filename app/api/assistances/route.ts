@@ -10,7 +10,7 @@ export async function GET() {
   const assistances = await prisma.assistance.findMany({
     where: { tenantId: session.user.tenantId },
     include: { insuranceCompanies: { orderBy: { sortOrder: 'asc' } } },
-    orderBy: { sortOrder: 'asc' },
+    orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
   })
 
   return NextResponse.json(assistances, {

@@ -11,6 +11,7 @@ vi.mock('@/lib/prisma', () => ({
       create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
+      aggregate: vi.fn(),
     },
     dispatch: {
       count: vi.fn(),
@@ -29,6 +30,7 @@ const mockedFindMany = prisma.vehicle.findMany as unknown as ReturnType<typeof v
 const mockedCreate = prisma.vehicle.create as unknown as ReturnType<typeof vi.fn>
 const mockedUpdate = prisma.vehicle.update as unknown as ReturnType<typeof vi.fn>
 const mockedDelete = prisma.vehicle.delete as unknown as ReturnType<typeof vi.fn>
+const mockedAggregate = prisma.vehicle.aggregate as unknown as ReturnType<typeof vi.fn>
 const mockedDispatchCount = prisma.dispatch.count as unknown as ReturnType<typeof vi.fn>
 
 function makeRequest(body: Record<string, unknown>, method = 'POST'): Request {
@@ -88,7 +90,7 @@ describe('GET /api/settings/vehicles', () => {
     expect(mockedFindMany).toHaveBeenCalledWith({
       where: { tenantId: 't1' },
       include: { _count: { select: { users: true, dispatches: true } } },
-      orderBy: { createdAt: 'asc' },
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
     })
   })
 
@@ -138,12 +140,14 @@ describe('POST /api/settings/vehicles', () => {
 
   it('201: 正常作成', async () => {
     mockedAuth.mockResolvedValueOnce(adminSession)
+    mockedAggregate.mockResolvedValueOnce({ _max: { sortOrder: 4 } })
     const created = {
       id: 'v1',
       tenantId: 't1',
       plateNumber: '品川 500 あ 1234',
       displayName: null,
       isActive: true,
+      sortOrder: 5,
     }
     mockedCreate.mockResolvedValueOnce(created)
 
@@ -158,12 +162,14 @@ describe('POST /api/settings/vehicles', () => {
         plateNumber: '品川 500 あ 1234',
         displayName: undefined,
         isActive: true,
+        sortOrder: 5,
       },
     })
   })
 
   it('409: Prisma P2002 発生時', async () => {
     mockedAuth.mockResolvedValueOnce(adminSession)
+    mockedAggregate.mockResolvedValueOnce({ _max: { sortOrder: null } })
     mockedCreate.mockRejectedValueOnce(
       new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
         code: 'P2002',

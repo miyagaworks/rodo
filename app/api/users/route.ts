@@ -23,7 +23,7 @@ export async function GET() {
       overtimeRate: true,
       transportationAllowance: true,
     },
-    orderBy: { createdAt: 'asc' },
+    orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
   })
 
   return NextResponse.json(users)
@@ -56,6 +56,13 @@ export async function POST(req: Request) {
 
   const passwordHash = await bcrypt.hash(body.password, 12)
 
+  // sortOrder: 末尾配置 (同一テナント内の max + 1)
+  const maxResult = await prisma.user.aggregate({
+    where: { tenantId: session.user.tenantId },
+    _max: { sortOrder: true },
+  })
+  const nextSortOrder = (maxResult._max.sortOrder ?? -1) + 1
+
   const user = await prisma.user.create({
     data: {
       tenantId: session.user.tenantId,
@@ -67,6 +74,7 @@ export async function POST(req: Request) {
       monthlySalary: body.monthlySalary,
       overtimeRate: body.overtimeRate,
       transportationAllowance: body.transportationAllowance,
+      sortOrder: nextSortOrder,
     },
     select: {
       id: true,

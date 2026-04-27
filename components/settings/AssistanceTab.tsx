@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import * as Accordion from '@radix-ui/react-accordion'
 import { ChevronRight, X, Plus } from 'lucide-react'
 import { FaSave } from 'react-icons/fa'
+import { SortableList } from '@/components/common/SortableList'
 
 interface InsuranceCompany {
   id: string
@@ -133,135 +134,152 @@ export default function AssistanceTab() {
     newAssistance.name.trim() !== '' &&
     newAssistance.displayAbbreviation.trim() !== ''
 
+  const reorderAssistances = async (orderedIds: string[]) => {
+    const res = await fetch('/api/assistances/reorder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderedIds }),
+    })
+    if (!res.ok) {
+      throw new Error('reorder failed')
+    }
+  }
+
   if (loading) return <div className="text-center py-8 text-gray-500">読み込み中...</div>
 
   return (
     <div>
       <Accordion.Root type="single" collapsible className="space-y-2">
-        {assistances.map((assistance) => {
-          const isEditing = editingId === assistance.id
-          const data = editData[assistance.id]
+        <SortableList
+          items={assistances}
+          onReorder={reorderAssistances}
+          renderItem={(assistance, dragHandle) => {
+            const isEditing = editingId === assistance.id
+            const data = editData[assistance.id]
 
-          return (
-            <Accordion.Item
-              key={assistance.id}
-              value={assistance.id}
-              className="bg-white rounded-lg shadow-sm overflow-hidden"
-            >
-              <Accordion.Header>
-                <Accordion.Trigger className="w-full flex items-center justify-between px-4 py-3 text-left group">
-                  <div className="flex items-center gap-2">
-                    <ChevronRight className="w-4 h-4 text-gray-400 transition-transform group-data-[state=open]:rotate-90" />
-                    <span className="font-medium text-gray-800">{assistance.name}</span>
-                  </div>
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    onClick={(e) => { e.stopPropagation(); deleteAssistance(assistance.id) }}
-                    onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); deleteAssistance(assistance.id) } }}
-                    className="p-1 rounded-full hover:bg-red-50 cursor-pointer"
-                  >
-                    <X className="w-4 h-4 text-red-400" />
-                  </div>
-                </Accordion.Trigger>
-              </Accordion.Header>
-
-              <Accordion.Content className="px-4 pb-4">
-                {!isEditing ? (
-                  <div>
-                    <p className="text-sm text-gray-500 mb-1">
-                      損保: {assistance.insuranceCompanies.map(c => c.name).join('、') || 'なし'}
-                    </p>
-                    <p className="text-sm text-gray-500 mb-3">略称: {assistance.displayAbbreviation}</p>
-                    <button
-                      onClick={() => startEditing(assistance)}
-                      className="text-sm px-3 py-1 rounded-md border border-gray-300 hover:bg-gray-50"
-                    >
-                      編集
-                    </button>
-                  </div>
-                ) : (
-                  <div>
-                    <div className="mb-3">
-                      <label className="block text-xs text-gray-500 mb-1">アシスタンス名</label>
-                      <input
-                        type="text"
-                        value={data?.name || ''}
-                        onChange={(e) => setEditData(prev => ({
-                          ...prev,
-                          [assistance.id]: { ...prev[assistance.id], name: e.target.value }
-                        }))}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                      />
-                    </div>
-                    <div className="mb-3">
-                      <label className="block text-xs text-gray-500 mb-1">表示略称</label>
-                      <input
-                        type="text"
-                        value={data?.abbr || ''}
-                        onChange={(e) => setEditData(prev => ({
-                          ...prev,
-                          [assistance.id]: { ...prev[assistance.id], abbr: e.target.value }
-                        }))}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                      />
-                    </div>
-                    <div className="mb-3">
-                      <label className="block text-xs text-gray-500 mb-1">損保会社</label>
-                      <div className="flex flex-wrap gap-2 mb-2">
-                        {data?.companies.map(c => (
-                          <span
-                            key={c.id}
-                            className="flex items-center gap-1 bg-blue-50 text-blue-700 text-xs px-2 py-1 rounded-full"
-                          >
-                            {c.name}
-                            <button onClick={() => removeCompany(assistance.id, c.id)}>
-                              <X className="w-3 h-3" />
-                            </button>
-                          </span>
-                        ))}
+            return (
+              <Accordion.Item
+                value={assistance.id}
+                className="bg-white rounded-lg shadow-sm overflow-hidden"
+              >
+                <div className="flex items-stretch">
+                  {dragHandle}
+                  <Accordion.Header className="flex-1">
+                    <Accordion.Trigger className="w-full flex items-center justify-between px-4 py-3 text-left group">
+                      <div className="flex items-center gap-2">
+                        <ChevronRight className="w-4 h-4 text-gray-400 transition-transform group-data-[state=open]:rotate-90" />
+                        <span className="font-medium text-gray-800">{assistance.name}</span>
                       </div>
-                      <div className="flex gap-2">
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => { e.stopPropagation(); deleteAssistance(assistance.id) }}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); deleteAssistance(assistance.id) } }}
+                        className="p-1 rounded-full hover:bg-red-50 cursor-pointer"
+                      >
+                        <X className="w-4 h-4 text-red-400" />
+                      </div>
+                    </Accordion.Trigger>
+                  </Accordion.Header>
+                </div>
+
+                <Accordion.Content className="px-4 pb-4">
+                  {!isEditing ? (
+                    <div>
+                      <p className="text-sm text-gray-500 mb-1">
+                        損保: {assistance.insuranceCompanies.map(c => c.name).join('、') || 'なし'}
+                      </p>
+                      <p className="text-sm text-gray-500 mb-3">略称: {assistance.displayAbbreviation}</p>
+                      <button
+                        onClick={() => startEditing(assistance)}
+                        className="text-sm px-3 py-1 rounded-md border border-gray-300 hover:bg-gray-50"
+                      >
+                        編集
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="mb-3">
+                        <label className="block text-xs text-gray-500 mb-1">アシスタンス名</label>
                         <input
                           type="text"
-                          value={newCompanyInput[assistance.id] || ''}
-                          onChange={(e) => setNewCompanyInput(prev => ({ ...prev, [assistance.id]: e.target.value }))}
-                          placeholder="損保会社名"
-                          className="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
-                          onKeyDown={(e) => e.key === 'Enter' && !e.nativeEvent.isComposing && addCompany(assistance.id)}
+                          value={data?.name || ''}
+                          onChange={(e) => setEditData(prev => ({
+                            ...prev,
+                            [assistance.id]: { ...prev[assistance.id], name: e.target.value }
+                          }))}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
                         />
+                      </div>
+                      <div className="mb-3">
+                        <label className="block text-xs text-gray-500 mb-1">表示略称</label>
+                        <input
+                          type="text"
+                          value={data?.abbr || ''}
+                          onChange={(e) => setEditData(prev => ({
+                            ...prev,
+                            [assistance.id]: { ...prev[assistance.id], abbr: e.target.value }
+                          }))}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                        />
+                      </div>
+                      <div className="mb-3">
+                        <label className="block text-xs text-gray-500 mb-1">損保会社</label>
+                        <div className="flex flex-wrap gap-2 mb-2">
+                          {data?.companies.map(c => (
+                            <span
+                              key={c.id}
+                              className="flex items-center gap-1 bg-blue-50 text-blue-700 text-xs px-2 py-1 rounded-full"
+                            >
+                              {c.name}
+                              <button onClick={() => removeCompany(assistance.id, c.id)}>
+                                <X className="w-3 h-3" />
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={newCompanyInput[assistance.id] || ''}
+                            onChange={(e) => setNewCompanyInput(prev => ({ ...prev, [assistance.id]: e.target.value }))}
+                            placeholder="損保会社名"
+                            className="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
+                            onKeyDown={(e) => e.key === 'Enter' && !e.nativeEvent.isComposing && addCompany(assistance.id)}
+                          />
+                          <button
+                            onClick={() => addCompany(assistance.id)}
+                            className="text-sm px-3 py-1.5 rounded-md text-white"
+                            style={{ backgroundColor: '#71A9F7' }}
+                          >
+                            <Plus className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 mt-3">
                         <button
-                          onClick={() => addCompany(assistance.id)}
-                          className="text-sm px-3 py-1.5 rounded-md text-white"
-                          style={{ backgroundColor: '#71A9F7' }}
+                          onClick={cancelEditing}
+                          className="flex-1 py-2 rounded-md text-sm font-medium"
+                          style={{ backgroundColor: '#9CA3AF', color: 'white' }}
                         >
-                          <Plus className="w-4 h-4" />
+                          キャンセル
+                        </button>
+                        <button
+                          onClick={() => saveAssistance(assistance.id)}
+                          className="flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2.5"
+                          style={{ backgroundColor: '#1C2948', color: 'white' }}
+                        >
+                          <FaSave className="w-4 h-4" />
+                          <span style={{ letterSpacing: '0.15em' }}>保存</span>
                         </button>
                       </div>
                     </div>
-                    <div className="flex gap-2 mt-3">
-                      <button
-                        onClick={cancelEditing}
-                        className="flex-1 py-2 rounded-md text-sm font-medium"
-                        style={{ backgroundColor: '#9CA3AF', color: 'white' }}
-                      >
-                        キャンセル
-                      </button>
-                      <button
-                        onClick={() => saveAssistance(assistance.id)}
-                        className="flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2.5"
-                        style={{ backgroundColor: '#1C2948', color: 'white' }}
-                      >
-                        <FaSave className="w-4 h-4" />
-                        <span style={{ letterSpacing: '0.15em' }}>保存</span>
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </Accordion.Content>
-            </Accordion.Item>
-          )
-        })}
+                  )}
+                </Accordion.Content>
+              </Accordion.Item>
+            )
+          }}
+        />
       </Accordion.Root>
 
       {isAdding && (

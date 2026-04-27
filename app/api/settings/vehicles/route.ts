@@ -13,7 +13,7 @@ export async function GET() {
   const vehicles = await prisma.vehicle.findMany({
     where: { tenantId: session.user.tenantId },
     include: { _count: { select: { users: true, dispatches: true } } },
-    orderBy: { createdAt: 'asc' },
+    orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
   })
 
   return NextResponse.json(vehicles, {
@@ -41,12 +41,20 @@ export async function POST(req: Request) {
   const body = parsed.data
 
   try {
+    // sortOrder: 末尾配置 (同一テナント内の max + 1)
+    const maxResult = await prisma.vehicle.aggregate({
+      where: { tenantId: session.user.tenantId },
+      _max: { sortOrder: true },
+    })
+    const nextSortOrder = (maxResult._max.sortOrder ?? -1) + 1
+
     const vehicle = await prisma.vehicle.create({
       data: {
         tenantId: session.user.tenantId,
         plateNumber: body.plateNumber,
         displayName: body.displayName,
         isActive: body.isActive,
+        sortOrder: nextSortOrder,
       },
     })
 
