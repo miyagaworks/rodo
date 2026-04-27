@@ -7,5 +7,5 @@ export default async function SettingsPage() {
   if (!session) redirect('/login')
   if (session.user.role !== 'ADMIN') redirect('/')
 
-  return <SettingsClient />
+  return <SettingsClient session={session} />
 }
