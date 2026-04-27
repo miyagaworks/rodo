@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import * as Accordion from '@radix-ui/react-accordion'
 import { ChevronRight, X, Plus } from 'lucide-react'
 import { FaSave } from 'react-icons/fa'
+import { SortableList } from '@/components/common/SortableList'
 
 interface Vehicle {
   id: string
@@ -154,6 +155,17 @@ export default function MembersTab() {
     newMember.email.trim() !== '' &&
     newMember.password.length >= 8
 
+  const reorderUsers = async (orderedIds: string[]) => {
+    const res = await fetch('/api/users/reorder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderedIds }),
+    })
+    if (!res.ok) {
+      throw new Error('reorder failed')
+    }
+  }
+
   const formatCurrency = (v: number | null) =>
     v != null ? `¥${v.toLocaleString()}` : '未設定'
 
@@ -162,35 +174,40 @@ export default function MembersTab() {
   return (
     <div>
       <Accordion.Root type="single" collapsible className="space-y-2">
-        {members.map((member) => {
-          const isEditing = editingId === member.id
-          const data = editData[member.id]
+        <SortableList
+          items={members}
+          onReorder={reorderUsers}
+          renderItem={(member, dragHandle) => {
+            const isEditing = editingId === member.id
+            const data = editData[member.id]
 
-          return (
-            <Accordion.Item
-              key={member.id}
-              value={member.id}
-              className="bg-white rounded-lg shadow-sm overflow-hidden"
-            >
-              <Accordion.Header>
-                <Accordion.Trigger className="w-full flex items-center justify-between px-4 py-3 text-left group">
-                  <div className="flex items-center gap-2">
-                    <ChevronRight className="w-4 h-4 text-gray-400 transition-transform group-data-[state=open]:rotate-90" />
-                    <span className="font-medium text-gray-800">{member.name}</span>
-                  </div>
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    onClick={(e) => { e.stopPropagation(); deleteMember(member.id) }}
-                    onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); deleteMember(member.id) } }}
-                    className="p-1 rounded-full hover:bg-red-50 cursor-pointer"
-                  >
-                    <X className="w-4 h-4 text-red-400" />
-                  </div>
-                </Accordion.Trigger>
-              </Accordion.Header>
+            return (
+              <Accordion.Item
+                value={member.id}
+                className="bg-white rounded-lg shadow-sm overflow-hidden"
+              >
+                <div className="flex items-stretch">
+                  {dragHandle}
+                  <Accordion.Header className="flex-1">
+                    <Accordion.Trigger className="w-full flex items-center justify-between px-4 py-3 text-left group">
+                      <div className="flex items-center gap-2">
+                        <ChevronRight className="w-4 h-4 text-gray-400 transition-transform group-data-[state=open]:rotate-90" />
+                        <span className="font-medium text-gray-800">{member.name}</span>
+                      </div>
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => { e.stopPropagation(); deleteMember(member.id) }}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); deleteMember(member.id) } }}
+                        className="p-1 rounded-full hover:bg-red-50 cursor-pointer"
+                      >
+                        <X className="w-4 h-4 text-red-400" />
+                      </div>
+                    </Accordion.Trigger>
+                  </Accordion.Header>
+                </div>
 
-              <Accordion.Content className="px-4 pb-4">
+                <Accordion.Content className="px-4 pb-4">
                 {!isEditing ? (
                   <div>
                     <p className="text-sm text-gray-600 mb-1">
@@ -285,7 +302,8 @@ export default function MembersTab() {
               </Accordion.Content>
             </Accordion.Item>
           )
-        })}
+        }}
+        />
       </Accordion.Root>
 
       {isAdding && (
