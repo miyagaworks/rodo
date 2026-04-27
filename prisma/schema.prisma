@@ -192,6 +192,9 @@ model Dispatch {
 
   isDraft Boolean @default(false)
 
+  /// 請求済みタイムスタンプ。NULL = 未請求、値あり = 請求済み。
+  billedAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -218,6 +221,7 @@ model Dispatch {
   @@index([status])
   @@index([isDraft])
   @@index([vehicleId])
+  @@index([tenantId, billedAt])
 }
 
 enum DispatchType {
