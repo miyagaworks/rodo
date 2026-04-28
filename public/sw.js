@@ -1,8 +1,8 @@
 /// <reference lib="webworker" />
 
-const CACHE_NAME = 'rodo-v5'
-const STATIC_CACHE = 'rodo-static-v5'
-const IMAGE_CACHE = 'rodo-images-v5'
+const CACHE_NAME = 'rodo-v6'
+const STATIC_CACHE = 'rodo-static-v6'
+const IMAGE_CACHE = 'rodo-images-v6'
 
 // 静的アセット（Cache First）
 // 注意: '/' は動的ページ（セッション依存）なのでプリキャッシュしない
@@ -128,7 +128,8 @@ async function networkFirst(request) {
         }
       )
     }
-    return caches.match('/') || new Response('Offline', { status: 503 })
+    const fallback = await caches.match('/')
+    return fallback || new Response('Offline', { status: 503 })
   }
 }
 
