@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Session } from 'next-auth'
 import AdminShell from '@/components/admin/AdminShell'
+import AppFooter from '@/components/common/AppFooter'
 import AppHeader from '@/components/common/AppHeader'
 
 interface AdminLayoutShellProps {
@@ -44,6 +45,8 @@ export default function AdminLayoutShell({
       )}
 
       <main className="flex-1 p-4">{children}</main>
+
+      <AppFooter />
     </div>
   )
 }
