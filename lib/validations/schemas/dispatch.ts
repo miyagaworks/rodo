@@ -165,4 +165,7 @@ export const adminUpdateDispatchSchema = z.object({
 
   // 請求
   billedAt: dateString,
+
+  // 二次搬送予定日時 (STORED 案件用)。null/undefined を許容（未定にするケース）。
+  scheduledSecondaryAt: dateString,
 }).partial()

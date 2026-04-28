@@ -195,6 +195,9 @@ model Dispatch {
   /// 請求済みタイムスタンプ。NULL = 未請求、値あり = 請求済み。
   billedAt DateTime?
 
+  /// 二次搬送予定日時。NULL = 未定（保険会社からの依頼待ち）。STORED 案件の管理用。
+  scheduledSecondaryAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -222,6 +225,7 @@ model Dispatch {
   @@index([isDraft])
   @@index([vehicleId])
   @@index([tenantId, billedAt])
+  @@index([tenantId, status, scheduledSecondaryAt])
 }
 
 enum DispatchType {

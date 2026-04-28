@@ -147,6 +147,13 @@ export async function PATCH(
   // 請求
   if (body.billedAt !== undefined) allowed.billedAt = body.billedAt ? new Date(body.billedAt) : null
 
+  // 二次搬送予定日時 (STORED 案件用)
+  if (body.scheduledSecondaryAt !== undefined) {
+    allowed.scheduledSecondaryAt = body.scheduledSecondaryAt
+      ? new Date(body.scheduledSecondaryAt)
+      : null
+  }
+
   try {
     const dispatch = await prisma.dispatch.update({
       where: { id, tenantId: session.user.tenantId },

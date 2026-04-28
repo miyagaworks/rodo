@@ -14,6 +14,8 @@ export interface DispatchItem {
   status: string
   isDraft: boolean
   billedAt: string | null
+  /** 二次搬送予定日時 (ISO 文字列)。null = 未定。Phase 3.5 で追加。 */
+  scheduledSecondaryAt: string | null
   type: 'ONSITE' | 'TRANSPORT'
   user: { id: string; name: string }
   assistance: { id: string; name: string; displayAbbreviation: string }
@@ -32,7 +34,14 @@ export interface DispatchesResponse {
 export interface DispatchesFilter {
   from?: string
   to?: string
-  status?: 'draft' | 'active' | 'completed' | 'unbilled' | 'billed' | 'all'
+  status?:
+    | 'draft'
+    | 'active'
+    | 'completed'
+    | 'unbilled'
+    | 'billed'
+    | 'stored'
+    | 'all'
   userId?: string
   assistanceId?: string
   page?: number

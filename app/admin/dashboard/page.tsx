@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import MemberStatusGrid from '@/components/admin/MemberStatusGrid'
 import TodayDispatchSummary from '@/components/admin/TodayDispatchSummary'
+import StoredVehicleList from '@/components/admin/StoredVehicleList'
 import OverdueDispatchList from '@/components/admin/OverdueDispatchList'
 import {
   getBusinessDayDate,
@@ -13,10 +14,11 @@ import {
 /**
  * 管理者ダッシュボード (/admin/dashboard)
  *
- * ワイヤーフレーム §6.2 に準拠:
+ * ワイヤーフレーム §6.2 / §11.2 に準拠:
  * 1. 隊員ステータス（グリッド + 最終更新 + 手動リフレッシュ）
  * 2. 今日の案件サマリ（進行中 / 完了 / 未請求）
- * 3. 持ち越し案件（前日以前の未請求）
+ * 3. 保管中の車両（二次搬送予定日時の管理 — Phase 3.5）
+ * 4. 持ち越し案件（前日以前の未請求）
  *
  * businessDayStartMinutes を /api/tenant/settings から取得し、
  * 「今日」「昨日」の日付を動的に計算する。
@@ -69,7 +71,10 @@ export default function AdminDashboardPage() {
       {/* 2. 今日の案件サマリ */}
       <TodayDispatchSummary today={today} />
 
-      {/* 3. 持ち越し案件 */}
+      {/* 3. 保管中の車両（二次搬送予定日時の管理） */}
+      <StoredVehicleList today={today} />
+
+      {/* 4. 持ち越し案件 */}
       <OverdueDispatchList yesterday={yesterday} />
     </div>
   )

@@ -119,6 +119,54 @@ describe('GET /api/admin/dispatches', () => {
     expect(captured).toMatchObject({ billedAt: null, isDraft: false })
   })
 
+  it('status=stored フィルタ: status=STORED && isDraft=false', async () => {
+    mockedAuth.mockResolvedValueOnce(adminSession())
+    const countMock = prisma.dispatch.count as unknown as ReturnType<typeof vi.fn>
+    const findMock = prisma.dispatch.findMany as unknown as ReturnType<typeof vi.fn>
+    let captured: { status?: unknown; isDraft?: unknown } | null = null
+    countMock.mockImplementationOnce((args: { where: typeof captured }) => {
+      captured = args.where
+      return Promise.resolve(0)
+    })
+    findMock.mockImplementationOnce(() => Promise.resolve([]))
+    mockedTransaction.mockImplementationOnce(async (calls: Promise<unknown>[]) =>
+      Promise.all(calls),
+    )
+
+    await GET(makeRequest('?status=stored'))
+    expect(captured?.status).toBe('STORED')
+    expect(captured?.isDraft).toBe(false)
+  })
+
+  it('レスポンスに scheduledSecondaryAt が含まれる', async () => {
+    mockedAuth.mockResolvedValueOnce(adminSession())
+    const scheduled = new Date('2026-04-28T05:00:00.000Z')
+    setupTxResolve(1, [
+      {
+        id: 'd1',
+        dispatchNumber: '20260428001',
+        dispatchTime: null,
+        status: 'STORED',
+        isDraft: false,
+        billedAt: null,
+        scheduledSecondaryAt: scheduled,
+        type: 'TRANSPORT',
+        customerName: null,
+        plateRegion: null,
+        plateClass: null,
+        plateKana: null,
+        plateNumber: null,
+        user: { id: 'u1', name: '山田' },
+        assistance: { id: 'a1', name: 'PA', displayAbbreviation: 'PA' },
+        report: null,
+      },
+    ])
+
+    const res = await GET(makeRequest())
+    const json = await res.json()
+    expect(json.dispatches[0].scheduledSecondaryAt).toBe(scheduled.toISOString())
+  })
+
   it('status=billed フィルタ: billedAt !== null', async () => {
     mockedAuth.mockResolvedValueOnce(adminSession())
     const countMock = prisma.dispatch.count as unknown as ReturnType<typeof vi.fn>

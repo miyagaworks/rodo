@@ -12,7 +12,7 @@ import type { Prisma } from '@prisma/client'
  * Query:
  *   from         YYYY-MM-DD       dispatchTime 下限
  *   to           YYYY-MM-DD       dispatchTime 上限（その日 23:59:59.999 まで含む）
- *   status       'draft' | 'active' | 'completed' | 'unbilled' | 'billed' | 'all'
+ *   status       'draft' | 'active' | 'completed' | 'unbilled' | 'billed' | 'stored' | 'all'
  *   userId       担当隊員フィルタ
  *   assistanceId アシスタンス会社フィルタ
  *   page         ページ番号（1 始まり、デフォ 1）
@@ -91,6 +91,11 @@ export async function GET(req: Request) {
     case 'billed':
       where.billedAt = { not: null }
       break
+    case 'stored':
+      // 保管中（二次搬送待ち）。Phase 3.5 で追加。
+      where.status = 'STORED'
+      where.isDraft = false
+      break
     case 'all':
     case null:
     case undefined:
@@ -117,6 +122,7 @@ export async function GET(req: Request) {
         status: true,
         isDraft: true,
         billedAt: true,
+        scheduledSecondaryAt: true,
         type: true,
         customerName: true,
         plateRegion: true,
@@ -156,6 +162,7 @@ export async function GET(req: Request) {
       status: d.status,
       isDraft: d.isDraft,
       billedAt: d.billedAt,
+      scheduledSecondaryAt: d.scheduledSecondaryAt,
       type: d.type,
       user: d.user,
       assistance: d.assistance,
