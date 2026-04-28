@@ -250,16 +250,21 @@ if (session.user.role !== 'ADMIN') return NextResponse.json({ error: 'Forbidden'
   month: number
   days: Array<{
     date: string  // YYYY-MM-DD
-    totalCount: number      // dispatchTime がその日の案件総数
-    unprocessedCount: number  // 未請求 or 報告書 isDraft=true の件数
+    primaryDispatches: Array<{
+      dispatchNumber: string
+      plate: { region: string; class: string; kana: string; number: string } | null
+    }>
   }>
 }
 ```
 
 **実装方針**:
-- `prisma.dispatch.findMany` を JST 月初〜月末の範囲で取り、API 層で日別集計。
-- DB 側の `GROUP BY` を使う場合は raw SQL になるため、まず Prisma の通常クエリで実装し、件数増大時に最適化。
+- 月内の `Dispatch` を `dispatchTime` で日別に集計
+- 各日付に 1 次搬送（`type=ONSITE | TRANSPORT` で初動）の出動番号と車番のみを返す
+- 「いつ二次搬送するか・誰が持っていくか」はカレンダーには載せない（業務状況依存のため）
 - JST 境界処理は既存 `app/api/dispatches/route.ts` の dispatchNumber 採番ロジック（`jstOffset = 9 * 60 * 60 * 1000`）と整合させる。
+
+> **Phase 4 カレンダー仕様変更（2026-04-28）**: 元設計の「totalCount / unprocessedCount」サマリ方式から、業務ヒアリングを受けて「1 次搬送の出動番号と車番を一覧で見せる」方式に変更。二次搬送の予定日時は Phase 3.5 のダッシュボード「保管中の車両」セクションで管理する。
 
 ### 4.4 PATCH `/api/admin/dispatches/[id]/billing`
 **目的**: 「請求済み」ボタンで `billedAt` をセット / 解除する。
@@ -479,12 +484,18 @@ if (session.user.role !== 'ADMIN') return NextResponse.json({ error: 'Forbidden'
 ├──┬──┬──┬──┬──┬──┬──┤                       │
 │日│月│火│水│木│金│土│                       │
 ├──┼──┼──┼──┼──┼──┼──┤                       │
-│ 1│ 2│ 3│ 4│ 5│ 6│ 7│  ← 件数 + 未処理バッジ   │
-│  │5 │3⚠│2 │  │1 │  │                       │
+│ 1│ 2│ 3│ 4│ 5│ 6│ 7│                       │
+│  │ 20260402-001  │  │   ← セルに 1次搬送の出動番号 + 車番│
+│  │ 練馬500あ1234 │  │                       │
+│  │               │  │                       │
+│  │ 20260402-002  │  │                       │
+│  │ 横浜300い5678 │  │                       │
 ├──┼──┼──┼──┼──┼──┼──┤                       │
 │...│                                          │
 └────────────────────────────────────────────────┘
 ```
+
+> 1 日に複数件ある場合は出動番号と車番を縦に並べる。件数が多い日はセル内スクロール or "+N 件" 表示で対応（Phase 4 着手時に判断）。「いつ・誰が」搬送するかはカレンダーには載せない。
 
 ### 6.4 案件編集（`/admin/dispatches/[id]`）
 
@@ -709,11 +720,13 @@ if (session.user.role !== 'ADMIN') return NextResponse.json({ error: 'Forbidden'
 | Q2 | **解消**: `DispatchStatus.WORKING` は schema.prisma の enum にのみ存在するデッドコード。`DispatchClient.tsx` / `SecondaryDispatchClient.tsx` / `VALID_STATUS_TRANSITIONS` のいずれにも遷移経路はなく、本機能では使用しない（サブフェーズは 4 段階に確定） | — | 解消済み |
 | Q3 | **解消**（実業務未使用のため発生せず）: 本アプリはまだ未稼働で DB に過去案件が存在しない。紙併用期間中は紙で請求した案件もアプリ上で「請求済みボタン」を押す運用で同期する | — | 解消済み |
 | Q4 | **ADMIN ログイン時のホーム遷移先**（`/` のままか `/admin/dashboard` に変えるか） | 業務担当者 | Phase 2 着手前（変更しないなら確認のみ） |
-| Q5 | **「持ち越し」の閾値**（前日以前 / 3 日前以前 / 月跨ぎ など） | 業務担当者 | Phase 3 着手前 |
+| Q5 | **解消**（前日以前で確定。Phase 3 で実装済み） | — | 解消済み |
 | Q6 | **ADMIN が編集した案件を隊員側に通知するか** | 業務担当者 | Phase 4 着手前（要件には「修正された表示は不要」とあるが、無音で書き換わると現場混乱の可能性） |
 | Q7 | **請求業務の同時編集**（複数管理者が同時に同じ案件を編集する想定があるか） | 業務担当者 | Phase 4 / Phase 5 着手前 |
-| Q8 | **テナント設定（`businessDayStartMinutes`）と「今日の案件」の境界** | 既存仕様確認 | Phase 3 着手時 |
+| Q8 | **解消**（`lib/admin/business-day.ts` で対応済み） | — | 解消済み |
 | Q9 | **解消**: `DispatchClient.tsx` L688-690 / L817-818 で `COMPLETED ↔ RETURNED` 遷移時に `returnTime` のセット / 解除が行われていることを確認済み。「`COMPLETED && returnTime IS NULL` → 帰社中」判定ロジックは妥当 | — | 解消済み |
+| Q10 | **保管中の車両を一括で「連休後 9 時」のような時刻に揃える操作は必要か** | 業務担当者 | Phase 3.5 リリース後の運用観察 |
+| Q11 | **未定状態が長期化した案件を自動でアラートするか** | 業務担当者 | Phase 3.5 リリース後の運用観察 |
 
 ---
 
@@ -725,17 +738,24 @@ Phase 1（スキーマ + API）
    ▼
 Phase 2（ハンバーガー + /admin ルーティング）
    │
-   ├─────────────┐
-   ▼             ▼
-Phase 3       Phase 4
-（ダッシュボード）（案件管理）
-   │             │
-   └─────┬───────┘
-         ▼
-       Phase 5（請求、※追加設計後）
+   ▼
+Phase 2.5（PC レイアウト是正）
+   │
+   ▼
+Phase 3（ダッシュボード）
+   │
+   ▼
+Phase 3.5（保管車両の二次搬送予定日管理）
+   │
+   ▼
+Phase 4（案件管理 + カレンダー新仕様）
+   │
+   ▼
+Phase 5（請求、※追加設計後）
 ```
 
-- Phase 3 と Phase 4 は API（Phase 1）と土台（Phase 2）が揃っていれば **並列実行可** （worktree 推奨）。
+> Phase 3.5 と Phase 4 を並列にしない。Phase 3.5 で `Dispatch.scheduledSecondaryAt` を導入する前提で Phase 4 のカレンダーが設計される、というほどではないが、業務優先度として「保管見落とし防止」を先行させる。
+
 - Phase 5 は Phase 4 で `Dispatch.billedAt` の最低限の手動操作 UI（テーブル行の「請求済みにする」ボタン）を仮実装しておけば、Phase 5 リリース前でも請求業務は最低限回せる。
 
 ---
@@ -808,6 +828,96 @@ Phase 3       Phase 4
 - AGENTS.md 警告: Next.js 16.x は破壊的変更あり。implementer は `node_modules/next/dist/docs/` の関連ガイド（`usePathname` / Client Components / `app/.../layout.tsx`）を **コードを書く前に必ず参照**する。
 - `AppHeader` を共有する `HomeClient` / `SettingsClient` で意図せぬ表示が起きないこと（`showAdminNav={false}` の明示で防御）。
 - ドロワー方向反転で z-index / overscroll / PWA viewport の整合性が崩れないこと。
+
+---
+
+### 11.2 Phase 3.5: 保管車両の二次搬送予定日管理（Phase 3 補強・Phase 4 前提条件）
+
+**背景**:
+- 業務ヒアリング（2026-04-28）で、保管中（`status=STORED`）の車両について「いつ二次搬送するか」を管理者が忘れやすいことが判明。
+- 業務フロー: 保険会社から「いつどこへ搬送して」の依頼が来る。午前回収 → 当日午後 / 夜回収 → 翌日 / 連休中保管 → 連休明け、等のパターン。
+- 現状は紙台帳で管理。アプリ化により管理者の見落としを防ぐ。
+
+**目的**:
+`Dispatch` に「二次搬送予定日時」フィールドを追加し、ダッシュボードに「保管中の車両」セクションを設ける。管理者が手動で日時を登録・更新できる UI を提供する。
+
+**確定要件**:
+- 自動算出ロジックは導入しない（依頼内容が業務状況依存のため、手動入力で十分）
+- 「未定」状態を許容する（`NULL` = 保険会社からの依頼待ち）
+- 表示優先度: 今日 → 明日 → それ以降 → 未定 の順（見落としやすい順）
+- 「未定」行は淡い赤バッジ等で強調
+
+**スキーマ変更**:
+```prisma
+model Dispatch {
+  // 既存フィールド
+  /// 二次搬送予定日時。NULL = 未定（保険会社からの依頼待ち）。
+  scheduledSecondaryAt DateTime?
+  // 既存フィールド
+  @@index([tenantId, status, scheduledSecondaryAt])
+}
+```
+
+マイグレーション名: `add_scheduled_secondary_at_to_dispatch`
+既存データは全行 `NULL`。本アプリは未稼働のため移行不要。
+
+**API 変更**:
+- `lib/validations/schemas/billing.ts` または `dispatch.ts` の `adminUpdateDispatchSchema` に `scheduledSecondaryAt: z.date().nullable().optional()` を追加
+- 既存 `PATCH /api/admin/dispatches/[id]` で更新可能にする（新規エンドポイント不要）
+- `GET /api/admin/dispatches?status=stored` を機能拡張（既存の status フィルタに `stored` を追加し、`Dispatch.status === 'STORED'` で抽出）
+
+**新規ファイル**:
+- `prisma/migrations/{timestamp}_add_scheduled_secondary_at_to_dispatch/migration.sql`
+- `components/admin/StoredVehicleList.tsx`（保管中車両リスト + 編集 UI）
+- `components/admin/ScheduledSecondaryEditor.tsx`（行内編集 or モーダル）
+- `__tests__/components/admin/StoredVehicleList.test.tsx`
+- `__tests__/lib/admin/scheduled-secondary-sort.test.ts`（ソート純粋関数のテスト）
+- `lib/admin/scheduled-secondary-sort.ts`（ソート純粋関数）
+
+**改修ファイル**:
+- `prisma/schema.prisma`（フィールド + インデックス追加）
+- `lib/validations/schemas/billing.ts` または `dispatch.ts`（`adminUpdateDispatchSchema` 拡張）
+- `app/api/admin/dispatches/route.ts`（`status=stored` フィルタ）
+- `app/admin/dashboard/page.tsx`（保管セクション追加）
+- `hooks/useAdminDispatches.ts`（`status=stored` 取得用フック追加 or パラメータ拡張）
+
+**ワイヤーフレーム（PC）**:
+
+```
+▼ 保管中の車両
+┌─────────────────────────────────────────────────────┐
+│ 出動番号       車番             搬送予定         操作  │
+│ 20260425-002  練馬500あ1234   4/28(火) PM     [編集]│
+│ 20260424-003  横浜300い5678   4/29(水) AM     [編集]│
+│ 20260423-001  品川300う9012   未定 ⚠          [編集]│
+└─────────────────────────────────────────────────────┘
+```
+
+**編集 UX**:
+- 行右の `[編集]` ボタンで日時ピッカー（`input[type="datetime-local"]` を基本、DatePicker 導入は後日判断）
+- 保存で `PATCH /api/admin/dispatches/[id]` 呼出
+- 同一テーブル内で更新（モーダルではなく行内展開、もしくは小型モーダル）
+
+**検証ゲート**:
+- `tsc` / `build` / `test` グリーン
+- dev server で `/admin/dashboard` を開き、保管セクションのソート挙動を確認
+- 「未定」「今日」「明日」「未来」「過去」の各状態で正しく分類・強調表示されることを目視
+- スクリーンショット必須:
+  - PC: 保管セクションあり / なし の 2 種
+  - SP: 同上
+  - 編集 UI 起動状態 1 枚
+
+**想定ファイル数**: 新規 6、改修 5
+
+**完了条件**:
+- 検証ゲート全通過
+- ユーザーがスクリーンショットを目視で承認
+- 承認後にコミット → push
+
+**禁止事項**:
+- 自動算出ロジックの導入
+- 「誰が搬送するか」の割当 UI 追加（業務状況依存のため Phase 3.5 では扱わない）
+- `SecondaryDispatchClient.tsx` への変更（隊員側フローには影響させない）
 
 ---
 
