@@ -1,6 +1,7 @@
 import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
 import AdminLayoutShell from '@/components/admin/AdminLayoutShell'
+import AdminQueryProvider from '@/components/admin/AdminQueryProvider'
 
 export default async function AdminLayout({
   children,
@@ -11,5 +12,9 @@ export default async function AdminLayout({
   if (!session) redirect('/login')
   if (session.user.role !== 'ADMIN') redirect('/')
 
-  return <AdminLayoutShell session={session}>{children}</AdminLayoutShell>
+  return (
+    <AdminLayoutShell session={session}>
+      <AdminQueryProvider>{children}</AdminQueryProvider>
+    </AdminLayoutShell>
+  )
 }
