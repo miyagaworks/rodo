@@ -69,7 +69,7 @@ export default function AdminShell({
           style={{ backgroundColor: '#1C2948' }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/rodo-logo.svg" alt="RODO" className="h-6" />
+          <img src="/menu.svg" alt="RODO" className="h-6" />
           <button
             type="button"
             onClick={onClose}
