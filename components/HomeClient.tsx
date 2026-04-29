@@ -2,15 +2,15 @@
 
 import { useState, useEffect } from 'react'
 import { Session } from 'next-auth'
-import { signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useAtomValue } from 'jotai'
 import { FaCoffee } from 'react-icons/fa'
-import { HiOutlineLogout } from 'react-icons/hi'
 import AssistanceButton from '@/components/AssistanceButton'
 import ProcessingBar from '@/components/ProcessingBar'
 import BreakBar from '@/components/BreakBar'
+import AdminShell from '@/components/admin/AdminShell'
 import AppFooter from '@/components/common/AppFooter'
+import AppHeader from '@/components/common/AppHeader'
 import { breakStateAtom } from '@/store/breakAtom'
 
 // displayAbbreviation → ロゴ・表示設定のマッピング
@@ -48,6 +48,9 @@ export default function HomeClient({ session }: HomeClientProps) {
   // 休憩上限（残時間 > 0 で true）。取得前は null、フェイルクローズで false。
   const [canStartBreak, setCanStartBreak] = useState<boolean | null>(null)
   const [limitStatusError, setLimitStatusError] = useState<string | null>(null)
+  // 管理者用ドロワー（ADMIN のみ ☰ ボタンから開く）
+  const [adminDrawerOpen, setAdminDrawerOpen] = useState(false)
+  const isAdmin = session.user.role === 'ADMIN'
 
   useEffect(() => {
     let cancelled = false
@@ -127,82 +130,82 @@ export default function HomeClient({ session }: HomeClientProps) {
   return (
     <div className="min-h-screen flex flex-col pb-16" style={{ backgroundColor: '#C6D8FF' }}>
       {/* ヘッダー */}
-      <header className="px-4 py-3 flex items-center justify-between" style={{ backgroundColor: '#1C2948' }}>
-        <img src="/rodo-logo.svg" alt="RODO" className="h-6" />
-        <div className="flex items-center gap-3">
-          {session.user.role === 'ADMIN' && (
-            <a href="/settings" className="text-white text-sm">設定</a>
-          )}
-          <span className="text-white text-sm">{session.user.name}</span>
-          <button
-            onClick={() => signOut({ callbackUrl: '/login' })}
-            className="text-white opacity-70 hover:opacity-100 transition-opacity"
-            title="ログアウト"
-          >
-            <HiOutlineLogout className="w-5 h-5" />
-          </button>
-        </div>
-      </header>
+      <AppHeader
+        session={session}
+        showAdminNav={isAdmin}
+        onMenuClick={() => setAdminDrawerOpen(true)}
+      />
+
+      {/* 管理者用ドロワー（ADMIN のみ。SP のみ表示=md:hidden） */}
+      {isAdmin && (
+        <AdminShell
+          open={adminDrawerOpen}
+          onClose={() => setAdminDrawerOpen(false)}
+          adminName={session.user.name}
+        />
+      )}
 
       {/* メインコンテンツ */}
       <main className="flex-1 p-4">
-        {/* 休憩中バー（ポーズ中のみ表示） */}
-        <div className="mb-3">
-          <BreakBar />
-        </div>
-
-        {/* アシスタンスボタングリッド */}
-        {displayAssistances.length > 0 ? (
-          <div className="grid grid-cols-2 gap-3 mb-3">
-            {displayAssistances.map((assistance) => (
-              <AssistanceButton key={assistance.id} assistance={assistance} />
-            ))}
+        <div className="max-w-md mx-auto w-full">
+          {/* 休憩中バー（ポーズ中のみ表示） */}
+          <div className="mb-3">
+            <BreakBar />
           </div>
-        ) : fetchError ? (
-          /* エラー表示 + リトライ */
-          <div className="flex flex-col items-center justify-center py-12 gap-4">
-            <p className="text-gray-600 text-sm">{fetchError}</p>
-            <button
-              onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-white rounded-md shadow text-sm font-medium text-gray-700 hover:bg-gray-50"
+
+          {/* アシスタンスボタングリッド */}
+          {displayAssistances.length > 0 ? (
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              {displayAssistances.map((assistance) => (
+                <AssistanceButton key={assistance.id} assistance={assistance} />
+              ))}
+            </div>
+          ) : fetchError ? (
+            /* エラー表示 + リトライ */
+            <div className="flex flex-col items-center justify-center py-12 gap-4">
+              <p className="text-gray-600 text-sm">{fetchError}</p>
+              <button
+                onClick={() => window.location.reload()}
+                className="px-4 py-2 bg-white rounded-md shadow text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                再読み込み
+              </button>
+            </div>
+          ) : (
+            /* ローディングスケルトン */
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="bg-white rounded-xl shadow-md animate-pulse"
+                  style={{ aspectRatio: '1 / 0.8' }}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* 休憩上限取得エラー通知（フェイルクローズした旨を案内） */}
+          {limitStatusError && (
+            <div
+              role="status"
+              className="mb-3 p-3 rounded-lg bg-yellow-50 border border-yellow-200 text-yellow-800 text-xs"
             >
-              再読み込み
+              休憩可否の取得に失敗しました。休憩を一時停止しています。
+            </div>
+          )}
+
+          {/* 休憩ボタン（ポーズ中 / 取得中 / 消化済みは非表示） */}
+          {breakState.status !== 'paused' && canStartBreak === true && (
+            <button
+              className="w-full flex items-center justify-center gap-3 py-5 rounded-lg text-white text-xl font-bold"
+              style={{ backgroundColor: '#888888' }}
+              onClick={() => router.push('/break')}
+            >
+              <FaCoffee className="text-3xl" />
+              <span style={{ letterSpacing: '0.25em', paddingLeft: '0.25em' }}>休憩</span>
             </button>
-          </div>
-        ) : (
-          /* ローディングスケルトン */
-          <div className="grid grid-cols-2 gap-3 mb-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div
-                key={i}
-                className="bg-white rounded-xl shadow-md animate-pulse"
-                style={{ aspectRatio: '1 / 0.8' }}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* 休憩上限取得エラー通知（フェイルクローズした旨を案内） */}
-        {limitStatusError && (
-          <div
-            role="status"
-            className="mb-3 p-3 rounded-lg bg-yellow-50 border border-yellow-200 text-yellow-800 text-xs"
-          >
-            休憩可否の取得に失敗しました。休憩を一時停止しています。
-          </div>
-        )}
-
-        {/* 休憩ボタン（ポーズ中 / 取得中 / 消化済みは非表示） */}
-        {breakState.status !== 'paused' && canStartBreak === true && (
-          <button
-            className="w-full flex items-center justify-center gap-3 py-5 rounded-lg text-white text-xl font-bold"
-            style={{ backgroundColor: '#888888' }}
-            onClick={() => router.push('/break')}
-          >
-            <FaCoffee className="text-3xl" />
-            <span style={{ letterSpacing: '0.25em', paddingLeft: '0.25em' }}>休憩</span>
-          </button>
-        )}
+          )}
+        </div>
       </main>
 
       <AppFooter />

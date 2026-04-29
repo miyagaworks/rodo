@@ -52,6 +52,37 @@ vi.mock('@/components/ProcessingBar', () => ({
   default: () => <div data-testid="processing-bar" />,
 }))
 
+// AdminShell モック（HomeClient のテストに不要、内部で usePathname を使うため）
+vi.mock('@/components/admin/AdminShell', () => ({
+  default: ({ open }: { open: boolean }) => (
+    <div data-testid="admin-shell" data-open={open} />
+  ),
+}))
+
+// AppHeader モック（next-auth/react.signOut 等の依存を切り離す）
+vi.mock('@/components/common/AppHeader', () => ({
+  default: ({
+    showMenuButton,
+    showAdminNav,
+    onMenuClick,
+    session,
+  }: {
+    showMenuButton?: boolean
+    showAdminNav?: boolean
+    onMenuClick?: () => void
+    session: { user: { name?: string | null } }
+  }) => (
+    <div data-testid="app-header">
+      {(showMenuButton || showAdminNav) && (
+        <button aria-label="メニューを開く" onClick={onMenuClick}>
+          menu
+        </button>
+      )}
+      <span>{session.user.name}</span>
+    </div>
+  ),
+}))
+
 const mockSession = {
   user: {
     name: 'テスト太郎',
@@ -153,7 +184,7 @@ describe('HomeClient', () => {
     expect(screen.getByText('テスト太郎')).toBeTruthy()
   })
 
-  it('ADMINユーザーには設定リンクが表示される', async () => {
+  it('ADMINユーザーにはメニューを開くボタン（☰）が表示される', async () => {
     fetchSpy = mockFetch({ ok: true, status: 200, data: [] })
 
     const adminSession = {
@@ -162,15 +193,16 @@ describe('HomeClient', () => {
     }
     render(<HomeClient session={adminSession as any} />)
 
-    expect(screen.getByText('設定')).toBeTruthy()
+    // ☰ ボタンは aria-label="メニューを開く" で識別
+    expect(screen.getByLabelText('メニューを開く')).toBeTruthy()
   })
 
-  it('一般ユーザーには設定リンクが表示されない', async () => {
+  it('一般ユーザーにはメニューを開くボタン（☰）が表示されない', async () => {
     fetchSpy = mockFetch({ ok: true, status: 200, data: [] })
 
     render(<HomeClient session={mockSession as any} />)
 
-    expect(screen.queryByText('設定')).toBeNull()
+    expect(screen.queryByLabelText('メニューを開く')).toBeNull()
   })
 
   // ── 異常系 ──

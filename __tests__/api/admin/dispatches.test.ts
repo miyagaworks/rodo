@@ -1,0 +1,303 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+
+vi.mock('@/auth', () => ({
+  auth: vi.fn(),
+}))
+
+vi.mock('@/lib/prisma', () => ({
+  prisma: {
+    $transaction: vi.fn(),
+    dispatch: {
+      count: vi.fn(),
+      findMany: vi.fn(),
+    },
+  },
+}))
+
+import { GET } from '@/app/api/admin/dispatches/route'
+import { auth } from '@/auth'
+import { prisma } from '@/lib/prisma'
+
+const mockedAuth = auth as unknown as ReturnType<typeof vi.fn>
+const mockedTransaction = prisma.$transaction as unknown as ReturnType<typeof vi.fn>
+
+function adminSession() {
+  return { user: { userId: 'u-admin', tenantId: 't1', role: 'ADMIN' } }
+}
+
+function makeRequest(qs = '') {
+  return new Request(`http://localhost/api/admin/dispatches${qs}`)
+}
+
+/**
+ * $transaction で渡された PrismaPromise の代わりに、count / findMany の実引数を取り出す。
+ * 実装は `prisma.$transaction([prisma.dispatch.count(...), prisma.dispatch.findMany(...)])` を呼んでいる。
+ * モックの count / findMany は `vi.fn()` のままだが、呼び出し時に渡された引数を解析対象とする。
+ */
+function setupTxResolve(count: number, dispatches: unknown[]) {
+  mockedTransaction.mockImplementationOnce(async (calls: unknown[]) => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    void calls
+    return [count, dispatches]
+  })
+}
+
+describe('GET /api/admin/dispatches', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('未認証は 401', async () => {
+    mockedAuth.mockResolvedValueOnce(null)
+    const res = await GET(makeRequest())
+    expect(res.status).toBe(401)
+  })
+
+  it('MEMBER は 403', async () => {
+    mockedAuth.mockResolvedValueOnce({
+      user: { userId: 'u', tenantId: 't1', role: 'MEMBER' },
+    })
+    const res = await GET(makeRequest())
+    expect(res.status).toBe(403)
+  })
+
+  it('ADMIN ならデフォルトページ（page=1, pageSize=50）で 200 を返す', async () => {
+    mockedAuth.mockResolvedValueOnce(adminSession())
+    setupTxResolve(0, [])
+    const res = await GET(makeRequest())
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json).toEqual({ dispatches: [], total: 0, page: 1, pageSize: 50 })
+  })
+
+  it('pageSize は MAX 200 にクランプされる', async () => {
+    mockedAuth.mockResolvedValueOnce(adminSession())
+    setupTxResolve(0, [])
+    const res = await GET(makeRequest('?pageSize=500'))
+    const json = await res.json()
+    expect(json.pageSize).toBe(200)
+  })
+
+  it('status=draft フィルタ: where.isDraft=true で count/findMany が呼ばれる', async () => {
+    mockedAuth.mockResolvedValueOnce(adminSession())
+    let countWhere: unknown = null
+    let findWhere: unknown = null
+    const countMock = prisma.dispatch.count as unknown as ReturnType<typeof vi.fn>
+    const findMock = prisma.dispatch.findMany as unknown as ReturnType<typeof vi.fn>
+    countMock.mockImplementationOnce((args: { where: unknown }) => {
+      countWhere = args.where
+      return Promise.resolve(0)
+    })
+    findMock.mockImplementationOnce((args: { where: unknown }) => {
+      findWhere = args.where
+      return Promise.resolve([])
+    })
+    mockedTransaction.mockImplementationOnce(async (calls: Promise<unknown>[]) => {
+      return Promise.all(calls)
+    })
+
+    await GET(makeRequest('?status=draft'))
+    expect(countWhere).toMatchObject({ tenantId: 't1', isDraft: true })
+    expect(findWhere).toMatchObject({ tenantId: 't1', isDraft: true })
+  })
+
+  it('status=unbilled フィルタ: billedAt=null', async () => {
+    mockedAuth.mockResolvedValueOnce(adminSession())
+    const countMock = prisma.dispatch.count as unknown as ReturnType<typeof vi.fn>
+    const findMock = prisma.dispatch.findMany as unknown as ReturnType<typeof vi.fn>
+    let captured: unknown = null
+    countMock.mockImplementationOnce((args: { where: unknown }) => {
+      captured = args.where
+      return Promise.resolve(0)
+    })
+    findMock.mockImplementationOnce(() => Promise.resolve([]))
+    mockedTransaction.mockImplementationOnce(async (calls: Promise<unknown>[]) =>
+      Promise.all(calls),
+    )
+
+    await GET(makeRequest('?status=unbilled'))
+    expect(captured).toMatchObject({ billedAt: null, isDraft: false })
+  })
+
+  it('status=stored フィルタ: status=STORED && isDraft=false', async () => {
+    mockedAuth.mockResolvedValueOnce(adminSession())
+    const countMock = prisma.dispatch.count as unknown as ReturnType<typeof vi.fn>
+    const findMock = prisma.dispatch.findMany as unknown as ReturnType<typeof vi.fn>
+    let captured: { status?: unknown; isDraft?: unknown } | null = null
+    countMock.mockImplementationOnce((args: { where: typeof captured }) => {
+      captured = args.where
+      return Promise.resolve(0)
+    })
+    findMock.mockImplementationOnce(() => Promise.resolve([]))
+    mockedTransaction.mockImplementationOnce(async (calls: Promise<unknown>[]) =>
+      Promise.all(calls),
+    )
+
+    await GET(makeRequest('?status=stored'))
+    expect(captured?.status).toBe('STORED')
+    expect(captured?.isDraft).toBe(false)
+  })
+
+  it('レスポンスに scheduledSecondaryAt が含まれる', async () => {
+    mockedAuth.mockResolvedValueOnce(adminSession())
+    const scheduled = new Date('2026-04-28T05:00:00.000Z')
+    setupTxResolve(1, [
+      {
+        id: 'd1',
+        dispatchNumber: '20260428001',
+        dispatchTime: null,
+        status: 'STORED',
+        isDraft: false,
+        billedAt: null,
+        scheduledSecondaryAt: scheduled,
+        type: 'TRANSPORT',
+        customerName: null,
+        plateRegion: null,
+        plateClass: null,
+        plateKana: null,
+        plateNumber: null,
+        user: { id: 'u1', name: '山田' },
+        assistance: { id: 'a1', name: 'PA', displayAbbreviation: 'PA' },
+        report: null,
+      },
+    ])
+
+    const res = await GET(makeRequest())
+    const json = await res.json()
+    expect(json.dispatches[0].scheduledSecondaryAt).toBe(scheduled.toISOString())
+  })
+
+  it('status=billed フィルタ: billedAt !== null', async () => {
+    mockedAuth.mockResolvedValueOnce(adminSession())
+    const countMock = prisma.dispatch.count as unknown as ReturnType<typeof vi.fn>
+    const findMock = prisma.dispatch.findMany as unknown as ReturnType<typeof vi.fn>
+    let captured: { billedAt?: unknown; tenantId?: unknown } | null = null
+    countMock.mockImplementationOnce((args: { where: typeof captured }) => {
+      captured = args.where
+      return Promise.resolve(0)
+    })
+    findMock.mockImplementationOnce(() => Promise.resolve([]))
+    mockedTransaction.mockImplementationOnce(async (calls: Promise<unknown>[]) =>
+      Promise.all(calls),
+    )
+
+    await GET(makeRequest('?status=billed'))
+    expect(captured?.billedAt).toEqual({ not: null })
+  })
+
+  it('userId / assistanceId フィルタが where に反映される', async () => {
+    mockedAuth.mockResolvedValueOnce(adminSession())
+    const countMock = prisma.dispatch.count as unknown as ReturnType<typeof vi.fn>
+    const findMock = prisma.dispatch.findMany as unknown as ReturnType<typeof vi.fn>
+    let captured: unknown = null
+    countMock.mockImplementationOnce((args: { where: unknown }) => {
+      captured = args.where
+      return Promise.resolve(0)
+    })
+    findMock.mockImplementationOnce(() => Promise.resolve([]))
+    mockedTransaction.mockImplementationOnce(async (calls: Promise<unknown>[]) =>
+      Promise.all(calls),
+    )
+
+    await GET(makeRequest('?userId=u9&assistanceId=a9'))
+    expect(captured).toMatchObject({ userId: 'u9', assistanceId: 'a9', tenantId: 't1' })
+  })
+
+  it('期間フィルタ from/to が dispatchTime の範囲条件として渡る', async () => {
+    mockedAuth.mockResolvedValueOnce(adminSession())
+    const countMock = prisma.dispatch.count as unknown as ReturnType<typeof vi.fn>
+    const findMock = prisma.dispatch.findMany as unknown as ReturnType<typeof vi.fn>
+    let captured: { dispatchTime?: { gte?: Date; lte?: Date } } | null = null
+    countMock.mockImplementationOnce((args: { where: typeof captured }) => {
+      captured = args.where
+      return Promise.resolve(0)
+    })
+    findMock.mockImplementationOnce(() => Promise.resolve([]))
+    mockedTransaction.mockImplementationOnce(async (calls: Promise<unknown>[]) =>
+      Promise.all(calls),
+    )
+
+    await GET(makeRequest('?from=2026-04-01&to=2026-04-30'))
+    expect(captured?.dispatchTime).toBeDefined()
+    expect(captured?.dispatchTime?.gte).toBeInstanceOf(Date)
+    expect(captured?.dispatchTime?.lte).toBeInstanceOf(Date)
+  })
+
+  it('ページング (skip/take) が反映される', async () => {
+    mockedAuth.mockResolvedValueOnce(adminSession())
+    const countMock = prisma.dispatch.count as unknown as ReturnType<typeof vi.fn>
+    const findMock = prisma.dispatch.findMany as unknown as ReturnType<typeof vi.fn>
+    let findArgs: { skip?: number; take?: number } | null = null
+    countMock.mockImplementationOnce(() => Promise.resolve(0))
+    findMock.mockImplementationOnce((args: typeof findArgs) => {
+      findArgs = args
+      return Promise.resolve([])
+    })
+    mockedTransaction.mockImplementationOnce(async (calls: Promise<unknown>[]) =>
+      Promise.all(calls),
+    )
+
+    await GET(makeRequest('?page=3&pageSize=20'))
+    expect(findArgs?.skip).toBe(40)
+    expect(findArgs?.take).toBe(20)
+  })
+
+  it('レスポンスに plate オブジェクトが組み立てられる', async () => {
+    mockedAuth.mockResolvedValueOnce(adminSession())
+    setupTxResolve(1, [
+      {
+        id: 'd1',
+        dispatchNumber: '20260427001',
+        dispatchTime: new Date('2026-04-27T01:00:00Z'),
+        status: 'COMPLETED',
+        isDraft: false,
+        billedAt: null,
+        type: 'ONSITE',
+        customerName: '顧客 A',
+        plateRegion: '練馬',
+        plateClass: '500',
+        plateKana: 'あ',
+        plateNumber: '1234',
+        user: { id: 'u1', name: '山田' },
+        assistance: { id: 'a1', name: 'PA', displayAbbreviation: 'PA' },
+        report: null,
+      },
+    ])
+
+    const res = await GET(makeRequest())
+    const json = await res.json()
+    expect(json.dispatches[0].plate).toEqual({
+      region: '練馬',
+      class: '500',
+      kana: 'あ',
+      number: '1234',
+    })
+  })
+
+  it('plate 系全 null なら plate=null', async () => {
+    mockedAuth.mockResolvedValueOnce(adminSession())
+    setupTxResolve(1, [
+      {
+        id: 'd1',
+        dispatchNumber: '20260427001',
+        dispatchTime: null,
+        status: 'STANDBY',
+        isDraft: true,
+        billedAt: null,
+        type: 'ONSITE',
+        customerName: null,
+        plateRegion: null,
+        plateClass: null,
+        plateKana: null,
+        plateNumber: null,
+        user: { id: 'u1', name: '山田' },
+        assistance: { id: 'a1', name: 'PA', displayAbbreviation: 'PA' },
+        report: null,
+      },
+    ])
+
+    const res = await GET(makeRequest())
+    const json = await res.json()
+    expect(json.dispatches[0].plate).toBeNull()
+  })
+})

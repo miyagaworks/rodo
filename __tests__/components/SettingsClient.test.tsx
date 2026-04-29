@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 
 // 子コンポーネントをスタブ化
 vi.mock('@/components/settings/AssistanceTab', () => ({
@@ -15,22 +15,78 @@ vi.mock('@/components/settings/TenantTab', () => ({
   default: () => <div data-testid="tenant-tab">TenantTab</div>,
 }))
 
+// AppHeader モック（共通ヘッダー。signOut 等の依存を切り離す）
+vi.mock('@/components/common/AppHeader', () => ({
+  default: ({
+    showMenuButton,
+    showAdminNav,
+    onMenuClick,
+    session,
+  }: {
+    showMenuButton?: boolean
+    showAdminNav?: boolean
+    onMenuClick?: () => void
+    session: { user: { name?: string | null } }
+  }) => (
+    <div data-testid="app-header">
+      {(showMenuButton || showAdminNav) && (
+        <button aria-label="メニューを開く" onClick={onMenuClick}>
+          menu
+        </button>
+      )}
+      <span>{session.user.name}</span>
+    </div>
+  ),
+}))
+
+// AdminShell モック（HomeClient と同様、内部で usePathname を使うため）
+vi.mock('@/components/admin/AdminShell', () => ({
+  default: ({ open }: { open: boolean }) => (
+    <div data-testid="admin-shell" data-open={open} />
+  ),
+}))
+
+// AppFooter モック
+vi.mock('@/components/common/AppFooter', () => ({
+  default: () => <div data-testid="app-footer" />,
+}))
+
 import SettingsClient from '@/components/SettingsClient'
+
+const mockSession = {
+  user: {
+    name: 'テスト管理者',
+    role: 'ADMIN' as const,
+    tenantId: 'tenant-1',
+  },
+  expires: '2099-01-01',
+}
 
 describe('SettingsClient', () => {
   // ── 正常系 ──
 
-  it('ヘッダーに「設定」タイトルと戻るリンクを表示する', () => {
-    render(<SettingsClient />)
+  it('サブタイトルとして「設定」を表示する', () => {
+    render(<SettingsClient session={mockSession as any} />)
 
     expect(screen.getByText('設定')).toBeInTheDocument()
-    // 戻るボタンはアイコン（IoIosArrowBack）に変更済み。テキストではなく href="/" のリンクで検証
-    const backLink = screen.getByRole('link', { name: '' })
-    expect(backLink).toHaveAttribute('href', '/')
+  })
+
+  it('AppHeader を表示する（☰ ボタン付き）', () => {
+    render(<SettingsClient session={mockSession as any} />)
+
+    expect(screen.getByTestId('app-header')).toBeInTheDocument()
+    expect(screen.getByLabelText('メニューを開く')).toBeInTheDocument()
+  })
+
+  it('「← 戻る」リンクは表示しない（廃止済み）', () => {
+    render(<SettingsClient session={mockSession as any} />)
+
+    // 戻る用の link は存在しない
+    expect(screen.queryByRole('link')).toBeNull()
   })
 
   it('4つのタブトリガーを表示する', () => {
-    render(<SettingsClient />)
+    render(<SettingsClient session={mockSession as any} />)
 
     expect(screen.getByText('アシスタンス')).toBeInTheDocument()
     expect(screen.getByText('隊員登録')).toBeInTheDocument()
@@ -39,13 +95,13 @@ describe('SettingsClient', () => {
   })
 
   it('デフォルトでアシスタンスタブが表示される', () => {
-    render(<SettingsClient />)
+    render(<SettingsClient session={mockSession as any} />)
 
     expect(screen.getByTestId('assistance-tab')).toBeInTheDocument()
   })
 
   it('タブトリガーが正しい role="tab" 属性を持つ', () => {
-    render(<SettingsClient />)
+    render(<SettingsClient session={mockSession as any} />)
 
     const tabs = screen.getAllByRole('tab')
     expect(tabs).toHaveLength(4)
@@ -56,7 +112,7 @@ describe('SettingsClient', () => {
   })
 
   it('デフォルトでアシスタンスタブが active、その他は inactive', () => {
-    render(<SettingsClient />)
+    render(<SettingsClient session={mockSession as any} />)
 
     const tabs = screen.getAllByRole('tab')
     expect(tabs[0]).toHaveAttribute('data-state', 'active')
@@ -66,7 +122,7 @@ describe('SettingsClient', () => {
   })
 
   it('tabpanel にアシスタンスタブの内容が表示される', () => {
-    render(<SettingsClient />)
+    render(<SettingsClient session={mockSession as any} />)
 
     const panel = screen.getByRole('tabpanel')
     expect(panel).toHaveAttribute('data-state', 'active')
@@ -75,15 +131,8 @@ describe('SettingsClient', () => {
 
   // ── スタイル検証 ──
 
-  it('ヘッダーの背景色が正しい', () => {
-    render(<SettingsClient />)
-
-    const header = screen.getByText('設定').closest('header')!
-    expect(header).toHaveStyle({ backgroundColor: '#1C2948' })
-  })
-
   it('ページ全体の背景色が正しい', () => {
-    const { container } = render(<SettingsClient />)
+    const { container } = render(<SettingsClient session={mockSession as any} />)
 
     const root = container.firstElementChild as HTMLElement
     expect(root).toHaveStyle({ backgroundColor: '#C6D8FF' })
