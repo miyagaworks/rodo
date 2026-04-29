@@ -111,7 +111,8 @@ function SignatureImage({
   alt: string
 }) {
   if (src) {
-    // base64 data URL なので next/image は不要
+    // P0-13 以降は Vercel Blob の HTTPS URL（移行期間中は旧 DataURL も互換受付）。
+    // どちらの場合も next/image は不要（Blob URL は既に最適化済みの PNG）。
     // eslint-disable-next-line @next/next/no-img-element
     return (
       <img

@@ -22,7 +22,8 @@ const nextConfig: NextConfig = {
               "worker-src 'self' blob:",
               "style-src 'self' 'unsafe-inline' https://static.bizdeli.net",
               "connect-src 'self' https://static.bizdeli.net https://app.bizdeli.net",
-              "img-src 'self' data: blob:",
+              // P0-15: 署名画像 / 出動写真は Vercel Blob (`*.public.blob.vercel-storage.com`) から配信される。
+              "img-src 'self' data: blob: https://*.public.blob.vercel-storage.com",
               "font-src 'self'",
               "frame-ancestors 'none'",
             ].join('; '),

@@ -142,12 +142,50 @@ function SignaturePad({
   }, [scaleCanvas])
 
   // Load initial data
+  // P0-13: initialData は DataURL（旧）または HTTPS URL（新: Vercel Blob）の両方を受け付ける。
+  // URL の場合は fetch → Blob → DataURL → fromDataURL のチェーンで読み込む。
   useEffect(() => {
-    if (initialData && sigRef.current) {
-      const w = containerRef.current?.offsetWidth || 300
+    if (!initialData || !sigRef.current) return
+
+    const w = containerRef.current?.offsetWidth || 300
+
+    if (initialData.startsWith('data:')) {
+      // 旧経路: DataURL は同期的にロード可能
       sigRef.current.fromDataURL(initialData, { width: w, height: SIG_HEIGHT })
       dataRef.current = initialData
       setIsEmpty(false)
+      return
+    }
+
+    if (initialData.startsWith('http')) {
+      let cancelled = false
+      ;(async () => {
+        try {
+          const res = await fetch(initialData)
+          if (!res.ok) throw new Error(`fetch ${initialData} failed: ${res.status}`)
+          const blob = await res.blob()
+          const dataUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader()
+            reader.onload = () => resolve(reader.result as string)
+            reader.onerror = () => reject(reader.error ?? new Error('FileReader error'))
+            reader.readAsDataURL(blob)
+          })
+          if (cancelled || !sigRef.current) return
+          sigRef.current.fromDataURL(dataUrl, { width: w, height: SIG_HEIGHT })
+          dataRef.current = dataUrl
+          setIsEmpty(false)
+        } catch (err) {
+          // フォールバック: 編集ロード失敗時は空のままにし、ユーザーに再署名を促す
+          console.error('Failed to load signature from URL:', err)
+          if (!cancelled) {
+            dataRef.current = null
+            setIsEmpty(true)
+          }
+        }
+      })()
+      return () => {
+        cancelled = true
+      }
     }
   }, [initialData])
 

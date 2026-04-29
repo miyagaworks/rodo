@@ -107,7 +107,10 @@ describe('upsertConfirmationSchema', () => {
     const result = upsertConfirmationSchema.safeParse({
       workDate: '2026-04-16',
       preApprovalChecks: [true, false, true],
-      customerSignature: 'data:image/png;base64,...',
+      // P0-13: 旧サンプル `'data:image/png;base64,...'` は新 signatureValue の正規表現に合致しないため、
+      // 移行後の代表値である Vercel Blob HTTPS URL に差し替え。
+      customerSignature:
+        'https://example.public.blob.vercel-storage.com/signatures/t1/d1/customer-1.png',
       customerName: 'Customer',
       customerDate: '2026-04-16',
       vehicleType: 'sedan',
@@ -115,9 +118,11 @@ describe('upsertConfirmationSchema', () => {
       workContent: 'Towing',
       shopCompanyName: 'Shop A',
       shopContactName: 'Contact A',
-      shopSignature: 'data:image/png;base64,...',
+      shopSignature:
+        'https://example.public.blob.vercel-storage.com/signatures/t1/d1/shop-1.png',
       postApprovalCheck: true,
-      postApprovalSignature: 'data:image/png;base64,...',
+      postApprovalSignature:
+        'https://example.public.blob.vercel-storage.com/signatures/t1/d1/postApproval-1.png',
       postApprovalName: 'Approver',
       batteryDetails: { voltage: 12, condition: 'good' },
       notes: 'Some notes',

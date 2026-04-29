@@ -57,7 +57,8 @@ const sampleConfirmation = {
   dispatchId: 'd1',
   workDate: new Date('2026-04-26T12:00:00Z'),
   preApprovalChecks: [true, true, false, false, false],
-  customerSignature: 'data:image/png;base64,sig',
+  customerSignature:
+    'https://example.public.blob.vercel-storage.com/signatures/t1/d1/customer-1.png',
   customerName: null,
   customerDate: null,
   vehicleType: 'トヨタ プリウス',
@@ -67,7 +68,8 @@ const sampleConfirmation = {
   shopContactName: null,
   shopSignature: null,
   postApprovalCheck: true,
-  postApprovalSignature: 'data:image/png;base64,sig2',
+  postApprovalSignature:
+    'https://example.public.blob.vercel-storage.com/signatures/t1/d1/postApproval-1.png',
   postApprovalName: '宮川 清美',
   batteryDetails: null,
   notes: null,
