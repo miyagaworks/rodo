@@ -94,7 +94,7 @@ export default function MemberStatusCard({ member }: MemberStatusCardProps) {
       {/* 出動中の案件情報 */}
       {status === 'DISPATCHING' && activeDispatch && (
         <div className="text-xs text-gray-600 space-y-0.5">
-          <div data-testid="dispatch-number">#{activeDispatch.dispatchNumber}</div>
+          <div data-testid="dispatch-number">{activeDispatch.dispatchNumber}</div>
           <div data-testid="assistance-name">{activeDispatch.assistanceName}</div>
         </div>
       )}

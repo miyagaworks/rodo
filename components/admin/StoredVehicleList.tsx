@@ -156,7 +156,7 @@ export default function StoredVehicleList({ today }: StoredVehicleListProps) {
                       className="font-mono text-xs text-gray-700 sm:text-sm"
                       data-testid="dispatch-number"
                     >
-                      #{d.dispatchNumber}
+                      {d.dispatchNumber}
                     </span>
 
                     {/* 車番 */}

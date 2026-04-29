@@ -148,9 +148,9 @@ describe('StoredVehicleList', () => {
       .getAllByTestId('dispatch-number')
       .map((el) => el.textContent)
     expect(numbers).toEqual([
-      '#20260425-001', // today
-      '#20260424-001', // tomorrow
-      '#20260423-001', // undecided
+      '20260425-001', // today
+      '20260424-001', // tomorrow
+      '20260423-001', // undecided
     ])
   })
 

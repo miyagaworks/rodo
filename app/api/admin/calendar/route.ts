@@ -5,18 +5,23 @@ import { prisma } from '@/lib/prisma'
 /**
  * GET /api/admin/calendar?year=YYYY&month=M
  *
- * 月間カレンダー用サマリ（日付ごとの案件総数 / 未処理件数）。
+ * 月間カレンダー用データ。Phase 4 仕様（docs/plans/admin-dashboard.md §4.3）。
+ *
+ * 業務観点: 1 次搬送（ONSITE / TRANSPORT で初動）の出動番号と車番だけをカレンダーに載せる。
+ * 「いつ二次搬送するか・誰が持っていくか」はカレンダー外で管理（Phase 3.5 ダッシュボード「保管中の車両」）。
+ *
+ * 集計対象:
+ *   - type ∈ (ONSITE, TRANSPORT)（SECONDARY_TRANSPORT 等は対象外。型としては存在しないが、
+ *     1 次/2 次の区別は isSecondaryTransport で表現される。1 次のみを対象とするため
+ *     `isSecondaryTransport: false` を明示）
+ *   - 下書き案件もカレンダーに表示。下書きは UI 側で「下書」バッジに置換し
+ *     現場/搬送/2次バッジと視覚的に区別する（テーブルとの件数乖離を解消するため）
+ *
+ * ソート: 各日内で dispatchTime ASC
+ *
+ * JST 境界: jstOffset = 9 * 60 * 60 * 1000。月初〜月末の UTC 範囲は前実装を踏襲。
+ *
  * 認可: ADMIN ロールのみ。
- *
- * 「未処理」の定義: billedAt IS NULL OR (report 紐付け済み AND report.isDraft = true)
- *   - 紙併用期間中、紙で請求した案件はアプリ上でも「請求済み」を押すため、
- *     billedAt IS NULL は実質「請求業務未完了」を意味する。
- *   - 報告書下書き状態も未処理に含める。
- *
- * 集計は API 層で実施（Prisma の通常クエリで月単位の rows を取得 → JST 日付で groupBy）。
- * 件数増大時は raw SQL の GROUP BY に置換できるよう、本関数は集計を 1 箇所に閉じ込める。
- *
- * JST 境界: 既存 `app/api/dispatches/route.ts` の jstOffset = 9 * 60 * 60 * 1000 と整合。
  */
 
 const JST_OFFSET_MS = 9 * 60 * 60 * 1000
@@ -28,8 +33,24 @@ function pad2(n: number) {
 /** Date を JST 日付文字列 'YYYY-MM-DD' に変換 */
 function toJstDateString(d: Date): string {
   const jst = new Date(d.getTime() + JST_OFFSET_MS)
-  // toISOString() で UTC として扱われるが、+offset 済みなので JST 相当の日付として使える
   return `${jst.getUTCFullYear()}-${pad2(jst.getUTCMonth() + 1)}-${pad2(jst.getUTCDate())}`
+}
+
+interface CalendarPlate {
+  region: string
+  class: string
+  kana: string
+  number: string
+}
+
+interface CalendarDispatch {
+  dispatchNumber: string
+  plate: CalendarPlate | null
+  type: 'ONSITE' | 'TRANSPORT'
+  /** dispatchTime の ISO 文字列。クライアントでの統合ソートに使用。null の場合は末尾扱い。 */
+  dispatchTime: string | null
+  /** 下書き状態。UI 側で「下書」バッジに置換するために必要。 */
+  isDraft: boolean
 }
 
 export async function GET(req: Request) {
@@ -60,35 +81,118 @@ export async function GET(req: Request) {
   const endJst = new Date(Date.UTC(year, month, 1, 0, 0, 0))
   const endUtc = new Date(endJst.getTime() - JST_OFFSET_MS)
 
+  // 1 次搬送（カレンダーセル本体に並ぶ案件）。下書きも含む。
   const dispatches = await prisma.dispatch.findMany({
     where: {
       tenantId: session.user.tenantId,
       dispatchTime: { gte: startUtc, lt: endUtc },
+      // 1 次搬送のみ（2 次はカレンダーの primary 対象外）
+      isSecondaryTransport: false,
+      // type は ONSITE / TRANSPORT のいずれか（schema enum 上はこの 2 値のみ。明示）
+      type: { in: ['ONSITE', 'TRANSPORT'] },
     },
+    orderBy: { dispatchTime: 'asc' },
     select: {
+      dispatchNumber: true,
       dispatchTime: true,
-      billedAt: true,
+      type: true,
       isDraft: true,
-      report: { select: { isDraft: true } },
+      plateRegion: true,
+      plateClass: true,
+      plateKana: true,
+      plateNumber: true,
     },
   })
 
-  // YYYY-MM-DD ごとに集計
-  const totals = new Map<string, number>()
-  const unprocessed = new Map<string, number>()
+  // 2 次搬送（同月内）。primary と同じ shape で日付別集約しモーダルに出す。下書きも含む。
+  const secondaryRows = await prisma.dispatch.findMany({
+    where: {
+      tenantId: session.user.tenantId,
+      dispatchTime: { gte: startUtc, lt: endUtc },
+      isSecondaryTransport: true,
+      type: { in: ['ONSITE', 'TRANSPORT'] },
+    },
+    orderBy: { dispatchTime: 'asc' },
+    select: {
+      dispatchNumber: true,
+      dispatchTime: true,
+      type: true,
+      isDraft: true,
+      plateRegion: true,
+      plateClass: true,
+      plateKana: true,
+      plateNumber: true,
+    },
+  })
 
+  function rowToCalendarDispatch(d: {
+    dispatchNumber: string
+    dispatchTime: Date | null
+    type: 'ONSITE' | 'TRANSPORT'
+    isDraft: boolean
+    plateRegion: string | null
+    plateClass: string | null
+    plateKana: string | null
+    plateNumber: string | null
+  }): CalendarDispatch {
+    const plate: CalendarPlate | null =
+      d.plateRegion && d.plateClass && d.plateKana && d.plateNumber
+        ? {
+            region: d.plateRegion,
+            class: d.plateClass,
+            kana: d.plateKana,
+            number: d.plateNumber,
+          }
+        : null
+    return {
+      dispatchNumber: d.dispatchNumber,
+      plate,
+      type: d.type,
+      dispatchTime: d.dispatchTime ? d.dispatchTime.toISOString() : null,
+      isDraft: d.isDraft,
+    }
+  }
+
+  // YYYY-MM-DD ごとに primaryDispatches を集約
+  const byDate = new Map<string, CalendarDispatch[]>()
   for (const d of dispatches) {
     if (!d.dispatchTime) continue
     const key = toJstDateString(d.dispatchTime)
-    totals.set(key, (totals.get(key) ?? 0) + 1)
+    const list = byDate.get(key) ?? []
+    list.push(
+      rowToCalendarDispatch({
+        dispatchNumber: d.dispatchNumber,
+        dispatchTime: d.dispatchTime,
+        type: d.type as 'ONSITE' | 'TRANSPORT',
+        isDraft: d.isDraft,
+        plateRegion: d.plateRegion,
+        plateClass: d.plateClass,
+        plateKana: d.plateKana,
+        plateNumber: d.plateNumber,
+      }),
+    )
+    byDate.set(key, list)
+  }
 
-    const isUnbilled = d.billedAt === null
-    const reportDraft = d.report?.isDraft === true
-    // 案件本体が下書き（isDraft）の場合は「未処理」というよりは「未確定」だが、
-    // 業務上は同じ「対応必要」枠なので未処理に含める。
-    if (isUnbilled || reportDraft || d.isDraft) {
-      unprocessed.set(key, (unprocessed.get(key) ?? 0) + 1)
-    }
+  // YYYY-MM-DD ごとに secondaryDispatches を集約（primary と同 shape）
+  const secondaryByDate = new Map<string, CalendarDispatch[]>()
+  for (const d of secondaryRows) {
+    if (!d.dispatchTime) continue
+    const key = toJstDateString(d.dispatchTime)
+    const list = secondaryByDate.get(key) ?? []
+    list.push(
+      rowToCalendarDispatch({
+        dispatchNumber: d.dispatchNumber,
+        dispatchTime: d.dispatchTime,
+        type: d.type as 'ONSITE' | 'TRANSPORT',
+        isDraft: d.isDraft,
+        plateRegion: d.plateRegion,
+        plateClass: d.plateClass,
+        plateKana: d.plateKana,
+        plateNumber: d.plateNumber,
+      }),
+    )
+    secondaryByDate.set(key, list)
   }
 
   // 月の全日を 1..lastDay 列挙
@@ -98,8 +202,8 @@ export async function GET(req: Request) {
     const date = `${year}-${pad2(month)}-${pad2(day)}`
     return {
       date,
-      totalCount: totals.get(date) ?? 0,
-      unprocessedCount: unprocessed.get(date) ?? 0,
+      primaryDispatches: byDate.get(date) ?? [],
+      secondaryDispatches: secondaryByDate.get(date) ?? [],
     }
   })
 

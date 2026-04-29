@@ -52,7 +52,7 @@ export default function OverdueDispatchList({ yesterday }: OverdueDispatchListPr
               data-testid="overdue-dispatch-item"
             >
               <span className="font-mono text-xs text-gray-600">
-                #{d.dispatchNumber}
+                {d.dispatchNumber}
               </span>
               <span className="font-medium" style={{ color: '#1C2948' }}>
                 {d.user.name}

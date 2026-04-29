@@ -103,7 +103,7 @@ describe('MemberStatusCard', () => {
       render(<MemberStatusCard member={dispatchingMember} />)
 
       expect(screen.getByTestId('dispatch-number')).toHaveTextContent(
-        '#20260428-001',
+        '20260428-001',
       )
     })
 
