@@ -570,7 +570,7 @@ npm run dev
 - [ ] G-07 CSP 違反が出ないこと
   - **手順**: 署名表示ページで DevTools コンソール
   - **期待結果**: `Content Security Policy` の violation がないこと（`img-src 'self' data: blob: https://*.public.blob.vercel-storage.com`）
-  - **関連ファイル**: `next.config.ts:22`
+  - **関連ファイル**: `next.config.ts:24`（connect-src）, `next.config.ts:28`（img-src）
 
 - [ ] G-08 PNG マジックバイト検証（不正データ）
   - **手順**: `curl -X POST .../confirmation` で `customerSignature` に `data:image/png;base64,AAAA...`（PNG ヘッダなし）を送信
@@ -715,8 +715,8 @@ H (パフォーマンス・全体)
 
 | # | 関連ID | 重大度 | 概要 | 関連ログ / スクショ | 対応方針 / Issue 番号 |
 |---|---|---|---|---|---|
-| 1 | | | | | |
-| 2 | | | | | |
+| 1 | G-06 / B-08 | Blocker | CSP `connect-src` に Vercel Blob ドメイン未指定で `fetch(blobUrl)` がブロックされ、既存署名が再表示されないバグ（B-04 検証で発見） | コミット `d3bb47c` | 修正済（PR #10 内 / `next.config.ts` connect-src に `https://*.public.blob.vercel-storage.com` 追加） |
+| 2 | B-16 | Major | 完了済みレコードでも「下書き保存」ボタンが表示され、押下すると `isDraft=true` に戻ってしまうバグ（B-16 検証で発見） | コミット `a7cd03d` | 修正済（PR #10 内 / Onsite/Transport 両 ReportClient と RecordClient で `isDraft` 条件分岐） |
 | 3 | | | | | |
 
 重大度の目安：
