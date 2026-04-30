@@ -197,12 +197,12 @@ export default function HomeClient({ session }: HomeClientProps) {
           {/* 休憩ボタン（ポーズ中 / 取得中 / 消化済みは非表示） */}
           {breakState.status !== 'paused' && canStartBreak === true && (
             <button
-              className="w-full flex items-center justify-center gap-3 py-5 rounded-lg text-white text-xl font-bold"
+              className="w-full h-[72px] flex items-center justify-center gap-4 rounded-lg text-white text-3xl font-bold"
               style={{ backgroundColor: '#888888' }}
               onClick={() => router.push('/break')}
             >
-              <FaCoffee className="text-3xl" />
-              <span style={{ letterSpacing: '0.25em', paddingLeft: '0.25em' }}>休憩</span>
+              <FaCoffee className="text-4xl" />
+              <span style={{ letterSpacing: '0.25em', paddingLeft: '0.25em', transform: 'translateY(1px)', display: 'inline-block' }}>休憩</span>
             </button>
           )}
         </div>

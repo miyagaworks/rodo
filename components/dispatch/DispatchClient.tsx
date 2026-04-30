@@ -224,7 +224,7 @@ function ActionButton({
           {iconJsx}
         </span>
       )}
-      <span style={{ color: 'white', letterSpacing: tracking, paddingLeft: tracking }}>
+      <span style={{ color: 'white', letterSpacing: tracking, paddingLeft: tracking, transform: 'translateY(1px)', display: 'inline-block' }}>
         {loading && isActive ? '処理中...' : label}
       </span>
     </button>
@@ -1094,7 +1094,7 @@ export default function DispatchClient({
                 style={{ backgroundColor: '#2FBF71' }}
               >
                 <MdPeopleAlt className="w-12 h-12 text-white scale-x-[-1]" />
-                <span className="text-white">振替が完了しました</span>
+                <span className="text-white" style={{ transform: 'translateY(1px)', display: 'inline-block' }}>振替が完了しました</span>
               </div>
             ) : (
               <div className="space-y-2">
@@ -1103,7 +1103,7 @@ export default function DispatchClient({
                   style={{ backgroundColor: '#2FBF71' }}
                 >
                   <MdPeopleAlt className="w-12 h-12 text-white scale-x-[-1]" />
-                  <span className="text-white">振替待ち中...</span>
+                  <span className="text-white" style={{ transform: 'translateY(1px)', display: 'inline-block' }}>振替待ち中...</span>
                 </div>
                 <button
                   onClick={async () => {
@@ -1143,7 +1143,7 @@ export default function DispatchClient({
               style={{ backgroundColor: '#2FBF71', cursor: step < 2 || isTransferred ? 'not-allowed' : 'pointer' }}
             >
               <MdPeopleAlt className="w-12 h-12 text-white scale-x-[-1]" />
-              <span className="text-white" style={{ letterSpacing: '0.25em', paddingLeft: '0.25em' }}>振替</span>
+              <span className="text-white" style={{ letterSpacing: '0.25em', paddingLeft: '0.25em', transform: 'translateY(1px)', display: 'inline-block' }}>振替</span>
             </button>
           )}
         </div>
@@ -1161,7 +1161,7 @@ export default function DispatchClient({
             }}
           >
             <img src="/icons/confirmation.svg" alt="" className="w-10 h-10 object-contain" />
-            <span className="text-white" style={{ letterSpacing: '0.1em', paddingLeft: '0.1em' }}>作業確認書</span>
+            <span className="text-white" style={{ letterSpacing: '0.1em', paddingLeft: '0.1em', transform: 'translateY(1px)', display: 'inline-block' }}>作業確認書</span>
           </button>
         </div>
 
@@ -1177,13 +1177,15 @@ export default function DispatchClient({
           }}
         >
           <IoMdCamera className="w-12 h-12 text-white" />
-          <span className="text-white" style={{ letterSpacing: '0.25em', paddingLeft: '0.25em' }}>写真</span>
+          <span className="text-white" style={{ letterSpacing: '0.25em', paddingLeft: '0.25em', transform: 'translateY(1px)', display: 'inline-block' }}>写真</span>
           {photoCount > 0 && (
             <span
-              className="flex items-center justify-center w-7 h-7 rounded-full bg-white text-sm font-bold flex-shrink-0"
+              className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-lg font-bold flex-shrink-0"
               style={{ color: '#71A9F7' }}
             >
-              {photoCount}
+              <span style={{ display: 'inline-block', transform: 'translateY(1px)' }}>
+                {photoCount}
+              </span>
             </span>
           )}
         </button>
@@ -1375,7 +1377,7 @@ export default function DispatchClient({
                   }}
                 >
                   <img src="/icons/completion.svg" alt="" className="w-10 h-10 object-contain" />
-                  <span style={{ color: 'white', letterSpacing: '0.25em', paddingLeft: '0.25em' }}>完了</span>
+                  <span style={{ color: 'white', letterSpacing: '0.25em', paddingLeft: '0.25em', transform: 'translateY(1px)', display: 'inline-block' }}>完了</span>
                 </button>
               )}
               </div>
