@@ -774,14 +774,14 @@ export default function ReportOnsiteClient({ dispatch, report, userName }: Props
             type="button"
             onClick={() => handleSave(false)}
             disabled={!isComplete || loading}
-            className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-md font-bold text-base transition-all active:opacity-80"
+            className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-md font-bold text-lg transition-all active:opacity-80"
             style={{
               backgroundColor: isComplete ? '#1C2948' : '#9CA3AF',
               color: isComplete ? '#D7AF70' : 'white',
               cursor: isComplete ? 'pointer' : 'not-allowed',
             }}
           >
-            <FaCheckSquare className="text-lg" />
+            <FaCheckSquare className="text-xl" />
             <span>完　了</span>
           </button>
         </div>
