@@ -163,72 +163,72 @@ npm run dev
     - `dispatchNumber` 採番失敗 → JST 基準（jstOffset = 9*60*60*1000）の `tenantId+dispatchNumber` ユニーク制約を確認
   - **備考**: B-02（DispatchClient 表示）と B-03（Dispatch 作成）は別操作だが、ホーム → 出動完了までで実施するボタン操作は「アシスタンスボタン」「出動ボタン」の 2 押下のみ（2026-04-30 検証で実装と整合化）
 
-- [ ] B-04 写真撮影（出動中）
+- [x] B-04 写真撮影（出動中）
   - **手順**: 「写真撮影」→ カメラ起動 → 撮影 → アップロード
   - **期待結果**: `DispatchPhoto` レコード追加、サムネイルが表示
   - **関連ファイル**: `components/dispatch/PhotoModal.tsx`, `PhotoThumbnails.tsx`, `hooks/usePhotoCapture.ts`, `app/api/dispatches/[id]/photos/route.ts`
-  - **失敗時**: 上限 10 枚（P0-17 完了済みなら）超過時にどう振る舞うか確認 [未確認: P0-17 実装状況]
+  - **既知**: 写真上限は未実装（P0-17 未着手、grep で `MAX_PHOTOS` / `photoLimit` / バリデーション無しを確認）。現状は上限なしで保存可能。上限制御の検証は P0-17 完了後に実施する。2026-04-30 検証で 11 枚保存可能を確認、想定通り。
 
-- [ ] B-05 写真削除
+- [x] B-05 写真削除
   - **手順**: サムネイル横の削除ボタン
   - **期待結果**: DELETE `/api/dispatches/[id]/photos/[photoId]` が 204、サムネイル消える
   - **関連ファイル**: `app/api/dispatches/[id]/photos/[photoId]/route.ts`
 
-- [ ] B-06 現着登録（ONSITE）
+- [x] B-06 現着登録（ONSITE）
   - **手順**: 「現着」ボタン
   - **期待結果**: `arrivalTime`, `arrivalOdo` 記録、status=ONSITE
   - **関連ファイル**: `DispatchClient.tsx`
 
-- [ ] B-07 作業内容入力 / 状況入力
+- [x] B-07 作業内容入力 / 状況入力
   - **手順**: 状況区分（事故 / 故障）、状況詳細、メモ等の入力
   - **期待結果**: PATCH `/api/dispatches/[id]` で保存、再読込でも保持
   - **関連ファイル**: `DispatchClient.tsx`
 
-- [ ] B-08 作業確認書 → 顧客署名取得
+- [x] B-08 作業確認書 → 顧客署名取得
   - **手順**: `/dispatch/[id]/confirmation` → 顧客署名欄でサイン → 保存
   - **期待結果**: POST or PATCH `/api/dispatches/[id]/confirmation` 200、`customerSignature` に Vercel Blob URL が保存される（PR #10）
   - **関連ファイル**: `app/api/dispatches/[id]/confirmation/route.ts:69-94`, `components/dispatch/ConfirmationClient.tsx`, `lib/blob/signature-storage.ts`
   - **失敗時**: 詳細はカテゴリ G を参照
 
-- [ ] B-09 作業確認書 → ショップ署名取得
+- [x] B-09 作業確認書 → ショップ署名取得
   - **手順**: ショップ署名欄でサイン → 保存
   - **期待結果**: `shopSignature` に Blob URL が保存
 
-- [ ] B-10 作業確認書 → 事後承認署名取得
+- [x] B-10 作業確認書 → 事後承認署名取得
   - **手順**: 事後承認欄チェック → 署名 → 保存
   - **期待結果**: `postApprovalCheck=true`, `postApprovalSignature` に Blob URL
 
-- [ ] B-11 共有トークン発行 → `/c/[token]` でアクセス
+- [x] B-11 共有トークン発行 → `/c/[token]` でアクセス
   - **手順**: ConfirmationClient の共有ボタン → QR / URL を表示 → 別タブで `/c/[token]` を開く
   - **期待結果**: 認証不要で confirmation が閲覧できる
   - **関連ファイル**: `components/dispatch/QrShareModal.tsx`, `app/c/[token]/page.tsx`, `app/api/c/[token]/route.ts`, `proxy.ts:9`（`/api/c` はホワイトリスト）
 
-- [ ] B-12 公開ページから PDF 生成
+- [x] B-12 公開ページから PDF 生成
   - **手順**: `/c/[token]` の PDF ダウンロードボタン
   - **期待結果**: PDF が DL される、署名画像が PDF 内に表示される
   - **関連ファイル**: `app/api/c/[token]/pdf/route.ts`, `lib/pdf/confirmation-template.tsx:86`
   - **失敗時**: `@react-pdf/renderer` の `<Image src={url}>` がサーバー fetch に失敗 → CSP / Blob ドメイン到達性 / token の正当性
 
-- [ ] B-13 報告書（Report）入力
+- [x] B-13 報告書（Report）入力
   - **手順**: `/dispatch/[id]/report` → 距離 / 高速料金 / 場所名 / 金額入力 → 保存
   - **期待結果**: PATCH `/api/dispatches/[id]/report` で Report レコード upsert、`isDraft=true`
   - **関連ファイル**: `app/api/dispatches/[id]/report/route.ts`, `components/dispatch/ReportOnsiteClient.tsx` / `ReportTransportClient.tsx`
 
-- [ ] B-14 ETC 入力（出動 → 現着）
+- [x] B-14 ETC 入力（出動 → 現着）
   - **手順**: 報告書画面で ETC 区間 1（DISPATCH_TO_ARRIVAL）を入力 → 保存
   - **期待結果**: `DispatchEtc` レコードに `phase=DISPATCH_TO_ARRIVAL` で保存
   - **関連ファイル**: `prisma/schema.prisma` `DispatchEtc`, ReportClient（ETC 入力 UI）
 
-- [ ] B-15 ETC 入力（帰社時）
+- [x] B-15 ETC 入力（帰社時）
   - **手順**: ETC 区間 2（COMPLETION_TO_RETURN）を入力 → 保存
   - **期待結果**: `phase=COMPLETION_TO_RETURN` で保存
 
-- [ ] B-16 報告書 完了化
+- [x] B-16 報告書 完了化
   - **手順**: 報告書「完了」ボタン
   - **期待結果**: `Report.isDraft=false`、status が COMPLETED もしくは関連状態に
   - **関連ファイル**: `app/api/dispatches/[id]/report/complete/route.ts`
 
-- [ ] B-17 帰社登録（returnOdo / returnTime）
+- [x] B-17 帰社登録（returnOdo / returnTime）
   - **手順**: 「帰社」ボタン
   - **期待結果**: `returnTime`, `returnOdo` 記録、status=RETURNED
   - **関連ファイル**: `app/dispatch/[id]/record/page.tsx`, `RecordClient.tsx`
