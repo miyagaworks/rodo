@@ -883,16 +883,18 @@ export default function RecordClient({ dispatch, userName }: RecordClientProps) 
         className="fixed bottom-0 left-0 right-0 flex gap-3 px-3 py-3"
         style={{ backgroundColor: '#E5E5E5' }}
       >
-        {/* 下書き保存 */}
-        <button
-          onClick={handleDraftSave}
-          disabled={loading}
-          className="flex-none flex items-center gap-2 px-6 py-4 rounded-md font-bold text-white text-base active:opacity-80 transition-opacity"
-          style={{ backgroundColor: '#D3170A' }}
-        >
-          <FaPen className="text-lg" />
-          <span>下書き保存</span>
-        </button>
+        {/* 下書き保存（下書き状態のときだけ表示） */}
+        {dispatch.isDraft && (
+          <button
+            onClick={handleDraftSave}
+            disabled={loading}
+            className="flex-none flex items-center gap-2 px-6 py-4 rounded-md font-bold text-white text-base active:opacity-80 transition-opacity"
+            style={{ backgroundColor: '#D3170A' }}
+          >
+            <FaPen className="text-lg" />
+            <span>下書き保存</span>
+          </button>
+        )}
 
         {/* 報告兼請求項目へ */}
         <button

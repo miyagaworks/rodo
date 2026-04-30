@@ -1205,16 +1205,18 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
       <div className="fixed bottom-0 left-0 right-0 px-3 py-3 space-y-2" style={{ backgroundColor: '#E5E5E5' }}>
         {/* Row 1: 下書き保存 + 完了 */}
         <div className="flex gap-3">
-          <button
-            type="button"
-            onClick={() => handleSave(true)}
-            disabled={loading}
-            className="flex-none flex items-center gap-2 px-6 py-3.5 rounded-md font-bold text-white text-base active:opacity-80 transition-opacity"
-            style={{ backgroundColor: '#D3170A' }}
-          >
-            <FaPen className="text-lg" />
-            <span>下書き保存</span>
-          </button>
+          {report.isDraft && (
+            <button
+              type="button"
+              onClick={() => handleSave(true)}
+              disabled={loading}
+              className="flex-none flex items-center gap-2 px-6 py-3.5 rounded-md font-bold text-white text-base active:opacity-80 transition-opacity"
+              style={{ backgroundColor: '#D3170A' }}
+            >
+              <FaPen className="text-lg" />
+              <span>下書き保存</span>
+            </button>
+          )}
 
           <button
             type="button"
