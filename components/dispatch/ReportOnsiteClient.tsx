@@ -763,10 +763,10 @@ export default function ReportOnsiteClient({ dispatch, report, userName }: Props
             type="button"
             onClick={() => handleSave(true)}
             disabled={loading}
-            className="flex-none flex items-center gap-2 px-5 py-3.5 rounded-md font-bold text-white text-sm active:opacity-80 transition-opacity"
+            className="flex-none flex items-center gap-2 px-6 py-3.5 rounded-md font-bold text-white text-base active:opacity-80 transition-opacity"
             style={{ backgroundColor: '#D3170A' }}
           >
-            <FaPen />
+            <FaPen className="text-lg" />
             <span>下書き保存</span>
           </button>
 
@@ -774,14 +774,14 @@ export default function ReportOnsiteClient({ dispatch, report, userName }: Props
             type="button"
             onClick={() => handleSave(false)}
             disabled={!isComplete || loading}
-            className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-md font-bold text-sm transition-all active:opacity-80"
+            className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-md font-bold text-base transition-all active:opacity-80"
             style={{
               backgroundColor: isComplete ? '#1C2948' : '#9CA3AF',
               color: isComplete ? '#D7AF70' : 'white',
               cursor: isComplete ? 'pointer' : 'not-allowed',
             }}
           >
-            <FaCheckSquare className="text-base" />
+            <FaCheckSquare className="text-lg" />
             <span>完　了</span>
           </button>
         </div>
@@ -790,7 +790,7 @@ export default function ReportOnsiteClient({ dispatch, report, userName }: Props
         <button
           type="button"
           onClick={() => router.push(`/dispatch/${dispatch.id}/record`)}
-          className="w-full flex items-center gap-2 px-4 py-3 rounded-md font-bold text-white text-sm active:opacity-80"
+          className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-md font-bold text-white text-base active:opacity-80"
           style={{ backgroundColor: '#1C2948' }}
         >
           <IoIosArrowBack className="text-lg" />

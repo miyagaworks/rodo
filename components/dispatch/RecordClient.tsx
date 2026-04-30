@@ -887,10 +887,10 @@ export default function RecordClient({ dispatch, userName }: RecordClientProps) 
         <button
           onClick={handleDraftSave}
           disabled={loading}
-          className="flex-none flex items-center gap-2 px-5 py-4 rounded-md font-bold text-white text-sm active:opacity-80 transition-opacity"
+          className="flex-none flex items-center gap-2 px-6 py-4 rounded-md font-bold text-white text-base active:opacity-80 transition-opacity"
           style={{ backgroundColor: '#D3170A' }}
         >
-          <FaPen className="text-base" />
+          <FaPen className="text-lg" />
           <span>下書き保存</span>
         </button>
 
@@ -898,7 +898,7 @@ export default function RecordClient({ dispatch, userName }: RecordClientProps) 
         <button
           onClick={handleProceed}
           disabled={!isComplete || loading}
-          className="flex-1 flex items-center justify-center gap-2 py-4 rounded-md font-bold text-sm transition-all"
+          className="flex-1 flex items-center justify-center gap-2 py-4 rounded-md font-bold text-base transition-all"
           style={{
             backgroundColor: isComplete ? '#1C2948' : '#9CA3AF',
             color: 'white',
