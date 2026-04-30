@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "lint": "eslint ."
   },
   "prisma": {
     "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
@@ -50,6 +51,8 @@
     "@types/react-dom": "^19",
     "@types/react-signature-canvas": "^1.0.7",
     "@vitejs/plugin-react": "^6.0.1",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^16.2.4",
     "jsdom": "^27.0.1",
     "tailwindcss": "^4",
     "ts-node": "^10.9.2",
