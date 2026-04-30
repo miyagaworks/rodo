@@ -152,9 +152,6 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
   const [secondaryDepartureOdo, setSecondaryDepartureOdo] = useState(
     (secondaryData?.report?.departureOdo ?? secondaryData?.dispatch.departureOdo)?.toString() ?? ''
   )
-  const [secondaryRecoveryDistance, setSecondaryRecoveryDistance] = useState(
-    secondaryData?.report?.recoveryDistance?.toString() ?? ''
-  )
   const [secondaryArrivalOdo, setSecondaryArrivalOdo] = useState(
     (secondaryData?.report?.arrivalOdo ?? secondaryData?.dispatch.arrivalOdo)?.toString() ?? ''
   )
@@ -391,7 +388,7 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
     departureOdo, recoveryDistance, transportDistance, returnDistance, completionOdo, returnOdo,
     recoveryHighway, transportHighway, returnHighway,
     secondaryTransportStartTime, secondaryArrivalTime, secondaryCompletionTime, secondaryReturnTime,
-    secondaryDepartureOdo, secondaryRecoveryDistance, secondaryArrivalOdo, secondaryTransportDistance, secondaryReturnDistance, secondaryCompletionOdo, secondaryReturnOdo,
+    secondaryDepartureOdo, secondaryArrivalOdo, secondaryTransportDistance, secondaryReturnDistance, secondaryCompletionOdo, secondaryReturnOdo,
     secondaryTransportHighway, secondaryReturnHighway,
     departurePlaceName, arrivalPlaceName, transportPlaceName,
     transportShopName, transportPhone, transportAddress, transportContact, transportMemo,
@@ -747,9 +744,8 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
                 <div className="flex-1 space-y-3 pt-0.5">
                   {[
                     { label: '搬開 ODO', key: 'sec_departureOdo', value: secondaryDepartureOdo, setValue: setSecondaryDepartureOdo, suffix: 'km', decimal: false },
-                    { label: '回送距離', key: 'sec_recoveryDistance', value: secondaryRecoveryDistance, setValue: setSecondaryRecoveryDistance, suffix: 'km', decimal: true },
-                    { label: '現着 ODO', key: 'sec_arrivalOdo', value: secondaryArrivalOdo, setValue: setSecondaryArrivalOdo, suffix: 'km', decimal: false },
                     { label: '搬送距離', key: 'sec_transportDistance', value: secondaryTransportDistance, setValue: setSecondaryTransportDistance, suffix: 'km', decimal: true },
+                    { label: '現着 ODO', key: 'sec_arrivalOdo', value: secondaryArrivalOdo, setValue: setSecondaryArrivalOdo, suffix: 'km', decimal: false },
                     { label: '完了 ODO', key: 'sec_completionOdo', value: secondaryCompletionOdo, setValue: setSecondaryCompletionOdo, suffix: 'km', decimal: false },
                     { label: '帰社距離', key: 'sec_returnDistance', value: secondaryReturnDistance, setValue: setSecondaryReturnDistance, suffix: 'km', decimal: true },
                     { label: '帰社 ODO', key: 'sec_returnOdo', value: secondaryReturnOdo, setValue: setSecondaryReturnOdo, suffix: 'km', decimal: false },
