@@ -202,7 +202,7 @@ export default function HomeClient({ session }: HomeClientProps) {
               onClick={() => router.push('/break')}
             >
               <FaCoffee className="text-4xl" />
-              <span style={{ letterSpacing: '0.25em', paddingLeft: '0.25em', transform: 'translateY(1px)', display: 'inline-block' }}>休憩</span>
+              <span style={{ letterSpacing: '0.25em', paddingLeft: '0.25em' }}>休憩</span>
             </button>
           )}
         </div>

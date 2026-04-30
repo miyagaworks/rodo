@@ -198,7 +198,7 @@ function ActionButton({
         // eslint-disable-next-line @next/next/no-img-element
         <img src={iconSrc} alt="" className={`${iconSize} object-contain ${iconClassName ?? ''}`} />
       )}
-      <span style={{ color: 'white', letterSpacing: tracking, paddingLeft: tracking, transform: 'translateY(1px)', display: 'inline-block' }}>
+      <span style={{ color: 'white', letterSpacing: tracking, paddingLeft: tracking }}>
         {loading && isActive ? '処理中...' : label}
       </span>
     </button>
