@@ -260,6 +260,92 @@ npm run dev
   - **期待結果**: `transferStatus=CANCELLED`、PENDING 解除
   - **関連ファイル**: `app/api/dispatches/[id]/transfer/cancel/route.ts`
 
+#### B-3.5 種別切替・保管・搬送署名・二次搬送（追加）
+
+- [ ] B-25 `/dispatch/new?type=transport` の初期表示
+  - **手順**: ?type=transport で `/dispatch/new` に直接アクセス
+  - **期待結果**:
+    - 背景色 `#C6D8FF`（搬送モード）
+    - 「現場 / 搬送」トグルの「搬送」が濃色 `#1C2948` で選択済み
+    - 「搬開」ODO 欄、「搬送開始」ボタン、「搬送高速」は描画されるが `step!==2` で全て disabled
+    - 「出発」ODO 入力で「出動」ボタンが活性化
+  - **関連ファイル**: `app/dispatch/new/page.tsx:31`, `components/dispatch/DispatchClient.tsx:250-252, 875, 1247-1396`
+  - **備考**: `?type` 不正値（例: `hoge`）は onsite にフォールバック（`new/page.tsx:31`）
+
+- [ ] B-26 出動種別切替 — step=0 でのローカル切替（DB 未作成）
+  - **手順**: `/dispatch/new` で「現場 / 搬送」トグルを切替（「出動」ボタン押下前）
+  - **期待結果**:
+    - DB レコードは作成されない（POST はまだ走らない）
+    - クライアント側 `mode` state のみ更新
+    - 初回「出動」ボタン押下時に最終 `type` が確定して POST `/api/dispatches`
+  - **関連ファイル**: `components/dispatch/DispatchClient.tsx:937-938, 980-981, 463-464`
+
+- [ ] B-27 出動種別切替 — step>2 で完了系データを巻き戻し
+  - **手順**: 搬送開始（step>2）まで進んだ TRANSPORT 案件で「現場」トグルを押下
+  - **期待結果**:
+    - `window.confirm`「現着後に戻り、完了時刻・帰社時刻等はリセットされます」が表示
+    - 承諾 → `step=2` にリセット、PATCH `/api/dispatches/[id]` で以下が `null` に:
+      - `transportStartTime` / `completionTime` / `returnTime`
+      - `transportStartOdo` / `completionOdo` / `returnOdo`
+      - `workStartTime` / `workEndTime` / `workDuration` / `canDrive` / `deliveryType`
+    - 保持される: `dispatchTime` / `arrivalTime` / `arrivalOdo` / `departureOdo` / `DispatchPhoto`
+    - サーバー: `originalType` 未設定時のみ初回 `type` を保存（再切替で上書きしない）
+  - **関連ファイル**: `components/dispatch/DispatchClient.tsx:940-961, 983-1004`, `app/api/dispatches/[id]/route.ts:170-189`
+
+- [ ] B-28 出動種別切替 — TRANSFERRED で API 拒否
+  - **手順**: 振替済み（`status=TRANSFERRED`）案件で `curl -X PATCH /api/dispatches/[id]` に `{ "type": "transport" }` を送信
+  - **期待結果**: `400`（TRANSFERRED の type 変更は拒否）
+  - **関連ファイル**: `app/api/dispatches/[id]/route.ts:111-116`
+
+- [ ] B-29 搬送 step 4 「保管」選択 → STORED 遷移
+  - **手順**: TRANSPORT で搬送完了 → step 4「帰社 / 保管」2択 → `returnOdo` 入力 → 「保管」ボタン
+  - **期待結果**:
+    - PATCH で `status=STORED`, `deliveryType=STORAGE`, `returnTime`, `returnOdo` 記録
+    - `step=5` に進み「帰社」ボタンはスキップ
+    - 取消（`handleCancelStep('return')`）で `deliveryType:null` に戻る
+  - **関連ファイル**: `components/dispatch/DispatchClient.tsx:667-705, 777-779, 1421-1444`
+
+- [ ] B-30 搬送 step 4 「帰社」選択 → RETURNED 遷移
+  - **手順**: 同 2択画面で `returnOdo` 入力 → 「帰社」ボタン
+  - **期待結果**: PATCH で `status=RETURNED`, `returnTime`, `returnOdo` 記録、`step=5`、`deliveryType` は `null` のまま
+  - **関連ファイル**: `components/dispatch/DispatchClient.tsx:1421-1444`
+
+- [ ] B-31 搬送モードでの 3 種署名取得（onsite と同一 UI）
+  - **手順**: TRANSPORT 案件で `/dispatch/[id]/confirmation` を開く → 3 種すべて署名 → 保存
+  - **期待結果**:
+    - `customerSignature`（作業前/作業完了後ご署名欄）+ `shopSignature`（入庫先ご担当者様記入欄）+ `postApprovalSignature`（作業完了後承認欄）が onsite と完全同一の UI で取得・保存される
+    - `ConfirmationClient.tsx` 内に `dispatch.type` 参照はなく、UI / バリデーション分岐なし
+    - 二次搬送ページ（`SecondaryDispatchClient`）には作業確認書ボタンが存在せず、二次搬送フロー画面からの導線は無い
+  - **関連ファイル**: `components/dispatch/ConfirmationClient.tsx:30, 352, 409, 525-531, 585, 638-644`, `app/api/dispatches/[id]/confirmation/route.ts`
+  - **備考**: 二次搬送案件で `/dispatch/[secondaryId]/confirmation` に直接 URL アクセスすれば API レベルでは保存可能。UI からの導線は意図的に無い
+
+- [ ] B-32 二次搬送 — 親情報の引継ぎ確認
+  - **手順**: TRANSPORT 1 次搬送が `status=STORED` に到達 → ProcessingBar の「二次搬送」から `/dispatch/[parentId]/secondary` → 出動 → 子 `Dispatch` 作成
+  - **期待結果**: API（`app/api/dispatches/route.ts:111-152`）で親から自動継承される値:
+    - `customerName` / `vehicleName` / `plateRegion` / `plateClass` / `plateKana` / `plateNumber`
+    - `situationType` / `situationDetail` / `canDrive`
+    - `address` / `isHighway` / `highwayName` / `highwayDirection` / `kiloPost` / `areaIcName`
+    - `insuranceCompanyId` / `memo` / `assistanceId`
+    - 出動番号サフィックス `-2`（既存子があれば `-3` …）
+    - `vehicleId` は **現ユーザー** の `vehicleId`（親値ではない）
+    - `isSecondaryTransport=true`, `parentDispatchId`, `type='transport'`
+  - **関連ファイル**: `app/api/dispatches/route.ts:111-152, 162`, `components/dispatch/SecondaryDispatchClient.tsx:312-318`
+
+- [ ] B-33 二次搬送 完了 → 親 status 同時更新
+  - **手順**: 二次搬送で帰社（`handleReturn`）押下
+  - **期待結果**: 二次自身が `status=RETURNED`、**同時に** 親 `Dispatch` も `{ status:'RETURNED', isDraft:true }` に更新
+  - **関連ファイル**: `components/dispatch/SecondaryDispatchClient.tsx:423-429`
+
+- [ ] B-34 二次搬送 取消 → 親 STORED に復元
+  - **手順**: 二次搬送で帰社後、`handleCancelStep('return')` 相当（取消ボタン）
+  - **期待結果**: 親 `Dispatch` が `{ status:'STORED', isDraft:false }` に戻る
+  - **関連ファイル**: `components/dispatch/SecondaryDispatchClient.tsx:514-520`
+
+- [ ] B-35 二次搬送 — 親 status ガード
+  - **手順**: 親 `status !== 'STORED'` の `Dispatch` で `/dispatch/[parentId]/secondary` に直接 URL アクセス
+  - **期待結果**: `/` にリダイレクト
+  - **関連ファイル**: `app/dispatch/[id]/secondary/page.tsx:21`
+
 #### B-4. 休憩
 
 - [ ] B-23 休憩開始 → 終了
@@ -670,7 +756,8 @@ B (業務フロー)
   ├─ B-08 ~ B-12（署名 → 共有 → PDF）  ← 同時に G-01 ~ G-07 を兼ねる
   ├─ B-13 ~ B-17（報告書・ETC・帰社）
   ├─ B-18 ~ B-22（TRANSPORT / 二次搬送 / 振替）
-  └─ B-23 ~ B-24（休憩）
+  ├─ B-23 ~ B-24（休憩）
+  └─ B-25 ~ B-35（種別切替・保管・搬送署名・二次搬送詳細）
        ↓
 C (オフライン同期)
   └─ C-01 ~ C-10（DevTools Offline 切替）
@@ -700,14 +787,14 @@ H (パフォーマンス・全体)
 | カテゴリ | 合格 | 不合格 | 未確認 | 全件 |
 |---|---|---|---|---|
 | A 認証フロー | / 10 | | | 10 |
-| B 業務フロー | / 24 | | | 24 |
+| B 業務フロー | / 35 | | | 35 |
 | C オフライン同期 | / 10 | | | 10 |
 | D 管理者ダッシュボード | / 20 | | | 20 |
 | E PWA | / 7 | | | 7 |
 | F マイグレーション | / 8 | | | 8 |
 | G 署名 Blob 化 | / 15 | | | 15 |
 | H パフォーマンス | / 8 | | | 8 |
-| **合計** | **/ 102** | | | **102** |
+| **合計** | **/ 113** | | | **113** |
 
 ---
 
