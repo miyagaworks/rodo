@@ -21,8 +21,10 @@ const nextConfig: NextConfig = {
               `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''} https://static.bizdeli.net`,
               "worker-src 'self' blob:",
               "style-src 'self' 'unsafe-inline' https://static.bizdeli.net",
-              "connect-src 'self' https://static.bizdeli.net https://app.bizdeli.net",
+              "connect-src 'self' https://static.bizdeli.net https://app.bizdeli.net https://*.public.blob.vercel-storage.com",
               // P0-15: 署名画像 / 出動写真は Vercel Blob (`*.public.blob.vercel-storage.com`) から配信される。
+              // img-src は <img> 表示用、connect-src は ConfirmationClient.tsx:164 の
+              // fetch(blobUrl) → DataURL 変換用に必要。
               "img-src 'self' data: blob: https://*.public.blob.vercel-storage.com",
               "font-src 'self'",
               "frame-ancestors 'none'",
