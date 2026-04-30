@@ -2,12 +2,6 @@ import { z } from 'zod/v4'
 
 // --- 再利用可能なカスタムスキーマ ---
 
-/** GPS緯度 (-90 ~ 90) */
-export const gpsLat = z.number().min(-90).max(90).nullable().optional()
-
-/** GPS経度 (-180 ~ 180) */
-export const gpsLng = z.number().min(-180).max(180).nullable().optional()
-
 /** 走行距離メーター (0以上の整数、文字列からの自動変換対応) */
 export const odometerReading = z.union([
   z.number().int().nonnegative(),

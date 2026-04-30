@@ -81,13 +81,9 @@ export async function POST(
           status: 'ONSITE',
           vehicleId: acceptUser?.vehicleId ?? null,
           transferredFromId: dispatch.id,
-          // 時刻・GPS（現着までのデータのみ引き継ぎ）
+          // 時刻（現着までのデータのみ引き継ぎ）
           dispatchTime: dispatch.dispatchTime,
           arrivalTime: dispatch.arrivalTime,
-          dispatchGpsLat: dispatch.dispatchGpsLat,
-          dispatchGpsLng: dispatch.dispatchGpsLng,
-          arrivalGpsLat: dispatch.arrivalGpsLat,
-          arrivalGpsLng: dispatch.arrivalGpsLng,
           // ODO（出発時のみ引き継ぎ）
           departureOdo: dispatch.departureOdo,
           // 案件情報

@@ -104,12 +104,6 @@ export async function PATCH(
   if (body.returnTime !== undefined) allowed.returnTime = body.returnTime ? new Date(body.returnTime) : null
   if (body.dispatchTime !== undefined) allowed.dispatchTime = body.dispatchTime ? new Date(body.dispatchTime) : null
 
-  // GPS
-  if (body.dispatchGpsLat !== undefined) allowed.dispatchGpsLat = body.dispatchGpsLat
-  if (body.dispatchGpsLng !== undefined) allowed.dispatchGpsLng = body.dispatchGpsLng
-  if (body.arrivalGpsLat !== undefined) allowed.arrivalGpsLat = body.arrivalGpsLat
-  if (body.arrivalGpsLng !== undefined) allowed.arrivalGpsLng = body.arrivalGpsLng
-
   // ODO
   if (body.departureOdo !== undefined) allowed.departureOdo = body.departureOdo
   if (body.arrivalOdo !== undefined) allowed.arrivalOdo = body.arrivalOdo

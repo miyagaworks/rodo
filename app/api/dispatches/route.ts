@@ -73,7 +73,7 @@ export async function POST(req: Request) {
       { status: 400 }
     )
   }
-  const { assistanceId, type, departureOdo, dispatchTime, dispatchGpsLat, dispatchGpsLng, parentDispatchId, isSecondaryTransport } = parsed.data
+  const { assistanceId, type, departureOdo, dispatchTime, parentDispatchId, isSecondaryTransport } = parsed.data
 
   // assistanceId のテナント検証
   const assistance = await prisma.assistance.findFirst({
@@ -162,8 +162,6 @@ export async function POST(req: Request) {
         vehicleId: currentUser?.vehicleId ?? null,
         departureOdo: departureOdo != null ? parseInt(String(departureOdo)) : null,
         dispatchTime: now,
-        dispatchGpsLat: dispatchGpsLat ?? null,
-        dispatchGpsLng: dispatchGpsLng ?? null,
         parentDispatchId: parentDispatchId ?? null,
         isSecondaryTransport: isSecondaryTransport ?? false,
         // 親の案件情報を上書き（dispatchNumber はサフィックス付き）

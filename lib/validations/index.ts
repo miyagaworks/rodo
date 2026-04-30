@@ -52,8 +52,6 @@ export {
 
 // Helpers
 export {
-  gpsLat,
-  gpsLng,
   odometerReading,
   monetaryAmount,
   distance,

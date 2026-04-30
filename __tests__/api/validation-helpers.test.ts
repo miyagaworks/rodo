@@ -1,8 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { z } from 'zod/v4'
 import {
-  gpsLat,
-  gpsLng,
   odometerReading,
   monetaryAmount,
   nonEmptyString,
@@ -15,39 +13,6 @@ function parse<T extends z.ZodType>(schema: T, value: unknown) {
   const wrapper = z.object({ v: schema })
   return wrapper.safeParse({ v: value })
 }
-
-describe('gpsLat', () => {
-  it.each([0, -90, 90, 45.123, -45.123])('accepts %s', (v) => {
-    expect(parse(gpsLat, v).success).toBe(true)
-  })
-
-  it.each([-91, 91, -180, 180])('rejects %s', (v) => {
-    expect(parse(gpsLat, v).success).toBe(false)
-  })
-
-  it('accepts null', () => {
-    expect(parse(gpsLat, null).success).toBe(true)
-  })
-
-  it('accepts undefined (optional)', () => {
-    const wrapper = z.object({ v: gpsLat })
-    expect(wrapper.safeParse({}).success).toBe(true)
-  })
-})
-
-describe('gpsLng', () => {
-  it.each([0, -180, 180, 90.5, -90.5])('accepts %s', (v) => {
-    expect(parse(gpsLng, v).success).toBe(true)
-  })
-
-  it.each([-181, 181, -200, 200])('rejects %s', (v) => {
-    expect(parse(gpsLng, v).success).toBe(false)
-  })
-
-  it('accepts null', () => {
-    expect(parse(gpsLng, null).success).toBe(true)
-  })
-})
 
 describe('odometerReading', () => {
   it('accepts 0', () => {

@@ -10,8 +10,6 @@ describe('createDispatchSchema', () => {
     type: 'onsite' as const,
     departureOdo: 12345,
     dispatchTime: '2026-04-16T10:00:00+09:00',
-    dispatchGpsLat: 35.6812,
-    dispatchGpsLng: 139.7671,
     parentDispatchId: null,
     isSecondaryTransport: false,
   }
@@ -129,8 +127,7 @@ describe('updateDispatchSchema', () => {
   it('accepts valid partial update', () => {
     const result = updateDispatchSchema.safeParse({
       status: 'DISPATCHED',
-      arrivalGpsLat: 35.6812,
-      arrivalGpsLng: 139.7671,
+      arrivalOdo: 12345,
     })
     expect(result.success).toBe(true)
   })
@@ -143,28 +140,6 @@ describe('updateDispatchSchema', () => {
   it('rejects invalid status enum', () => {
     const result = updateDispatchSchema.safeParse({
       status: 'INVALID_STATUS',
-    })
-    expect(result.success).toBe(false)
-  })
-
-  it('accepts valid GPS coordinates', () => {
-    const result = updateDispatchSchema.safeParse({
-      arrivalGpsLat: 35.6812,
-      arrivalGpsLng: 139.7671,
-    })
-    expect(result.success).toBe(true)
-  })
-
-  it('rejects out-of-range GPS latitude', () => {
-    const result = updateDispatchSchema.safeParse({
-      arrivalGpsLat: 91,
-    })
-    expect(result.success).toBe(false)
-  })
-
-  it('rejects out-of-range GPS longitude', () => {
-    const result = updateDispatchSchema.safeParse({
-      arrivalGpsLng: 181,
     })
     expect(result.success).toBe(false)
   })

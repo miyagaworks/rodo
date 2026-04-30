@@ -17,8 +17,6 @@ import AppFooter from '@/components/common/AppFooter'
 
 interface TimeRecord {
   time: Date
-  gpsLat?: number | null
-  gpsLng?: number | null
 }
 
 interface SerializedDispatch {
@@ -35,10 +33,6 @@ interface SerializedDispatch {
   arrivalTime: string | null
   completionTime: string | null
   returnTime: string | null
-  dispatchGpsLat: number | null
-  dispatchGpsLng: number | null
-  arrivalGpsLat: number | null
-  arrivalGpsLng: number | null
   transportStartTime: string | null
   deliveryType: 'DIRECT' | 'STORAGE' | null
   transferStatus: string | null
@@ -238,16 +232,6 @@ function ActionButton({
 }
 
 // -------------------------------------------------------
-// GPS helper
-// -------------------------------------------------------
-
-function getGPS(): Promise<{ lat: number; lng: number } | null> {
-  // GPS 自動取得は廃止（ODO メーター手動記録に変更）。
-  // 関数シグネチャは維持し、常に null を返す no-op 実装。
-  return Promise.resolve(null)
-}
-
-// -------------------------------------------------------
 // Main component
 // -------------------------------------------------------
 
@@ -287,22 +271,10 @@ export default function DispatchClient({
   )
   const [lastReturnOdo, setLastReturnOdo] = useState<number | null>(null)
   const [dispatchTime, setDispatchTime] = useState<TimeRecord | null>(
-    initialDispatch?.dispatchTime
-      ? {
-          time: new Date(initialDispatch.dispatchTime),
-          gpsLat: initialDispatch.dispatchGpsLat,
-          gpsLng: initialDispatch.dispatchGpsLng,
-        }
-      : null
+    initialDispatch?.dispatchTime ? { time: new Date(initialDispatch.dispatchTime) } : null
   )
   const [arrivalTime, setArrivalTime] = useState<TimeRecord | null>(
-    initialDispatch?.arrivalTime
-      ? {
-          time: new Date(initialDispatch.arrivalTime),
-          gpsLat: initialDispatch.arrivalGpsLat,
-          gpsLng: initialDispatch.arrivalGpsLng,
-        }
-      : null
+    initialDispatch?.arrivalTime ? { time: new Date(initialDispatch.arrivalTime) } : null
   )
   const [transportStartTime, setTransportStartTime] = useState<TimeRecord | null>(
     initialDispatch?.transportStartTime ? { time: new Date(initialDispatch.transportStartTime) } : null
@@ -465,7 +437,6 @@ export default function DispatchClient({
     setLoading(true)
     try {
       const now = new Date()
-      const gps = await getGPS()
 
       // 取消後の再出動: 既存レコードを再利用して欠番を防ぐ
       if (dispatchId) {
@@ -474,17 +445,14 @@ export default function DispatchClient({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             dispatchTime: now.toISOString(),
-            dispatchGpsLat: gps?.lat ?? null,
-            dispatchGpsLng: gps?.lng ?? null,
             departureOdo: departureOdo ?? null,
             status: 'DISPATCHED',
           }),
           offlineActionType: 'dispatch_update',
           offlineDispatchId: dispatchId,
-          offlineGps: gps,
         })
         if (!res.ok) throw new Error('dispatch update failed')
-        setDispatchTime({ time: now, gpsLat: gps?.lat, gpsLng: gps?.lng })
+        setDispatchTime({ time: now })
         setStep(1)
       } else {
         // 初回出動: 新規作成
@@ -496,12 +464,9 @@ export default function DispatchClient({
             type: mode,
             departureOdo: departureOdo ?? null,
             dispatchTime: now.toISOString(),
-            dispatchGpsLat: gps?.lat ?? null,
-            dispatchGpsLng: gps?.lng ?? null,
           }),
           offlineActionType: 'dispatch_create',
           offlineDispatchId: null,
-          offlineGps: gps,
           offlineOptimisticData: { id: `offline-${Date.now()}`, dispatchNumber: '---' },
         })
 
@@ -510,7 +475,7 @@ export default function DispatchClient({
 
         setDispatchId(data.id)
         setDispatchNumber(data.dispatchNumber)
-        setDispatchTime({ time: now, gpsLat: gps?.lat, gpsLng: gps?.lng })
+        setDispatchTime({ time: now })
         setStep(1)
         router.replace(`/dispatch/${data.id}`)
       }
@@ -526,21 +491,17 @@ export default function DispatchClient({
     setLoading(true)
     try {
       const now = new Date()
-      const gps = await getGPS()
 
       await offlineFetch(`/api/dispatches/${dispatchId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           arrivalTime: now.toISOString(),
-          arrivalGpsLat: gps?.lat ?? null,
-          arrivalGpsLng: gps?.lng ?? null,
           arrivalOdo: arrivalOdo ?? null,
           status: 'ONSITE',
         }),
         offlineActionType: 'dispatch_update',
         offlineDispatchId: dispatchId,
-        offlineGps: gps,
       })
 
       // 回送高速が入力されていればReportへ保存
@@ -554,7 +515,7 @@ export default function DispatchClient({
         }).catch(console.error)
       }
 
-      setArrivalTime({ time: now, gpsLat: gps?.lat, gpsLng: gps?.lng })
+      setArrivalTime({ time: now })
       setStep(2)
     } catch (e) {
       console.error(e)
@@ -795,7 +756,7 @@ export default function DispatchClient({
           resetState: () => setDispatchTime(null),
         },
         arrival: {
-          fields: { arrivalTime: null, arrivalGpsLat: null, arrivalGpsLng: null, arrivalOdo: null, status: 'DISPATCHED' },
+          fields: { arrivalTime: null, arrivalOdo: null, status: 'DISPATCHED' },
           prevStep: 1,
           resetState: () => { setArrivalTime(null); setArrivalOdo(null) },
         },

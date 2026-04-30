@@ -138,11 +138,6 @@ model Dispatch {
   completionTime DateTime?
   returnTime     DateTime?
 
-  dispatchGpsLat Float?
-  dispatchGpsLng Float?
-  arrivalGpsLat  Float?
-  arrivalGpsLng  Float?
-
   address          String?
   highwayName      String?
   highwayDirection HighwayDirection?

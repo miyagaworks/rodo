@@ -88,7 +88,6 @@ describe('offlineFetch', () => {
       body: JSON.stringify({ name: 'test' }),
       offlineActionType: 'dispatch_create',
       offlineDispatchId: 'disp-1',
-      offlineGps: { lat: 35.6, lng: 139.7 },
       offlineOptimisticData: { queued: true, id: 'temp' },
     })
 
@@ -102,7 +101,6 @@ describe('offlineFetch', () => {
     expect(action.endpoint).toBe('/api/dispatches')
     expect(action.method).toBe('POST')
     expect(action.dispatchId).toBe('disp-1')
-    expect(action.gps).toEqual({ lat: 35.6, lng: 139.7 })
   })
 
   it('オンライン POST で 5xx かつ offlineActionType 未設定 → そのままエラーレスポンスを返す', async () => {
@@ -224,7 +222,7 @@ describe('offlineFetch', () => {
     expect(action.data).toEqual({})
   })
 
-  it('offlineGps/offlineDispatchId が未指定の場合は null でキューイングする', async () => {
+  it('offlineDispatchId が未指定の場合は null でキューイングする', async () => {
     setOnline(false)
 
     await offlineFetch('/api/dispatches', {
@@ -235,6 +233,5 @@ describe('offlineFetch', () => {
 
     const action = mockAddPendingAction.mock.calls[0][0]
     expect(action.dispatchId).toBeNull()
-    expect(action.gps).toBeNull()
   })
 })

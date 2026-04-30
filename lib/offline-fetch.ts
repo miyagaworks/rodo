@@ -14,8 +14,6 @@ export async function offlineFetch(
     offlineActionType?: PendingAction['type']
     /** 関連する dispatchId */
     offlineDispatchId?: string | null
-    /** GPS座標 */
-    offlineGps?: { lat: number; lng: number } | null
     /** キューイング後に返す楽観的レスポンスデータ */
     offlineOptimisticData?: Record<string, unknown>
   },
@@ -64,7 +62,6 @@ async function queueFromInit(
   init: RequestInit & {
     offlineActionType?: PendingAction['type']
     offlineDispatchId?: string | null
-    offlineGps?: { lat: number; lng: number } | null
   },
 ) {
   const body = init.body ? JSON.parse(init.body as string) : {}
@@ -72,7 +69,6 @@ async function queueFromInit(
     type: init.offlineActionType!,
     dispatchId: init.offlineDispatchId ?? null,
     timestamp: Date.now(),
-    gps: init.offlineGps ?? null,
     data: body,
     endpoint,
     method: (init.method?.toUpperCase() ?? 'POST') as 'POST' | 'PATCH',
