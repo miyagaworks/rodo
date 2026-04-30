@@ -124,11 +124,11 @@ export default function NumberPlateInput({ value, onChange, onClose }: Props) {
 
           {/* プレートプレビュー */}
           <div
-            className="w-full rounded-lg border-4 px-3 py-3 flex items-center justify-between font-black tracking-wider whitespace-nowrap"
+            className="w-full rounded-lg border-4 px-3 py-3 flex items-center justify-between font-bold tracking-wider whitespace-nowrap"
             style={{ borderColor: '#A0A8B0', backgroundColor: 'white' }}
           >
             <span
-              className="text-3xl"
+              className="text-3xl font-semibold"
               style={{ color: local.region ? PLATE_GREEN : '#9CA3AF' }}
             >
               {local.region || '地名'}
@@ -140,7 +140,7 @@ export default function NumberPlateInput({ value, onChange, onClose }: Props) {
               {local.classNum || '・・・'}
             </span>
             <span
-              className="text-3xl"
+              className="text-3xl font-semibold"
               style={{ color: local.kana ? PLATE_GREEN : '#9CA3AF' }}
             >
               {local.kana || '・'}
@@ -221,7 +221,7 @@ export default function NumberPlateInput({ value, onChange, onClose }: Props) {
               onChange={handleSerialChange}
               maxLength={4}
               placeholder="1234"
-              className="w-full rounded-lg py-4 px-3 text-center text-5xl font-black border-2"
+              className="w-full rounded-lg py-4 px-3 text-center text-5xl font-bold border-2"
               style={{
                 borderColor: PLATE_GREEN,
                 color: local.serial ? PLATE_GREEN : '#9CA3AF',
