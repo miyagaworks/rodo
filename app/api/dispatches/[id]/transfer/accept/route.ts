@@ -86,8 +86,6 @@ export async function POST(
           arrivalTime: dispatch.arrivalTime,
           // ODO（出発時のみ引き継ぎ）
           departureOdo: dispatch.departureOdo,
-          // 現着 ODO も引き継ぐ（元担当が現場到着まで実走しているため。コメントとの実装乖離を修正）
-          arrivalOdo: dispatch.arrivalOdo,
           // 案件情報
           customerName: dispatch.customerName,
           vehicleName: dispatch.vehicleName,
