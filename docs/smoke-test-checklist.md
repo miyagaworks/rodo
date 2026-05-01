@@ -297,7 +297,7 @@ npm run dev
   - **自動テスト**: `__tests__/api/dispatches-patch.test.ts` の TRANSFERRED ガード describe ブロック
   - **関連ファイル**: `app/api/dispatches/[id]/route.ts:111-116`
 
-- [ ] B-29 搬送 step 4 「保管」選択 → STORED 遷移
+- [x] B-29 搬送 step 4 「保管」選択 → STORED 遷移
   - **手順**: TRANSPORT で搬送完了 → step 4「帰社 / 保管」2択 → `returnOdo` 入力 → 「保管」ボタン
   - **期待結果**:
     - PATCH で `status=STORED`, `deliveryType=STORAGE`, `returnTime`, `returnOdo` 記録
@@ -305,7 +305,7 @@ npm run dev
     - 取消（`handleCancelStep('return')`）で `deliveryType:null` に戻る
   - **関連ファイル**: `components/dispatch/DispatchClient.tsx:667-705, 777-779, 1421-1444`
 
-- [ ] B-30 搬送 step 4 「帰社」選択 → RETURNED 遷移
+- [x] B-30 搬送 step 4 「帰社」選択 → RETURNED 遷移
   - **手順**: 同 2択画面で `returnOdo` 入力 → 「帰社」ボタン
   - **期待結果**: PATCH で `status=RETURNED`, `returnTime`, `returnOdo` 記録、`step=5`、`deliveryType` は `null` のまま
   - **関連ファイル**: `components/dispatch/DispatchClient.tsx:1421-1444`
