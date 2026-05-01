@@ -6,7 +6,9 @@ const PUBLIC_FILE_EXTENSIONS =
   /\.(ico|png|jpg|jpeg|svg|gif|webp|woff|woff2|ttf|eot|css|js|map|json|txt|xml|webmanifest)$/
 
 // #6 修正: 認証不要なAPIルートをホワイトリストで明示
-const PUBLIC_API_PREFIXES = ['/api/auth', '/api/c']
+// /api/health: useOnlineStatus.probeHealth から疎通確認用に呼ばれる純粋なヘルスチェック。
+// SW フォールバック 503 と区別するため、サーバ側は無条件で 200 を返す必要がある。
+const PUBLIC_API_PREFIXES = ['/api/auth', '/api/c', '/api/health']
 
 export default auth((req) => {
   const { pathname } = req.nextUrl

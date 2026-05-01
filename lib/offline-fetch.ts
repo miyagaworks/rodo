@@ -32,8 +32,12 @@ export async function offlineFetch(
       const res = await fetch(input, init)
       if (res.ok) return res
 
-      // 5xx → キューイングしてリトライ可能にする
-      if (res.status >= 500 && init?.offlineActionType) {
+      // SW フォールバックによる 503 のみ実ネット断としてキューイング経路に入る。
+      // 通常の 5xx（サーバ側エラー）はそのまま呼び出し元に返し、エラー処理させる。
+      // 判定は `X-SW-Offline: 1` カスタムヘッダで行う（body を読むと
+      // ストリーム消費の副作用があるため、ヘッダ方式に統一）。
+      const isSwOffline = res.headers.get('X-SW-Offline') === '1'
+      if (isSwOffline && init?.offlineActionType) {
         await queueFromInit(input, init)
         return createOptimisticResponse(init?.offlineOptimisticData)
       }
