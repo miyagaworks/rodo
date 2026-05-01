@@ -84,8 +84,9 @@ export async function POST(
           // 時刻（現着までのデータのみ引き継ぎ）
           dispatchTime: dispatch.dispatchTime,
           arrivalTime: dispatch.arrivalTime,
-          // ODO（出発時のみ引き継ぎ）
+          // ODO（1次の値をコピー。transportStartOdo 以降はフロント側で初期値表示）
           departureOdo: dispatch.departureOdo,
+          arrivalOdo: dispatch.arrivalOdo,
           // 案件情報
           customerName: dispatch.customerName,
           vehicleName: dispatch.vehicleName,
