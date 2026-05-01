@@ -84,10 +84,17 @@ function buildReportData(body: CompleteReportBody, dispatch: Dispatch) {
   data.returnDistance = distances.returnDistance
 
   if (body.recoveryHighway !== undefined) data.recoveryHighway = body.recoveryHighway
+  if (body.transportHighway !== undefined) data.transportHighway = body.transportHighway
   if (body.returnHighway !== undefined) data.returnHighway = body.returnHighway
   if (body.totalHighway !== undefined) data.totalHighway = body.totalHighway
   if (body.departurePlaceName !== undefined) data.departurePlaceName = body.departurePlaceName
   if (body.arrivalPlaceName !== undefined) data.arrivalPlaceName = body.arrivalPlaceName
+  if (body.transportPlaceName !== undefined) data.transportPlaceName = body.transportPlaceName
+  if (body.transportShopName !== undefined) data.transportShopName = body.transportShopName
+  if (body.transportPhone !== undefined) data.transportPhone = body.transportPhone
+  if (body.transportAddress !== undefined) data.transportAddress = body.transportAddress
+  if (body.transportContact !== undefined) data.transportContact = body.transportContact
+  if (body.transportMemo !== undefined) data.transportMemo = body.transportMemo
   if (body.primaryCompletionItems !== undefined) data.primaryCompletionItems = body.primaryCompletionItems
   if (body.primaryCompletionNote !== undefined) data.primaryCompletionNote = body.primaryCompletionNote
   if (body.secondaryCompletionItems !== undefined) data.secondaryCompletionItems = body.secondaryCompletionItems
