@@ -6,6 +6,40 @@
 
 ---
 
+## ⚠️ 2026-04-30 23:50 セッション末追記（最重要・先に読む）
+
+§5 の「ステップ1: revert」「ステップ2: バックフィル NULL 戻し」は **本セッションで実施完了**。
+次セッションで二重実行しないこと。
+
+| §5 ステップ | 状態 | 結果 |
+|---|---|---|
+| Step 1: `git revert 7a753c6 --no-edit` | ✅ 完了 | 新コミット `7aa1da7`（accept/route.ts の arrivalOdo コピー2行削除分）|
+| Step 2: バックフィル2件 NULL 戻し SQL | ✅ 完了 | `cmol9cgz500038owwmdclwzw6` / `cmolfo3xg000h8owwu5mdmski` 両方 NULL 確認済（psql で COMMIT 済）|
+| Step 3: 統合調査CC プロンプト発行 | ⏳ 未実施 | **新セッションで §6 のプロンプトを投入する** |
+
+### 次セッション開始時の git 状態（origin より 4 commits ahead、push 未実施）
+```
+7aa1da7  Revert "fix(transfer): 振替先 Dispatch ... arrivalOdo ..."  ← 直近
+2677f91  docs(handover): 振替時ODO設計の再考と新規問題4件 ...
+7a753c6  fix(transfer): 振替先 Dispatch ... arrivalOdo ...（誤修正、上で revert 済）
+9bbaa35  refactor(report): 2次の secondaryRecoveryDistance ...（保持）
+```
+
+未コミット（タスクC 保持予定、変更なし）:
+- `app/dispatch/[id]/report/page.tsx`
+- `components/dispatch/ReportOnsiteClient.tsx`
+- `components/dispatch/ReportTransportClient.tsx`
+
+### 次セッションの最初のアクション
+1. 本ノートを読み直す（特にこの追記ブロックと §6）
+2. `git log --oneline -5` で上記の状態を実物確認
+3. **§6 の統合調査CC プロンプトを投入**（読み取り専用、§6 本文に最新の前提を追加した版を使う、本セッションで提示済）
+4. 調査結果を踏まえて修正タスクを再設計（タスクB-rev / D / E / バックフィル再実施）
+
+§5 の Step 1〜2 はスキップ。§10 の挨拶テンプレも「revert 済」前提で読み替えること。
+
+---
+
 ## 0. 次セッションで最初に読むべきもの
 
 1. このファイル（全体）
