@@ -235,34 +235,34 @@ npm run dev
 
 #### B-3. TRANSPORT / 二次搬送 / 振替
 
-- [ ] B-18 TRANSPORT 1 次：搬送開始 → 搬送完了
+- [x] B-18 TRANSPORT 1 次：搬送開始 → 搬送完了
   - **手順**: TRANSPORT 種別の出動で「搬送開始」（`transportStartTime`, `transportStartOdo`）→ 「搬送完了」（`completionTime`, `completionOdo`）
   - **期待結果**: 各タイムスタンプ / ODO が記録、status 遷移 TRANSPORTING → COMPLETED
   - **関連ファイル**: `DispatchClient.tsx`
 
-- [ ] B-19 二次搬送（SECONDARY）作成
+- [x] B-19 二次搬送（SECONDARY）作成
   - **手順**: 1 次搬送完了画面 → 「二次搬送」ボタン → `/dispatch/[id]/secondary`
   - **期待結果**: `parentDispatchId` を持つ子 Dispatch が作成（`isSecondaryTransport=true`）
   - **関連ファイル**: `app/dispatch/[id]/secondary/page.tsx`, `SecondaryDispatchClient.tsx`
 
-- [ ] B-20 振替リクエスト発信
+- [x] B-20 振替リクエスト発信
   - **手順**: 出動詳細画面 → 「振替」→ 振替先隊員選択 → 送信
   - **期待結果**: `transferStatus=PENDING`, `transferRequestedAt` 記録、相手側に通知（30 秒ポーリング）
   - **関連ファイル**: `app/api/dispatches/[id]/transfer/route.ts`, `DispatchClient.tsx:327-372`
 
-- [ ] B-21 振替受諾
+- [x] B-21 振替受諾
   - **手順**: 受信側が「受諾」
   - **期待結果**: 元案件 status=TRANSFERRED、新案件作成、`transferredFromId` / `transferredToId` リンク
   - **関連ファイル**: `app/api/dispatches/[id]/transfer/accept/route.ts`
 
-- [ ] B-22 振替キャンセル
+- [x] B-22 振替キャンセル
   - **手順**: PENDING 中に発信側が「キャンセル」
   - **期待結果**: `transferStatus=CANCELLED`、PENDING 解除
   - **関連ファイル**: `app/api/dispatches/[id]/transfer/cancel/route.ts`
 
 #### B-3.5 種別切替・保管・搬送署名・二次搬送（追加）
 
-- [ ] B-25 `/dispatch/new?type=transport` の初期表示
+- [x] B-25 `/dispatch/new?type=transport` の初期表示
   - **手順**: ?type=transport で `/dispatch/new` に直接アクセス
   - **期待結果**:
     - 背景色 `#C6D8FF`（搬送モード）
@@ -272,7 +272,7 @@ npm run dev
   - **関連ファイル**: `app/dispatch/new/page.tsx:31`, `components/dispatch/DispatchClient.tsx:250-252, 875, 1247-1396`
   - **備考**: `?type` 不正値（例: `hoge`）は onsite にフォールバック（`new/page.tsx:31`）
 
-- [ ] B-26 出動種別切替 — step=0 でのローカル切替（DB 未作成）
+- [x] B-26 出動種別切替 — step=0 でのローカル切替（DB 未作成）
   - **手順**: `/dispatch/new` で「現場 / 搬送」トグルを切替（「出動」ボタン押下前）
   - **期待結果**:
     - DB レコードは作成されない（POST はまだ走らない）
@@ -280,7 +280,7 @@ npm run dev
     - 初回「出動」ボタン押下時に最終 `type` が確定して POST `/api/dispatches`
   - **関連ファイル**: `components/dispatch/DispatchClient.tsx:937-938, 980-981, 463-464`
 
-- [ ] B-27 出動種別切替 — step>2 で完了系データを巻き戻し
+- [x] B-27 出動種別切替 — step>2 で完了系データを巻き戻し
   - **手順**: 搬送開始（step>2）まで進んだ TRANSPORT 案件で「現場」トグルを押下
   - **期待結果**:
     - `window.confirm`「現着後に戻り、完了時刻・帰社時刻等はリセットされます」が表示
