@@ -1364,13 +1364,15 @@ export default function DispatchClient({
                       >
                         修正
                       </button>
-                      <button
-                        className="flex-1 bg-white rounded-md py-2 text-center font-bold text-lg shadow-sm border-2 border-red-300 active:bg-red-50"
-                        style={{ color: '#D3170A', letterSpacing: '0.25em', paddingLeft: '0.25em' }}
-                        onClick={() => handleCancelStep('completion')}
-                      >
-                        取消
-                      </button>
+                      {step === 4 && (
+                        <button
+                          className="flex-1 bg-white rounded-md py-2 text-center font-bold text-lg shadow-sm border-2 border-red-300 active:bg-red-50"
+                          style={{ color: '#D3170A', letterSpacing: '0.25em', paddingLeft: '0.25em' }}
+                          onClick={() => handleCancelStep('completion')}
+                        >
+                          取消
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1399,7 +1401,7 @@ export default function DispatchClient({
                       <button
                         className="flex-1 bg-white rounded-md py-2 text-center font-bold text-lg shadow-sm border-2 border-red-300 active:bg-red-50"
                         style={{ color: '#D3170A', letterSpacing: '0.25em', paddingLeft: '0.25em' }}
-                        onClick={() => handleCancelStep('completion')}
+                        onClick={() => handleCancelStep('return')}
                       >
                         取消
                       </button>
