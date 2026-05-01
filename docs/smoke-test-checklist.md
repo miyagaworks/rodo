@@ -292,9 +292,9 @@ npm run dev
     - サーバー: `originalType` 未設定時のみ初回 `type` を保存（再切替で上書きしない）
   - **関連ファイル**: `components/dispatch/DispatchClient.tsx:940-961, 983-1004`, `app/api/dispatches/[id]/route.ts:170-189`
 
-- [ ] B-28 出動種別切替 — TRANSFERRED で API 拒否
-  - **手順**: 振替済み（`status=TRANSFERRED`）案件で `curl -X PATCH /api/dispatches/[id]` に `{ "type": "transport" }` を送信
-  - **期待結果**: `400`（TRANSFERRED の type 変更は拒否）
+- [x] B-28 出動種別切替 — TRANSFERRED で API 拒否（自動テストでカバー）
+  - **理由**: 振替済み案件はどの画面にも表示されない仕様のため、手動テスト不可能
+  - **自動テスト**: `__tests__/api/dispatches-patch.test.ts` の TRANSFERRED ガード describe ブロック
   - **関連ファイル**: `app/api/dispatches/[id]/route.ts:111-116`
 
 - [ ] B-29 搬送 step 4 「保管」選択 → STORED 遷移

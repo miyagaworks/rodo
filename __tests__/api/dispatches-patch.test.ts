@@ -260,3 +260,31 @@ describe('PATCH /api/dispatches/[id] - Phase B ODO fields', () => {
     expect(res.status).toBe(400)
   })
 })
+
+describe('PATCH /api/dispatches/[id] - TRANSFERRED ガード', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockedAuth.mockResolvedValue({
+      user: { userId: 'u1', tenantId: 't1', role: 'MEMBER' },
+    })
+  })
+
+  it('TRANSFERRED 案件への type 変更は 400 で拒否され update が呼ばれない (B-28)', async () => {
+    // type 変更バリデーション用 findUnique: status=TRANSFERRED を返す
+    mockedFindUnique.mockResolvedValueOnce({
+      status: 'TRANSFERRED',
+      type: 'ONSITE',
+      originalType: null,
+    })
+
+    const res = await PATCH(
+      makeRequest({ type: 'transport' }),
+      makeParams(),
+    )
+
+    expect(res.status).toBe(400)
+    const json = await res.json()
+    expect(json.error).toBe('振替済みの出動はタイプ変更できません')
+    expect(mockedUpdate).not.toHaveBeenCalled()
+  })
+})
