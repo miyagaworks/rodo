@@ -60,6 +60,8 @@ export interface SerializedDispatch {
 interface RecordClientProps {
   dispatch: SerializedDispatch
   userName: string
+  /** 報告書が確定済みかどうかの判定に使う。null = 未作成。 */
+  report?: { isDraft: boolean } | null
 }
 
 interface InsuranceCompany {
@@ -189,7 +191,7 @@ function ToggleButton({
 // Main Component
 // -------------------------------------------------------
 
-export default function RecordClient({ dispatch, userName }: RecordClientProps) {
+export default function RecordClient({ dispatch, userName, report }: RecordClientProps) {
   const router = useRouter()
 
   // ── State ──
@@ -378,10 +380,12 @@ export default function RecordClient({ dispatch, userName }: RecordClientProps) 
     if (!isComplete || loading) return
     setLoading(true)
     try {
+      // dispatch.isDraft は維持（true）。最終確定は報告兼請求項目ページの完了押下で
+      // report.isDraft=false となった時点に統一する。
       await offlineFetch(`/api/dispatches/${dispatch.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(buildPayload(false)),
+        body: JSON.stringify(buildPayload(true)),
         offlineActionType: 'dispatch_update',
         offlineDispatchId: dispatch.id,
       })
@@ -883,8 +887,8 @@ export default function RecordClient({ dispatch, userName }: RecordClientProps) 
         className="fixed bottom-0 left-0 right-0 flex gap-3 px-3 py-3"
         style={{ backgroundColor: '#E5E5E5' }}
       >
-        {/* 下書き保存（下書き状態のときだけ表示） */}
-        {dispatch.isDraft && (
+        {/* 下書き保存（報告書未確定なら表示。report 未作成 or report.isDraft=true のとき） */}
+        {(!report || report.isDraft) && (
           <button
             onClick={handleDraftSave}
             disabled={loading}

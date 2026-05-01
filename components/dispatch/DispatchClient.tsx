@@ -263,6 +263,10 @@ export default function DispatchClient({
   const [transportStartOdo, setTransportStartOdo] = useState<number | null>(
     initialDispatch?.transportStartOdo ?? null
   )
+  // -T レコードでは「搬開ODO が DB に保存済みか」を独立に追跡し、搬送開始ボタンの活性化に用いる
+  const [isTransportStartOdoSaved, setIsTransportStartOdoSaved] = useState<boolean>(
+    initialDispatch?.transportStartOdo != null
+  )
   const [completionOdo, setCompletionOdo] = useState<number | null>(
     initialDispatch?.completionOdo ?? null
   )
@@ -412,8 +416,13 @@ export default function DispatchClient({
     departureOdo ?? (lastReturnOdo !== null ? lastReturnOdo : 0)
   const arrivalPlaceholder: number =
     arrivalOdo ?? departurePlaceholder
+  // 振替先 -T では受諾者車両の最終 returnOdo を直接 placeholder に流す
+  // （1次値を継承する chain をバイパス）
   const transportStartPlaceholder: number =
-    transportStartOdo ?? arrivalPlaceholder
+    transportStartOdo ??
+    (isTransferredIn && lastReturnOdo !== null
+      ? lastReturnOdo
+      : arrivalPlaceholder)
   const completionPlaceholder: number = mode === 'transport'
     ? (completionOdo ?? transportStartPlaceholder)
     : (completionOdo ?? arrivalPlaceholder)
@@ -569,14 +578,18 @@ export default function DispatchClient({
     setLoading(true)
     try {
       const now = new Date()
+      // 振替先 -T では transportStartOdo は OdoDialInput 確定時に既に保存済みのため body から除外
+      const body: Record<string, unknown> = {
+        transportStartTime: now.toISOString(),
+        status: 'TRANSPORTING',
+      }
+      if (!isTransferredIn) {
+        body.transportStartOdo = transportStartOdo ?? null
+      }
       await offlineFetch(`/api/dispatches/${dispatchId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          transportStartTime: now.toISOString(),
-          transportStartOdo: transportStartOdo ?? null,
-          status: 'TRANSPORTING',
-        }),
+        body: JSON.stringify(body),
         offlineActionType: 'dispatch_update',
         offlineDispatchId: dispatchId,
       })
@@ -587,7 +600,7 @@ export default function DispatchClient({
     } finally {
       setLoading(false)
     }
-  }, [step, dispatchId, loading, transportStartOdo])
+  }, [step, dispatchId, loading, transportStartOdo, isTransferredIn])
 
   // 搬送専用: 完了（搬送高速を保存）
   const handleTransportComplete = useCallback(async () => {
@@ -763,7 +776,11 @@ export default function DispatchClient({
         transportStart: {
           fields: { transportStartTime: null, transportStartOdo: null, status: 'ONSITE' },
           prevStep: 2,
-          resetState: () => { setTransportStartTime(null); setTransportStartOdo(null) },
+          resetState: () => {
+            setTransportStartTime(null)
+            setTransportStartOdo(null)
+            setIsTransportStartOdoSaved(false)
+          },
         },
         completion: {
           fields: {
@@ -1040,7 +1057,8 @@ export default function DispatchClient({
             time={dispatchTime?.time}
             onPress={handleDispatch}
             onCorrect={() => setClockTarget('dispatch')}
-            onCancel={() => handleCancelStep('dispatch')}
+            // -T レコードでは出動の取消は 1次データを破壊するため非表示
+            onCancel={isTransferredIn ? undefined : () => handleCancelStep('dispatch')}
             loading={loading && step === 0}
           />
         </div>
@@ -1079,7 +1097,8 @@ export default function DispatchClient({
             time={arrivalTime?.time}
             onPress={handleArrival}
             onCorrect={() => setClockTarget('arrival')}
-            onCancel={() => handleCancelStep('arrival')}
+            // -T レコードでは現着の取消は 1次データを破壊するため非表示
+            onCancel={isTransferredIn ? undefined : () => handleCancelStep('arrival')}
             loading={loading && step === 1}
           />
         </div>
@@ -1248,7 +1267,24 @@ export default function DispatchClient({
             <OdoDialInput
               label="搬開"
               value={transportStartOdo}
-              onChange={setTransportStartOdo}
+              onChange={async (v) => {
+                setTransportStartOdo(v)
+                // 振替先 -T では確定時に DB へ即時保存（搬送開始ボタンの活性化条件）
+                if (isTransferredIn && dispatchId) {
+                  try {
+                    await offlineFetch(`/api/dispatches/${dispatchId}`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ transportStartOdo: v }),
+                      offlineActionType: 'dispatch_update',
+                      offlineDispatchId: dispatchId,
+                    })
+                    setIsTransportStartOdoSaved(true)
+                  } catch (e) {
+                    console.error(e)
+                  }
+                }
+              }}
               disabled={step !== 2}
               placeholder={transportStartPlaceholder}
             />
@@ -1265,7 +1301,13 @@ export default function DispatchClient({
                 label="搬送開始"
                 isActive={step === 2}
                 isPressed={step >= 3}
-                isDisabled={step !== 2 || (step === 2 && transportStartOdo === null)}
+                isDisabled={
+                  step !== 2 ||
+                  (step === 2 &&
+                    (isTransferredIn
+                      ? !isTransportStartOdoSaved // -T: DB 保存済み必須
+                      : transportStartOdo === null))
+                }
                 time={transportStartTime?.time}
                 onPress={handleTransportStart}
                 onCorrect={() => setClockTarget('transportStart')}

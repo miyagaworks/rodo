@@ -27,16 +27,21 @@ export interface SerializedDispatchForReport {
   completionTime: string | null
   returnTime: string | null
   departureOdo: number | null
+  arrivalOdo: number | null
+  transportStartOdo: number | null
   completionOdo: number | null
   returnOdo: number | null
   vehicleId: string | null
   vehicle: { plateNumber: string; displayName: string | null } | null
   deliveryType?: 'DIRECT' | 'STORAGE' | null
+  transferredFromId: string | null
 }
 
 export interface SerializedReport {
   id: string | null
   departureOdo: number | null
+  arrivalOdo: number | null
+  transportStartOdo: number | null
   recoveryDistance: number | null
   transportDistance?: number | null
   returnDistance: number | null

@@ -13,7 +13,7 @@ export default async function DispatchRecordPage({ params }: Props) {
 
   const { id } = await params
 
-  const [dispatch, user] = await Promise.all([
+  const [dispatch, user, report] = await Promise.all([
     prisma.dispatch.findFirst({
       where: { id, tenantId: session.user.tenantId },
       include: {
@@ -26,6 +26,10 @@ export default async function DispatchRecordPage({ params }: Props) {
         vehicleId: true,
         vehicle: { select: { plateNumber: true, displayName: true } },
       },
+    }),
+    prisma.report.findUnique({
+      where: { dispatchId: id },
+      select: { isDraft: true },
     }),
   ])
 
@@ -75,5 +79,11 @@ export default async function DispatchRecordPage({ params }: Props) {
     vehicle: resolvedVehicle,
   }
 
-  return <RecordClient dispatch={serialized} userName={session.user.name} />
+  return (
+    <RecordClient
+      dispatch={serialized}
+      userName={session.user.name}
+      report={report ? { isDraft: report.isDraft } : null}
+    />
+  )
 }

@@ -55,6 +55,7 @@ interface Props {
 }
 
 type TimeField = 'dispatch' | 'arrival' | 'transportStart' | 'completion' | 'return'
+type SecondaryTimeField = 'transportStart' | 'arrival' | 'completion' | 'return'
 
 // -------------------------------------------------------
 // Helpers
@@ -110,9 +111,13 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
     dispatch.returnTime ? new Date(dispatch.returnTime) : null
   )
   const [clockPickerFor, setClockPickerFor] = useState<TimeField | null>(null)
+  const [secondaryClockPickerFor, setSecondaryClockPickerFor] = useState<SecondaryTimeField | null>(null)
 
   // ── 保管（2次搬送）判定 ──
   const isStored = dispatch.deliveryType === 'STORAGE'
+
+  // ── 振替案件判定（振替先 -T レコードかどうか） ──
+  const isTransferredIn = !!dispatch.transferredFromId
 
   // ── 2次搬送 時間 ──
   const [secondaryTransportStartTime, setSecondaryTransportStartTime] = useState<Date | null>(
@@ -131,6 +136,12 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
   // ── 距離・ODO ──
   const [departureOdo, setDepartureOdo] = useState(
     (report.departureOdo ?? dispatch.departureOdo)?.toString() ?? ''
+  )
+  const [arrivalOdo, setArrivalOdo] = useState(
+    (report.arrivalOdo ?? dispatch.arrivalOdo)?.toString() ?? ''
+  )
+  const [transportStartOdo, setTransportStartOdo] = useState(
+    (report.transportStartOdo ?? dispatch.transportStartOdo)?.toString() ?? ''
   )
   const [recoveryDistance, setRecoveryDistance] = useState(
     report.recoveryDistance?.toString() ?? ''
@@ -328,6 +339,42 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
     return { minTime, maxTime }
   }
 
+  // ── 2次 ClockPicker 用 ──
+  const secondaryTimeMap: Record<SecondaryTimeField, Date | null> = {
+    transportStart: secondaryTransportStartTime,
+    arrival: secondaryArrivalTime,
+    completion: secondaryCompletionTime,
+    return: secondaryReturnTime,
+  }
+  const secondarySetTimeMap: Record<SecondaryTimeField, (d: Date) => void> = {
+    transportStart: setSecondaryTransportStartTime,
+    arrival: setSecondaryArrivalTime,
+    completion: setSecondaryCompletionTime,
+    return: setSecondaryReturnTime,
+  }
+
+  const handleSecondaryTimeChange = (field: SecondaryTimeField, date: Date) => {
+    secondarySetTimeMap[field](date)
+    setSecondaryClockPickerFor(null)
+  }
+
+  // ── 2次 時間制約（搬送開始 < 現着 < 完了 < 帰社 の順序を保証） ──
+  const secondaryTimeOrder: SecondaryTimeField[] = ['transportStart', 'arrival', 'completion', 'return']
+  const getSecondaryTimeConstraints = (field: SecondaryTimeField): { minTime: Date | null; maxTime: Date | null } => {
+    const idx = secondaryTimeOrder.indexOf(field)
+    let minTime: Date | null = null
+    let maxTime: Date | null = null
+    // 前方向: 直前の設定済み時刻
+    for (let i = idx - 1; i >= 0; i--) {
+      if (secondaryTimeMap[secondaryTimeOrder[i]]) { minTime = secondaryTimeMap[secondaryTimeOrder[i]]; break }
+    }
+    // 後方向: 直後の設定済み時刻
+    for (let i = idx + 1; i < secondaryTimeOrder.length; i++) {
+      if (secondaryTimeMap[secondaryTimeOrder[i]]) { maxTime = secondaryTimeMap[secondaryTimeOrder[i]]; break }
+    }
+    return { minTime, maxTime }
+  }
+
   // ── ペイロード ──
   const buildDispatchPayload = (isDraft: boolean) => ({
     dispatchTime: dispatchTime?.toISOString() ?? null,
@@ -340,6 +387,8 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
 
   const buildReportPayload = (isDraft: boolean) => ({
     departureOdo: departureOdo ? parseInt(departureOdo) : null,
+    arrivalOdo: arrivalOdo ? parseInt(arrivalOdo, 10) : null,
+    transportStartOdo: transportStartOdo ? parseInt(transportStartOdo, 10) : null,
     recoveryDistance: recoveryDistance ? parseFloat(recoveryDistance) : null,
     transportDistance: transportDistance ? parseFloat(transportDistance) : null,
     returnDistance: returnDistance ? parseFloat(returnDistance) : null,
@@ -385,7 +434,7 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     dispatchTime, arrivalTime, transportStartTime, completionTime, returnTime,
-    departureOdo, recoveryDistance, transportDistance, returnDistance, completionOdo, returnOdo,
+    departureOdo, arrivalOdo, transportStartOdo, recoveryDistance, transportDistance, returnDistance, completionOdo, returnOdo,
     recoveryHighway, transportHighway, returnHighway,
     secondaryTransportStartTime, secondaryArrivalTime, secondaryCompletionTime, secondaryReturnTime,
     secondaryDepartureOdo, secondaryArrivalOdo, secondaryTransportDistance, secondaryReturnDistance, secondaryCompletionOdo, secondaryReturnOdo,
@@ -637,11 +686,11 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
                 </div>
                 <div className="flex-1 space-y-3 pt-0.5">
                   {[
-                    { label: '搬送開始', value: secondaryTransportStartTime, setter: setSecondaryTransportStartTime },
-                    { label: '現着時間', value: secondaryArrivalTime, setter: setSecondaryArrivalTime },
-                    { label: '完了時間', value: secondaryCompletionTime, setter: setSecondaryCompletionTime },
-                    { label: '帰社時間', value: secondaryReturnTime, setter: setSecondaryReturnTime },
-                  ].map(({ label, value }, i) => (
+                    { label: '搬送開始', field: 'transportStart' as SecondaryTimeField, value: secondaryTransportStartTime },
+                    { label: '現着時間', field: 'arrival' as SecondaryTimeField, value: secondaryArrivalTime },
+                    { label: '完了時間', field: 'completion' as SecondaryTimeField, value: secondaryCompletionTime },
+                    { label: '帰社時間', field: 'return' as SecondaryTimeField, value: secondaryReturnTime },
+                  ].map(({ label, field, value }, i) => (
                     <div key={`secondary-time-${i}`} className="flex items-center gap-2">
                       <RequiredDot />
                       <span className="text-sm flex-shrink-0 w-[72px]" style={{ color: '#1C2948', opacity: 0.65 }}>
@@ -650,6 +699,7 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
                       <span className="text-sm font-bold flex-1" style={{ color: '#1C2948' }}>
                         {formatTime(value)}
                       </span>
+                      <EditButton onClick={() => setSecondaryClockPickerFor(field)} />
                     </div>
                   ))}
                 </div>
@@ -712,6 +762,46 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
                   {[
                     { label: '出発 ODO', key: 'departureOdo', value: departureOdo, setValue: setDepartureOdo, suffix: 'km', decimal: false },
                     { label: '回送距離', key: 'recoveryDistance', value: recoveryDistance, setValue: setRecoveryDistance, suffix: 'km', decimal: true },
+                  ].map(({ label, key, value, setValue, suffix, decimal }) => (
+                    <div key={key} className="flex items-center gap-2">
+                      <RequiredDot />
+                      <span className="text-sm flex-shrink-0 w-[72px]" style={{ color: '#1C2948', opacity: 0.65 }}>
+                        {label}
+                      </span>
+                      <InlineNumericField fieldKey={key} value={value} setValue={setValue} suffix={suffix} decimal={decimal} />
+                      <EditButton onClick={() => setEditingField(editingField === key ? null : key)} />
+                    </div>
+                  ))}
+
+                  {/* 現着 ODO（常時表示） */}
+                  <div className="flex items-center gap-2">
+                    <RequiredDot />
+                    <span className="text-sm flex-shrink-0 w-[72px]" style={{ color: '#1C2948', opacity: 0.65 }}>現着 ODO</span>
+                    <InlineNumericField fieldKey="arrivalOdo" value={arrivalOdo} setValue={setArrivalOdo} suffix="km" decimal={false} />
+                    <EditButton onClick={() => setEditingField(editingField === 'arrivalOdo' ? null : 'arrivalOdo')} />
+                  </div>
+
+                  {/* 振替バッジ（振替案件のみ） */}
+                  {isTransferredIn && (
+                    <div className="flex items-center gap-2 pl-[88px]">
+                      <span
+                        className="text-xs font-bold px-2.5 py-1 rounded-full"
+                        style={{ backgroundColor: '#2FBF71', color: 'white' }}
+                      >
+                        振替
+                      </span>
+                    </div>
+                  )}
+
+                  {/* 搬開 ODO（常時表示） */}
+                  <div className="flex items-center gap-2">
+                    <RequiredDot />
+                    <span className="text-sm flex-shrink-0 w-[72px]" style={{ color: '#1C2948', opacity: 0.65 }}>搬開 ODO</span>
+                    <InlineNumericField fieldKey="transportStartOdo" value={transportStartOdo} setValue={setTransportStartOdo} suffix="km" decimal={false} />
+                    <EditButton onClick={() => setEditingField(editingField === 'transportStartOdo' ? null : 'transportStartOdo')} />
+                  </div>
+
+                  {[
                     { label: '搬送距離', key: 'transportDistance', value: transportDistance, setValue: setTransportDistance, suffix: 'km', decimal: true },
                     { label: '完了 ODO', key: 'completionOdo', value: completionOdo, setValue: setCompletionOdo, suffix: 'km', decimal: false },
                     { label: '帰社距離', key: 'returnDistance', value: returnDistance, setValue: setReturnDistance, suffix: 'km', decimal: true },
@@ -778,6 +868,46 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
                 {[
                   { label: '出発 ODO', key: 'departureOdo', value: departureOdo, setValue: setDepartureOdo, suffix: 'km', decimal: false },
                   { label: '回送距離', key: 'recoveryDistance', value: recoveryDistance, setValue: setRecoveryDistance, suffix: 'km', decimal: true },
+                ].map(({ label, key, value, setValue, suffix, decimal }) => (
+                  <div key={key} className="flex items-center gap-2">
+                    <RequiredDot />
+                    <span className="text-sm flex-shrink-0 w-[72px]" style={{ color: '#1C2948', opacity: 0.65 }}>
+                      {label}
+                    </span>
+                    <InlineNumericField fieldKey={key} value={value} setValue={setValue} suffix={suffix} decimal={decimal} />
+                    <EditButton onClick={() => setEditingField(editingField === key ? null : key)} />
+                  </div>
+                ))}
+
+                {/* 現着 ODO（常時表示） */}
+                <div className="flex items-center gap-2">
+                  <RequiredDot />
+                  <span className="text-sm flex-shrink-0 w-[72px]" style={{ color: '#1C2948', opacity: 0.65 }}>現着 ODO</span>
+                  <InlineNumericField fieldKey="arrivalOdo" value={arrivalOdo} setValue={setArrivalOdo} suffix="km" decimal={false} />
+                  <EditButton onClick={() => setEditingField(editingField === 'arrivalOdo' ? null : 'arrivalOdo')} />
+                </div>
+
+                {/* 振替バッジ（振替案件のみ） */}
+                {isTransferredIn && (
+                  <div className="flex items-center gap-2 pl-[88px]">
+                    <span
+                      className="text-xs font-bold px-2.5 py-1 rounded-full"
+                      style={{ backgroundColor: '#2FBF71', color: 'white' }}
+                    >
+                      振替
+                    </span>
+                  </div>
+                )}
+
+                {/* 搬開 ODO（常時表示） */}
+                <div className="flex items-center gap-2">
+                  <RequiredDot />
+                  <span className="text-sm flex-shrink-0 w-[72px]" style={{ color: '#1C2948', opacity: 0.65 }}>搬開 ODO</span>
+                  <InlineNumericField fieldKey="transportStartOdo" value={transportStartOdo} setValue={setTransportStartOdo} suffix="km" decimal={false} />
+                  <EditButton onClick={() => setEditingField(editingField === 'transportStartOdo' ? null : 'transportStartOdo')} />
+                </div>
+
+                {[
                   { label: '搬送距離', key: 'transportDistance', value: transportDistance, setValue: setTransportDistance, suffix: 'km', decimal: true },
                   { label: '完了 ODO', key: 'completionOdo', value: completionOdo, setValue: setCompletionOdo, suffix: 'km', decimal: false },
                   { label: '帰社距離', key: 'returnDistance', value: returnDistance, setValue: setReturnDistance, suffix: 'km', decimal: true },
@@ -1250,6 +1380,20 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
             value={timeMap[clockPickerFor] ?? new Date()}
             onChange={(date) => handleTimeChange(clockPickerFor, date)}
             onClose={() => setClockPickerFor(null)}
+            minTime={minTime}
+            maxTime={maxTime}
+          />
+        )
+      })()}
+
+      {/* ─── 2次 ClockPicker モーダル ─── */}
+      {secondaryClockPickerFor && (() => {
+        const { minTime, maxTime } = getSecondaryTimeConstraints(secondaryClockPickerFor)
+        return (
+          <ClockPicker
+            value={secondaryTimeMap[secondaryClockPickerFor] ?? new Date()}
+            onChange={(date) => handleSecondaryTimeChange(secondaryClockPickerFor, date)}
+            onClose={() => setSecondaryClockPickerFor(null)}
             minTime={minTime}
             maxTime={maxTime}
           />

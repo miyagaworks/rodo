@@ -67,11 +67,14 @@ export default async function DispatchReportPage({ params, searchParams }: Props
     completionTime: dispatch.completionTime?.toISOString() ?? null,
     returnTime: dispatch.returnTime?.toISOString() ?? null,
     departureOdo: dispatch.departureOdo,
+    arrivalOdo: dispatch.arrivalOdo,
+    transportStartOdo: dispatch.transportStartOdo,
     completionOdo: dispatch.completionOdo,
     returnOdo: dispatch.returnOdo,
     vehicleId: dispatch.vehicleId,
     vehicle: dispatch.vehicle,
     deliveryType: dispatch.deliveryType,
+    transferredFromId: dispatch.transferredFromId,
   }
 
   // primaryCompletionItems は Prisma の JsonValue 型なので安全にキャスト
@@ -87,6 +90,8 @@ export default async function DispatchReportPage({ params, searchParams }: Props
   const serializedReport: SerializedReport = {
     id: report?.id ?? null,
     departureOdo: report?.departureOdo ?? null,
+    arrivalOdo: report?.arrivalOdo ?? null,
+    transportStartOdo: report?.transportStartOdo ?? null,
     recoveryDistance: enrichedDistances.recoveryDistance ?? null,
     transportDistance: enrichedDistances.transportDistance ?? null,
     returnDistance: enrichedDistances.returnDistance ?? null,
