@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Pencil, Check } from 'lucide-react'
 import { FaPen } from 'react-icons/fa'
 import { IoIosArrowForward } from 'react-icons/io'
+import { TiHome } from 'react-icons/ti'
 import NumberPlateInput, { PlateValue } from './NumberPlateInput'
 import ClockPicker from './ClockPicker'
 import VehicleSelector from './VehicleSelector'
@@ -403,21 +404,30 @@ export default function RecordClient({ dispatch, userName, report }: RecordClien
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: '#E5E5E5' }}>
 
       {/* ─── Header ─── */}
-      <header
-        className="flex-shrink-0 px-4 pt-3 pb-3"
+      <div
+        className="px-4 pt-4 pb-3 shadow-sm flex-shrink-0 sticky top-0 z-30"
         style={{ backgroundColor: '#D7AF70' }}
       >
-        {/* タイトル + 日付 */}
-        <div className="flex items-center gap-2 mb-2">
-          <span className="font-bold text-base whitespace-nowrap" style={{ color: '#1C2948' }}>出動記録</span>
-          <div className="flex-1" />
+        {/* 1行目: ホーム / タイトル / バッジ / 日付 */}
+        <div className="flex items-center gap-2 mb-2.5">
           <button
             onClick={() => setShowBackConfirm(true)}
-            className="px-3 py-1.5 rounded-md text-xs font-bold active:opacity-60 whitespace-nowrap"
-            style={{ backgroundColor: '#1C2948', color: '#FFFFFF' }}
+            aria-label="ホームに戻る"
+            className="inline-flex items-center justify-center p-2 rounded-md active:opacity-70"
+            style={{ backgroundColor: '#71A9F7', color: '#FFFFFF' }}
           >
-            出動画面に戻る
+            <TiHome className="w-4 h-4" />
           </button>
+          <span className="text-lg font-bold whitespace-nowrap" style={{ color: '#1C2948' }}>出動記録</span>
+          <span
+            className="text-sm font-bold px-3 py-1 rounded-full whitespace-nowrap"
+            style={{
+              backgroundColor: dispatch.type === 'ONSITE' ? '#2FBF71' : '#1C2948',
+              color: 'white',
+            }}
+          >
+            {dispatch.type === 'ONSITE' ? '現場対応' : '搬送'}
+          </span>
           <div className="flex-1" />
           <span className="text-xs whitespace-nowrap" style={{ color: '#1C2948' }}>
             {formatDate(dispatch.dispatchTime)}
@@ -465,7 +475,7 @@ export default function RecordClient({ dispatch, userName, report }: RecordClien
             </>
           )}
         </div>
-      </header>
+      </div>
 
       {/* ─── スクロールコンテンツ ─── */}
       <div className="flex-1 overflow-y-auto pb-28 px-3 py-3 space-y-3">
@@ -694,6 +704,21 @@ export default function RecordClient({ dispatch, userName, report }: RecordClien
               </span>
             )}
           </div>
+
+          {/* 作業確認書ボタン: 現着済み（arrivalTime あり）のときのみ表示。
+              振替済みは page.tsx 側で /dispatch/[id] へリダイレクトするため
+              record ページでは isTransferred を考慮不要。 */}
+          {dispatch.arrivalTime && (
+            <button
+              onClick={() => router.push(`/dispatch/${dispatch.id}/confirmation`)}
+              className="mt-3 w-full h-12 flex items-center justify-center gap-2 rounded-md font-bold text-base active:opacity-80"
+              style={{ backgroundColor: '#71A9F7', color: '#FFFFFF' }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/icons/confirmation.svg" alt="" className="w-5 h-5" />
+              作業確認書
+            </button>
+          )}
         </Section>
 
         {/* ─── 自走・搬送（搬送のみ表示） ─── */}
@@ -1011,7 +1036,7 @@ export default function RecordClient({ dispatch, userName, report }: RecordClien
                     })
                     if (!res.ok) throw new Error('下書きの保存に失敗しました')
                     await clearDraft()
-                    router.push(`/dispatch/${dispatch.id}`)
+                    router.push('/')
                   } catch (e) {
                     console.error(e)
                     alert(e instanceof Error ? e.message : '保存に失敗しました')
@@ -1029,7 +1054,7 @@ export default function RecordClient({ dispatch, userName, report }: RecordClien
               <button
                 onClick={() => {
                   setShowBackConfirm(false)
-                  router.push(`/dispatch/${dispatch.id}`)
+                  router.push('/')
                 }}
                 disabled={loading}
                 className="w-full py-3 rounded-md font-bold text-sm active:opacity-80 border"

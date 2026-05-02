@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { FaPen, FaCheckSquare } from 'react-icons/fa'
 import { FaCircleArrowRight } from 'react-icons/fa6'
 import { IoIosArrowBack } from 'react-icons/io'
+import { TiHome } from 'react-icons/ti'
 import { Check } from 'lucide-react'
 import ClockPicker from './ClockPicker'
 import TransportShopAutocomplete from './TransportShopAutocomplete'
@@ -64,6 +65,15 @@ type SecondaryTimeField = 'transportStart' | 'arrival' | 'completion' | 'return'
 function formatTime(d: Date | null): string {
   if (!d) return '--:--'
   return d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false })
+}
+
+function formatDate(iso: string | null): string {
+  const d = iso ? new Date(iso) : new Date()
+  const days = ['日', '月', '火', '水', '木', '金', '土']
+  const y = d.getFullYear()
+  const m = d.getMonth() + 1
+  const day = d.getDate()
+  return `${y}年${m}月${day}日（${days[d.getDay()]}）`
 }
 
 // -------------------------------------------------------
@@ -533,21 +543,29 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: '#E5E5E5' }}>
 
       {/* ─── ヘッダー ─── */}
-      <div className="px-4 pt-4 pb-3 shadow-sm flex-shrink-0" style={{ backgroundColor: '#D7AF70' }}>
-        {/* タイトル行 */}
-        <div className="flex items-center justify-between mb-2.5">
-          <div className="flex items-center gap-2">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/rodo-square-logo.svg" alt="RODO" className="w-8 h-8" />
-            <span className="text-lg font-bold" style={{ color: '#1C2948' }}>
-              報告兼請求項目
-            </span>
-          </div>
+      <div className="px-4 pt-4 pb-3 shadow-sm flex-shrink-0 sticky top-0 z-30" style={{ backgroundColor: '#D7AF70' }}>
+        {/* 1行目: ホーム / タイトル / バッジ / 日付 */}
+        <div className="flex items-center gap-2 mb-2.5">
+          <button
+            onClick={() => router.push('/')}
+            aria-label="ホームに戻る"
+            className="inline-flex items-center justify-center p-2 rounded-md active:opacity-70"
+            style={{ backgroundColor: '#71A9F7', color: 'white' }}
+          >
+            <TiHome className="w-4 h-4" />
+          </button>
+          <span className="text-lg font-bold whitespace-nowrap" style={{ color: '#1C2948' }}>
+            報告/請求
+          </span>
           <span
-            className="text-sm font-bold px-3 py-1 rounded-full"
+            className="text-sm font-bold px-3 py-1 rounded-full whitespace-nowrap"
             style={{ backgroundColor: '#1C2948', color: 'white' }}
           >
             搬送
+          </span>
+          <div className="flex-1" />
+          <span className="text-xs whitespace-nowrap" style={{ color: '#1C2948' }}>
+            {formatDate(dispatch.dispatchTime)}
           </span>
         </div>
 
