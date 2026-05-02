@@ -310,7 +310,7 @@ npm run dev
   - **期待結果**: PATCH で `status=RETURNED`, `returnTime`, `returnOdo` 記録、`step=5`、`deliveryType` は `null` のまま
   - **関連ファイル**: `components/dispatch/DispatchClient.tsx:1421-1444`
 
-- [ ] B-31 搬送モードでの 3 種署名取得（onsite と同一 UI）
+- [x] B-31 搬送モードでの 3 種署名取得（onsite と同一 UI）
   - **手順**: TRANSPORT 案件で `/dispatch/[id]/confirmation` を開く → 3 種すべて署名 → 保存
   - **期待結果**:
     - `customerSignature`（作業前/作業完了後ご署名欄）+ `shopSignature`（入庫先ご担当者様記入欄）+ `postApprovalSignature`（作業完了後承認欄）が onsite と完全同一の UI で取得・保存される
