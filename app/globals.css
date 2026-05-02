@@ -22,3 +22,67 @@
 body {
   font-family: var(--font-line-seed-jp), sans-serif;
 }
+
+/*
+ * BizDeli 企業検索候補リスト: 縦幅拡張オーバーライド。
+ *
+ * BizDeli 外部 CSS (https://static.bizdeli.net/style.css) で
+ * #bizdeli-company-list { height: 200px } と固定されているため、
+ * 候補が少ない時に余白が無駄に広がり、多い時は窮屈という
+ * 二重の問題があった。height を auto 化し max-height で上限制御する。
+ *
+ * - 詳細度: id 1 + !important（カスケード順で BizDeli link が後勝ちのため）
+ * - セレクタ依存: BizDeli の id 名 #bizdeli-company-list に依存。
+ *   将来 BizDeli が id 名を変更した場合、本オーバーライドは空振りする。
+ * - 値の根拠: docs/research/2026-05-02-bizdeli-suggestion-dropdown.md §5
+ */
+#bizdeli-company-list {
+  height: auto !important;
+  max-height: 60vh !important;
+}
+
+/*
+ * BizDeli 候補リストの閉じる×ボタンの完璧な中央配置（要塞版）。
+ *
+ * 経緯:
+ *  - 旧旧実装: :before に SVG mask（実機で効かず、フォント × が残った）
+ *  - 旧実装: ボタンに background-image で SVG 描画 + :before に display:none
+ *           実機検証で × がボタン内の下寄せで残った。フォント描画経路が
+ *           完全に殺せていなかった（:after か direct text content が出所と推定）
+ *
+ * 今回方針: フォント描画経路を「全部」殺す要塞構成。
+ *  (1) ボタン本体: フォントの可視化を多重遮断
+ *      - font-size: 0     → グリフサイズを 0 化（最強）
+ *      - line-height: 0   → 行ボックスを潰す
+ *      - color: transparent → 念押し
+ *      - text-indent: -9999px → 直接 text content も画面外へ
+ *      - overflow: hidden → text-indent した残骸を完全に隠蔽
+ *  (2) ::before / ::after の両方を完全無効化
+ *      - display: none / content: none / font-size: 0 を多重に当てる
+ *  (3) ボタン本体に background-image で SVG を中央描画
+ *      （mask 経路は :before 互換性問題があったため background 経路を採用）
+ *  (4) SVG は base64 data URI（生 SVG のパース問題を排除）
+ *  (5) すべて !important
+ *
+ * - 詳細度: id + class + !important（BizDeli カスケードに勝つ）
+ * - SVG: Material Icons close (Apache 2.0)、白塗り、24x24 viewBox
+ */
+#bizdeli-company-list .bizdeli-close-button {
+  background-color: #7f7f7f !important;
+  background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI2ZmZiI+PHBhdGggZD0iTTE5IDYuNDFMMTcuNTkgNSAxMiAxMC41OSA2LjQxIDUgNSA2LjQxIDEwLjU5IDEyIDUgMTcuNTkgNi40MSAxOSAxMiAxMy40MSAxNy41OSAxOSAxOSAxNy41OSAxMy40MSAxMnoiLz48L3N2Zz4=") !important;
+  background-position: center center !important;
+  background-repeat: no-repeat !important;
+  background-size: 60% 60% !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+  color: transparent !important;
+  text-indent: -9999px !important;
+  overflow: hidden !important;
+}
+#bizdeli-company-list .bizdeli-close-button::before,
+#bizdeli-company-list .bizdeli-close-button::after {
+  display: none !important;
+  content: none !important;
+  font-size: 0 !important;
+  color: transparent !important;
+}
