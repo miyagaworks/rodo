@@ -396,7 +396,7 @@ export default function ReportOnsiteClient({ dispatch, report, userName }: Props
           </span>
           <span
             className="text-sm font-bold px-3 py-1 rounded-full whitespace-nowrap"
-            style={{ backgroundColor: '#2FBF71', color: 'white' }}
+            style={{ backgroundColor: '#ea7600', color: 'white' }}
           >
             現場対応
           </span>

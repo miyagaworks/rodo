@@ -424,7 +424,7 @@ export default function RecordClient({ dispatch, userName, report }: RecordClien
           <span
             className="text-sm font-bold px-3 py-1 rounded-full whitespace-nowrap"
             style={{
-              backgroundColor: dispatch.type === 'ONSITE' ? '#2FBF71' : '#1C2948',
+              backgroundColor: dispatch.type === 'ONSITE' ? '#ea7600' : '#1C2948',
               color: 'white',
             }}
           >
