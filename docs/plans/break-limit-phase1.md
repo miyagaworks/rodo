@@ -375,3 +375,79 @@ tenantSettingsPatchSchema:
 2. ホーム画面で limit-status 取得中の扱い（非表示 / スケルトン / 「確認中」表示）
 3. 当日 BreakRecord リセットは選択肢 A / B のどちらで進めるか
 4. `limit-status` の API エラー時の UI（フェイルクローズ＝非表示にする方針で良いか、開発時は fallback で表示する方針か）
+
+---
+
+## 11. Phase 1 逸脱の修正記録（2026-05-02）
+
+### 経緯
+
+Phase 1 実装後、以下の不具合が報告された:
+
+> ホーム画面で「休憩」ボタンを押下すると、休憩画面（カウントダウン）に滞在せず、即座に「休憩終了」扱いとなりホームへ戻る。
+
+`research/2026-05-02-break-instant-end-investigation.md` の調査により、根本原因は次の通り判明:
+
+1. ブラウザを閉じる/電源断などで `/end` API が呼ばれず、DB に `endTime=null` の古い未終了 BreakRecord が残るケースがある
+2. POST /api/breaks は既存の未終了レコードを検出して 409 を返す
+3. クライアント (`components/BreakScreen.tsx`) は 409 復元 path で `(Date.now() - startTime) / 1000` から残時間を計算していたが、`pauseTime` を考慮していなかった
+4. 結果として「pause で実消化が小さいまま放置されたが、開始から 60 分以上経過した」レコードがある場合、`remaining = 0` がセットされ即終了処理が走っていた
+
+つまり「サーバー側に古い未終了レコードを締めるロジックが無い」「クライアント 409 path の残時間計算が limit-status と乖離している」という 2 層の問題。
+
+### 計画外で実施した変更
+
+Phase 1 計画書には含まれない以下を本タスクで実施した:
+
+#### 層 1: サーバー側で「上限超過した未終了レコード」を自動クローズ
+
+新規ファイル: `lib/breakAutoClose.ts`
+
+- `closeStaleBreaks(client, { userId, tenantId, now? })` ヘルパーを追加
+- userId/tenantId に紐づく `endTime=null` のレコードのうち、`(now - startTime) > BREAK_DURATION_SECONDS * 1000` を超えているものに `endTime` をセット
+  - `pauseTime` があれば `endTime = pauseTime`（実消化はそこで止まっている扱い）
+  - なければ `endTime = startTime + BREAK_DURATION_SECONDS * 1000`（タイマー満了時刻）
+- `BREAK_DURATION_SECONDS` のみ参照。マジックナンバー直書き禁止
+
+呼び出し箇所:
+- `app/api/breaks/active/route.ts` (GET): 冒頭で実行 → 古いレコードを片付けてから findFirst
+- `app/api/breaks/route.ts` (POST): Serializable トランザクション内で `findFirst` の前に同じ `tx` を渡して実行
+
+#### 層 2: GET /api/breaks/active のレスポンスに `remainingSeconds` を含める
+
+- `app/api/breaks/active/route.ts` のレスポンスに以下を追加:
+  - `remainingSeconds: number`（pause を考慮した「この個別休憩の残り秒数」、0 以上の整数）
+  - `serverNow: string`（ISO 文字列、時計ずれ検証用）
+- `remainingSeconds` の計算は既存純関数 `calculateUsedBreakMs`（`lib/breakUsage.ts`）を流用
+- これにより `limit-status` と `active` で「pause/resume の解釈」が完全一致する
+
+#### 層 2 の連動: クライアント `components/BreakScreen.tsx` の 409 path 修正
+
+- 旧: 取得した `active.startTime` から `(Date.now() - serverStartMs) / 1000` で elapsed を計算 → `remaining = max(0, BREAK_DURATION - elapsed)` をセット
+- 新: `active.remainingSeconds` をそのまま `setBreakState` の `remainingSeconds` に渡す
+- `active.remainingSeconds` が `number` でない場合は atom を更新せずエラーログのみ（フェイルクローズ）
+- `active.pauseTime !== null && resumeTime === null` のときに 'paused' で復元する責務は本タスクのスコープ外（TODO コメントを残置）
+
+### 計画外実施の理由
+
+層 1（自動クローズ）は計画書に含まれないが、これを入れないとデータが汚染され続け、層 2 の修正だけでは「初回再現を防げない」だけで「過去レコードによる継続的な詰まり」を解決できない。研究ノートの「修正方針 5」に該当する措置。
+
+層 2 のクライアント側変更は `BreakScreen.tsx` のロジック修正であり、Phase 1 計画書の「変更ファイル一覧」には含まれていなかった。「409 path での独自残時間計算」が Phase 1 で導入された経緯があるため、修正も同時に行った（同 commit で生まれたバグを同タスクで閉じる）。
+
+### 追加・書き換えテスト
+
+- 新規: `__tests__/lib/breakAutoClose.test.ts`（8 ケース）
+- 新規: `__tests__/api/breaks-active.test.ts`（7 ケース）
+- 書き換え: `__tests__/components/BreakScreen.test.tsx` の「409 ⇒ 独自計算で復元」テストを「409 ⇒ active.remainingSeconds をそのまま atom にセット」に変更
+- 追記: `__tests__/api/breaks-post.test.ts` に「60 分超過レコードが自動クローズされて新規 201」ケースを追加
+
+### サイレント故障チェック（同タスク完了時）
+
+- `closeStaleBreaks` 失敗時: 例外を握り潰さず呼び出し側へ伝播させる方針。両 API ルートの `try/catch` で 500 として返却される
+- active API レスポンスの `remainingSeconds` が `undefined` の場合: クライアントは atom を更新せずエラーログを出す（独自計算へのフォールバックは意図的に行わない。limit-status と必ず同じ計算に揃えるため）
+- POST /api/breaks の Serializable トランザクション内で `closeStaleBreaks` を実行することによる競合: 既存の P2034 ハンドリング（409 として処理）でカバーされる
+
+### スコープ外（残課題）
+
+- `BreakScreen.tsx` の 409 path で `active.pauseTime !== null && resumeTime === null` のレコードを 'paused' 状態として復元する処理（現状は問答無用で 'breaking' をセット）
+- 過去 24h より古いがまだ 60 分未満の未終了レコード（バックグラウンド job で定期クリーンアップする手段は別タスク）

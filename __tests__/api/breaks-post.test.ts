@@ -22,6 +22,9 @@ vi.mock('@/lib/prisma', () => {
       breakRecord: {
         findFirst: vi.fn(),
         create: vi.fn(),
+        // closeStaleBreaks 内で利用
+        findMany: vi.fn(),
+        update: vi.fn(),
       },
       $transaction: vi.fn(),
     },
@@ -43,6 +46,12 @@ const mockedCreate = prisma.breakRecord.create as unknown as ReturnType<
 const mockedTransaction = prisma.$transaction as unknown as ReturnType<
   typeof vi.fn
 >
+const mockedFindMany = prisma.breakRecord.findMany as unknown as ReturnType<
+  typeof vi.fn
+>
+const mockedUpdate = prisma.breakRecord.update as unknown as ReturnType<
+  typeof vi.fn
+>
 
 describe('POST /api/breaks', () => {
   beforeEach(() => {
@@ -53,6 +62,10 @@ describe('POST /api/breaks', () => {
     mockedTransaction.mockImplementation(
       async (fn: (tx: typeof prisma) => Promise<unknown>) => fn(prisma),
     )
+
+    // 既定: closeStaleBreaks 内の findMany は「該当なし」
+    mockedFindMany.mockResolvedValue([])
+    mockedUpdate.mockResolvedValue({})
   })
 
   it('未認証の場合は 401 を返す', async () => {
@@ -198,5 +211,50 @@ describe('POST /api/breaks', () => {
     // 1 本目は 201、2 本目は 409
     const statuses = [res1.status, res2.status].sort()
     expect(statuses).toEqual([201, 409])
+  })
+
+  it('60 分超過の未終了レコードがあるユーザーが POST → 古いレコードが自動クローズされ、新規 201 で休憩が作成される', async () => {
+    mockedAuth.mockResolvedValue({
+      user: { userId: 'u1', tenantId: 't1', role: 'MEMBER' },
+    })
+
+    // closeStaleBreaks 内の findMany は古いレコードを 1 件返す
+    const now = Date.now()
+    const staleStart = new Date(now - 90 * 60 * 1000)
+    mockedFindMany.mockReset()
+    mockedFindMany.mockResolvedValueOnce([
+      { id: 'b-stale', startTime: staleStart, pauseTime: null },
+    ])
+
+    // closeStaleBreaks の update（古いレコードのクローズ）
+    mockedUpdate.mockResolvedValueOnce({ id: 'b-stale' })
+
+    // close した後の findFirst は「アクティブなし」 → create に進む
+    mockedFindFirst.mockResolvedValueOnce(null)
+    mockedCreate.mockResolvedValueOnce({
+      id: 'new-after-stale',
+      userId: 'u1',
+      tenantId: 't1',
+      startTime: new Date(),
+      endTime: null,
+      pauseTime: null,
+      resumeTime: null,
+      totalBreakMinutes: null,
+      dispatchId: null,
+      createdAt: new Date(),
+    })
+
+    const res = await POST()
+
+    expect(res.status).toBe(201)
+    const body = await res.json()
+    expect(body.id).toBe('new-after-stale')
+
+    // 古いレコードがクローズされたこと
+    expect(mockedUpdate).toHaveBeenCalledTimes(1)
+    expect(mockedUpdate.mock.calls[0][0].where).toEqual({ id: 'b-stale' })
+
+    // create は 1 回だけ
+    expect(mockedCreate).toHaveBeenCalledTimes(1)
   })
 })

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import React from 'react'
 import { Provider, createStore } from 'jotai'
-import { breakStateAtom, BREAK_DURATION, initialBreakState } from '@/store/breakAtom'
+import { breakStateAtom, BREAK_DURATION } from '@/store/breakAtom'
 
 // next/navigation モック
 const pushMock = vi.fn()
@@ -73,9 +73,11 @@ describe('BreakScreen', () => {
     consoleSpy.mockRestore()
   })
 
-  it('startBreak 409 応答時は GET /api/breaks/active で既存休憩を復元する', async () => {
-    // サーバー側の休憩開始から 600 秒経過しているケース
-    const serverStartMs = Date.now() - 600 * 1000
+  it('startBreak 409 応答時は GET /api/breaks/active のレスポンス remainingSeconds をそのまま atom にセットする', async () => {
+    // サーバーが返す remainingSeconds をクライアントは独自計算せずそのまま使う仕様。
+    // 古い実装では startTime からの経過秒で再計算していたが、pauseTime 考慮もれで
+    // remaining=0 を生み即終了してしまう不具合があった（research/2026-05-02-break-instant-end-investigation.md 参照）。
+    const serverRemainingSeconds = 1800
 
     fetchSpy = vi.spyOn(globalThis, 'fetch')
     fetchSpy.mockImplementation(
@@ -88,11 +90,18 @@ describe('BreakScreen', () => {
           )
         }
         if (url === '/api/breaks/active') {
+          // 故意に古い startTime を渡しても、クライアントはそれを使わず
+          // サーバーから渡された remainingSeconds をそのまま採用する。
+          const farPastStart = new Date(Date.now() - 90 * 60 * 1000).toISOString()
           return new Response(
             JSON.stringify({
               id: 'break-existing',
-              startTime: new Date(serverStartMs).toISOString(),
+              startTime: farPastStart,
               endTime: null,
+              pauseTime: null,
+              resumeTime: null,
+              remainingSeconds: serverRemainingSeconds,
+              serverNow: new Date().toISOString(),
             }),
             { status: 200 },
           )
@@ -110,9 +119,49 @@ describe('BreakScreen', () => {
     const state = store.get(breakStateAtom)
     expect(state.status).toBe('breaking')
     expect(state.breakRecordId).toBe('break-existing')
-    // 経過約600秒なので、残りは BREAK_DURATION - 600 付近
-    expect(state.remainingSeconds).toBeGreaterThan(BREAK_DURATION - 601)
-    expect(state.remainingSeconds).toBeLessThanOrEqual(BREAK_DURATION - 599)
+    // サーバー値をそのまま採用（startTime ベースの再計算は行わない）
+    expect(state.remainingSeconds).toBe(serverRemainingSeconds)
+  })
+
+  it('startBreak 409 応答時に active.remainingSeconds が欠けていれば atom を更新しない', async () => {
+    // フォールバック仕様: サーバーが新仕様レスポンスを返さなかった場合、
+    // クライアントは独自計算に逃げず、atom を更新せずにエラーログを出す。
+    fetchSpy = vi.spyOn(globalThis, 'fetch')
+    fetchSpy.mockImplementation(
+      (async (input: RequestInfo | URL) => {
+        const url = typeof input === 'string' ? input : input.toString()
+        if (url === '/api/breaks') {
+          return new Response(
+            JSON.stringify({ error: 'Active break already exists', breakRecordId: 'break-existing' }),
+            { status: 409 },
+          )
+        }
+        if (url === '/api/breaks/active') {
+          // remainingSeconds なし
+          return new Response(
+            JSON.stringify({
+              id: 'break-existing',
+              startTime: new Date().toISOString(),
+              endTime: null,
+            }),
+            { status: 200 },
+          )
+        }
+        return new Response('not found', { status: 404 })
+      }) as typeof fetch,
+    )
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    renderWithStore()
+
+    await waitFor(() => {
+      expect(fetchSpy).toHaveBeenCalledWith('/api/breaks/active')
+    })
+
+    const state = store.get(breakStateAtom)
+    expect(state.status).toBe('idle')
+    expect(state.breakRecordId).toBeNull()
+    consoleSpy.mockRestore()
   })
 
   it('startBreak 409 後 GET /api/breaks/active も失敗した場合は atom を更新しない', async () => {
