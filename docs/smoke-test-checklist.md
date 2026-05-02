@@ -319,7 +319,7 @@ npm run dev
   - **関連ファイル**: `components/dispatch/ConfirmationClient.tsx:30, 352, 409, 525-531, 585, 638-644`, `app/api/dispatches/[id]/confirmation/route.ts`
   - **備考**: 二次搬送案件で `/dispatch/[secondaryId]/confirmation` に直接 URL アクセスすれば API レベルでは保存可能。UI からの導線は意図的に無い
 
-- [ ] B-32 二次搬送 — 親情報の引継ぎ確認
+- [x] B-32 二次搬送 — 親情報の引継ぎ確認
   - **手順**: TRANSPORT 1 次搬送が `status=STORED` に到達 → ProcessingBar の「二次搬送」から `/dispatch/[parentId]/secondary` → 出動 → 子 `Dispatch` 作成
   - **期待結果**: API（`app/api/dispatches/route.ts:111-152`）で親から自動継承される値:
     - `customerName` / `vehicleName` / `plateRegion` / `plateClass` / `plateKana` / `plateNumber`
@@ -331,29 +331,29 @@ npm run dev
     - `isSecondaryTransport=true`, `parentDispatchId`, `type='transport'`
   - **関連ファイル**: `app/api/dispatches/route.ts:111-152, 162`, `components/dispatch/SecondaryDispatchClient.tsx:312-318`
 
-- [ ] B-33 二次搬送 完了 → 親 status 同時更新
+- [x] B-33 二次搬送 完了 → 親 status 同時更新
   - **手順**: 二次搬送で帰社（`handleReturn`）押下
   - **期待結果**: 二次自身が `status=RETURNED`、**同時に** 親 `Dispatch` も `{ status:'RETURNED', isDraft:true }` に更新
   - **関連ファイル**: `components/dispatch/SecondaryDispatchClient.tsx:423-429`
 
-- [ ] B-34 二次搬送 取消 → 親 STORED に復元
+- [x] B-34 二次搬送 取消 → 親 STORED に復元
   - **手順**: 二次搬送で帰社後、`handleCancelStep('return')` 相当（取消ボタン）
   - **期待結果**: 親 `Dispatch` が `{ status:'STORED', isDraft:false }` に戻る
   - **関連ファイル**: `components/dispatch/SecondaryDispatchClient.tsx:514-520`
 
-- [ ] B-35 二次搬送 — 親 status ガード
+- [x] B-35 二次搬送 — 親 status ガード
   - **手順**: 親 `status !== 'STORED'` の `Dispatch` で `/dispatch/[parentId]/secondary` に直接 URL アクセス
   - **期待結果**: `/` にリダイレクト
   - **関連ファイル**: `app/dispatch/[id]/secondary/page.tsx:21`
 
 #### B-4. 休憩
 
-- [ ] B-23 休憩開始 → 終了
+- [x] B-23 休憩開始 → 終了
   - **手順**: ホーム or `/break` → 「休憩開始」→ しばらく待つ → 「休憩終了」
   - **期待結果**: `BreakRecord` 作成、`endTime IS NULL` で同時存在判定、終了で `endTime` 設定
   - **関連ファイル**: `app/break/page.tsx`, `app/api/breaks/route.ts`, `app/api/breaks/[id]/end/route.ts`, `components/BreakBar.tsx`, `BreakScreen.tsx`
 
-- [ ] B-24 休憩 一時停止 → 再開
+- [x] B-24 休憩 一時停止 → 再開
   - **手順**: 休憩中に「一時停止」→ 「再開」
   - **期待結果**: `pauseTime`, `resumeTime`, `totalBreakMinutes` が更新
   - **関連ファイル**: `app/api/breaks/[id]/pause/route.ts`, `resume/route.ts`
@@ -423,17 +423,17 @@ npm run dev
 
 #### D-1. レイアウト・ナビ（Phase 2 / 2.5）
 
-- [ ] D-01 PC 幅 → 上部水平ナビ表示
+- [x] D-01 PC 幅 → 上部水平ナビ表示
   - **手順**: 1280px 以上の幅で `/admin/dashboard`
   - **期待結果**: AppHeader 内に「ホーム / ダッシュボード / 案件管理 / 設定 / ログアウト」が水平表示
   - **関連ファイル**: `components/admin/AdminLayoutShell.tsx`, `AdminMenu.tsx`（orientation prop）, `components/common/AppHeader.tsx`
 
-- [ ] D-02 SP 幅 → 右ドロワー
+- [x] D-02 SP 幅 → 右ドロワー
   - **手順**: 375px 幅で `/admin/dashboard` → ハンバーガー
   - **期待結果**: `AdminShell` が右からスライドイン、menu.svg ロゴ表示
   - **関連ファイル**: `AdminShell.tsx`, `public/menu.svg`
 
-- [ ] D-03 フッター表示
+- [x] D-03 フッター表示
   - **手順**: ページ下部までスクロール
   - **期待結果**: AppFooter が表示
   - **関連ファイル**: `AdminLayoutShell.tsx`
@@ -445,7 +445,7 @@ npm run dev
   - **期待結果**: MemberStatusGrid に各隊員のカードが表示（待機 / 出動中 / 休憩中 / オフライン）
   - **関連ファイル**: `components/admin/MemberStatusGrid.tsx`, `MemberStatusCard.tsx`, `lib/admin/status-derivation.ts`, `app/api/admin/members-status/route.ts`
 
-- [ ] D-05 隊員ステータス 10 秒ポーリング
+- [x] D-05 隊員ステータス 10 秒ポーリング
   - **手順**: DevTools → Network で `/api/admin/members-status` の周期確認
   - **期待結果**: 約 10 秒間隔で再取得（ReactQuery 設定）
   - **関連ファイル**: `hooks/useMembersStatus.ts`, `AdminQueryProvider.tsx`
