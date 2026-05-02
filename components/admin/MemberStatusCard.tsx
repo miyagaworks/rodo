@@ -1,24 +1,17 @@
 'use client'
 
-import type { MemberStatusItem, DispatchSubPhase } from '@/hooks/useMembersStatus'
+import type { MemberStatusItem } from '@/hooks/useMembersStatus'
+import { toBusinessStatus } from '@/lib/admin/business-status'
+import MemberStatusBadge from './MemberStatusBadge'
 
 /**
  * 隊員ステータスカード（1 隊員分）。
  *
- * ステータスバッジ色（§7）:
- * - 待機中: gray-300 系（淡い）
- * - 出動中: blue-500 系（濃い、目立つ）
- * - 休憩中: amber-500 系
- *
- * サブフェーズはバッジ右に小テキスト。
+ * バッジは業務 6 ステータスを色 + アイコンで直感判別可能なピル型
+ * （MemberStatusBadge）に統一。バッジ右側に補助情報を並べる:
+ *   - 休憩中: 経過時間（mm:ss）
+ *   - 出動中: 案件番号 + AS 名（バッジ下段に表示）
  */
-
-const SUB_PHASE_LABELS: Record<DispatchSubPhase, string> = {
-  DISPATCHING: '出動中',
-  ONSITE: '作業中',
-  TRANSPORTING: '搬送中',
-  RETURNING_TO_BASE: '帰社中',
-}
 
 interface MemberStatusCardProps {
   member: MemberStatusItem
@@ -26,35 +19,16 @@ interface MemberStatusCardProps {
 
 export default function MemberStatusCard({ member }: MemberStatusCardProps) {
   const { status, activeDispatch, activeBreak } = member
-
-  // バッジ色
-  let badgeBg: string
-  let badgeText: string
-  let statusLabel: string
-
-  switch (status) {
-    case 'DISPATCHING':
-      badgeBg = 'bg-blue-500'
-      badgeText = 'text-white'
-      statusLabel = '出動中'
-      break
-    case 'BREAK':
-      badgeBg = 'bg-amber-500'
-      badgeText = 'text-white'
-      statusLabel = '休憩中'
-      break
-    case 'STANDBY':
-    default:
-      badgeBg = 'bg-gray-300'
-      badgeText = 'text-gray-700'
-      statusLabel = '待機中'
-      break
-  }
+  const businessStatus = toBusinessStatus(member)
 
   // 休憩中の経過時間
+  // NOTE: refetchInterval (10s) によるカード再描画ごとに mm:ss を計算する仕様。
+  // 1 秒粒度の滑らかな更新は不要なため、useState + setInterval ではなく
+  // 描画時の Date.now() を許容している（バッジ 6 色化前から同実装）。
   let breakDuration: string | null = null
   if (status === 'BREAK' && activeBreak) {
     const startMs = new Date(activeBreak.startTime).getTime()
+    // eslint-disable-next-line react-hooks/purity -- 再描画ごとの mm:ss 算出は仕様（上記コメント参照）
     const elapsed = Math.floor((Date.now() - startMs) / 1000)
     const mins = Math.floor(elapsed / 60)
     const secs = elapsed % 60
@@ -71,25 +45,17 @@ export default function MemberStatusCard({ member }: MemberStatusCardProps) {
         {member.name}
       </div>
 
-      {/* ステータスバッジ + サブフェーズ */}
-      <div className="flex items-center gap-2">
-        <span
-          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${badgeBg} ${badgeText}`}
-          data-testid="status-badge"
-        >
-          {statusLabel}
-        </span>
-        {status === 'DISPATCHING' && activeDispatch && (
-          <span className="text-xs text-gray-500" data-testid="sub-phase">
-            {SUB_PHASE_LABELS[activeDispatch.subPhase]}
-          </span>
-        )}
-        {status === 'BREAK' && breakDuration && (
-          <span className="text-xs text-gray-500" data-testid="break-duration">
-            {breakDuration}
-          </span>
-        )}
+      {/* ステータスバッジ */}
+      <div className="flex items-center">
+        <MemberStatusBadge status={businessStatus} />
       </div>
+
+      {/* 休憩中の経過時間（バッジ下段、別行） */}
+      {status === 'BREAK' && breakDuration && (
+        <div className="text-xs text-gray-500" data-testid="break-duration">
+          {breakDuration}
+        </div>
+      )}
 
       {/* 出動中の案件情報 */}
       {status === 'DISPATCHING' && activeDispatch && (
