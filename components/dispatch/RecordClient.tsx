@@ -383,17 +383,19 @@ export default function RecordClient({ dispatch, userName, report }: RecordClien
     try {
       // dispatch.isDraft は維持（true）。最終確定は報告兼請求項目ページの完了押下で
       // report.isDraft=false となった時点に統一する。
-      await offlineFetch(`/api/dispatches/${dispatch.id}`, {
+      const res = await offlineFetch(`/api/dispatches/${dispatch.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(buildPayload(true)),
         offlineActionType: 'dispatch_update',
         offlineDispatchId: dispatch.id,
       })
+      if (!res.ok) throw new Error('保存に失敗しました')
       await clearDraft()
       router.push(`/dispatch/${dispatch.id}/report`)
     } catch (e) {
       console.error(e)
+      alert(e instanceof Error ? e.message : '保存に失敗しました')
     } finally {
       setLoading(false)
     }
