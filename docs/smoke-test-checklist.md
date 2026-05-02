@@ -440,21 +440,31 @@ npm run dev
 
 #### D-2. ダッシュボード（Phase 3 / 3.5）
 
-- [ ] D-04 隊員ステータス一覧表示
+- [x] D-04 隊員ステータス一覧表示
   - **手順**: `/admin/dashboard`
-  - **期待結果**: MemberStatusGrid に各隊員のカードが表示（待機 / 出動中 / 休憩中 / オフライン）
-  - **関連ファイル**: `components/admin/MemberStatusGrid.tsx`, `MemberStatusCard.tsx`, `lib/admin/status-derivation.ts`, `app/api/admin/members-status/route.ts`
+  - **期待結果**: MemberStatusGrid に各隊員のカードが表示され、業務6ステータス（待機中 / 出動中 / 作業中 / 搬送中 / 帰社中 / 休憩中）がピル型バッジ（色+アイコン）で表示される
+  - **関連ファイル**: `components/admin/MemberStatusGrid.tsx`, `MemberStatusCard.tsx`, `components/admin/MemberStatusBadge.tsx`, `lib/admin/status-derivation.ts`, `lib/admin/business-status.ts`, `app/api/admin/members-status/route.ts`
 
 - [x] D-05 隊員ステータス 10 秒ポーリング
   - **手順**: DevTools → Network で `/api/admin/members-status` の周期確認
   - **期待結果**: 約 10 秒間隔で再取得（ReactQuery 設定）
   - **関連ファイル**: `hooks/useMembersStatus.ts`, `AdminQueryProvider.tsx`
 
-- [ ] D-06 出動中バッジ（blue-500）表示確認
-  - **手順**: status=DISPATCHED / ONSITE / TRANSPORTING の隊員を作る
-  - **期待結果**: 該当カードが青系バッジ
-  - **関連ファイル**: `MemberStatusCard.tsx`
-  - **既知**: 引き継ぎ書に「Seed に該当案件がないため未確認」と記載あり（実データ投入後検証）
+- [ ] D-06 業務6ステータスバッジ（色+アイコン）表示確認
+  - **手順**: status と subPhase を組み合わせ、6 ステータス各々の隊員を用意して `/admin/dashboard` を表示
+  - **期待結果**: 各カードが以下の色+アイコンのピル型バッジで表示される
+
+    | ステータス | 表示色 | アイコン |
+    |---|---|---|
+    | standby（待機中） | `#2FBF71` | `stand-by.svg` |
+    | dispatch（出動中） | `#D3170A` | `dispatch.svg` |
+    | work（作業中） | `#ea7600` | `work.svg` |
+    | transport（搬送中） | `#71A9F7` | `transportation-start.svg` |
+    | return（帰社中） | `#1c2948` | `return-truck.svg` |
+    | break（休憩中） | `#888888` | `FaCoffee` |
+
+  - **関連ファイル**: `components/admin/MemberStatusBadge.tsx`, `MemberStatusCard.tsx`, `lib/admin/business-status.ts`
+  - **既知**: Seed に DISPATCHING 系（特に subPhase=ONSITE/TRANSPORTING/RETURNING_TO_BASE）の案件がないため、dispatch/work/transport/return の 4 状態は実データ投入後検証
 
 - [ ] D-07 当日案件サマリ
   - **手順**: TodayDispatchSummary の数字
