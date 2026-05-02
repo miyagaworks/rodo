@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { IoIosArrowBack } from 'react-icons/io'
 import SignatureCanvas from 'react-signature-canvas'
@@ -342,6 +342,7 @@ function ToggleButton({
 
 export default function ConfirmationClient({ dispatchId, confirmation, userName }: Props) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [saving, setSaving] = useState(false)
   const [qrToken, setQrToken] = useState<string | null>(null)
 
@@ -443,7 +444,8 @@ export default function ConfirmationClient({ dispatchId, confirmation, userName 
         }
       }
 
-      router.push(`/dispatch/${dispatchId}`)
+      const fromRecord = searchParams.get('from') === 'record'
+      router.push(fromRecord ? `/dispatch/${dispatchId}/record` : `/dispatch/${dispatchId}`)
     } catch (err) {
       console.error('Save confirmation error:', err)
     } finally {
@@ -452,12 +454,13 @@ export default function ConfirmationClient({ dispatchId, confirmation, userName 
   }, [
     confirmation, dispatchId, workDate, preChecks, customerSig,
     vehicleType, regNumber, workContent, shopCompany,
-    shopSig, postCheck, postSig, userName, battery, notes, router,
+    shopSig, postCheck, postSig, userName, battery, notes, router, searchParams,
   ])
 
   const handleCancel = useCallback(() => {
-    router.push(`/dispatch/${dispatchId}`)
-  }, [router, dispatchId])
+    const fromRecord = searchParams.get('from') === 'record'
+    router.push(fromRecord ? `/dispatch/${dispatchId}/record` : `/dispatch/${dispatchId}`)
+  }, [router, dispatchId, searchParams])
 
   // --- Pre-approval checkbox texts ---
   const preCheckLabels = [
@@ -808,7 +811,8 @@ export default function ConfirmationClient({ dispatchId, confirmation, userName 
           token={qrToken}
           onClose={() => {
             setQrToken(null)
-            router.push(`/dispatch/${dispatchId}?focus=confirmation`)
+            const fromRecord = searchParams.get('from') === 'record'
+            router.push(fromRecord ? `/dispatch/${dispatchId}/record` : `/dispatch/${dispatchId}?focus=confirmation`)
           }}
         />
       )}

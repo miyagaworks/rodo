@@ -712,7 +712,7 @@ export default function RecordClient({ dispatch, userName, report }: RecordClien
               record ページでは isTransferred を考慮不要。 */}
           {dispatch.arrivalTime && (
             <button
-              onClick={() => router.push(`/dispatch/${dispatch.id}/confirmation`)}
+              onClick={() => router.push(`/dispatch/${dispatch.id}/confirmation?from=record`)}
               className="mt-3 w-full h-12 flex items-center justify-center gap-2 rounded-md font-bold text-base active:opacity-80"
               style={{ backgroundColor: '#71A9F7', color: '#FFFFFF' }}
             >
