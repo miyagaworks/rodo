@@ -6,10 +6,18 @@ import { useAdminDispatches } from '@/hooks/useAdminDispatches'
 /**
  * 今日の案件サマリ（3 カード: 進行中 / 完了 / 未請求）。
  *
- * 集計定義（§設計判断 5）:
- * - 進行中: status が STANDBY/DISPATCHED/ONSITE/TRANSPORTING かつ today 範囲
- * - 完了: status が COMPLETED/RETURNED/STORED かつ today 範囲
- * - 未請求: billedAt が null かつ today 範囲（isDraft=false）
+ * 集計定義:
+ * - 進行中:
+ *     - status が STANDBY / DISPATCHED / ONSITE / TRANSPORTING
+ *     - もしくは status === 'COMPLETED' && returnTime === null（帰社中）
+ *   ※ 帰社中はまだ動いている隊員がいるので「進行中」に含める
+ *     （隊員バッジの subPhase=RETURNING_TO_BASE と整合させる:
+ *       lib/admin/status-derivation.ts §1）
+ * - 完了:
+ *     - status === 'COMPLETED' && returnTime !== null（帰社済み）
+ *     - もしくは status === 'RETURNED' / 'STORED'
+ * - 未請求: billedAt が null（status 問わず）
+ * - isDraft=true は全集合から除外
  *
  * today の日付文字列は親コンポーネントから受け取る
  * （businessDayStartMinutes に基づいて計算済み）。
@@ -25,7 +33,6 @@ const ACTIVE_STATUSES = new Set([
   'ONSITE',
   'TRANSPORTING',
 ])
-const COMPLETED_STATUSES = new Set(['COMPLETED', 'RETURNED', 'STORED'])
 
 export default function TodayDispatchSummary({ today }: TodayDispatchSummaryProps) {
   // 今日の全案件を取得（status=all で全件、from/to で今日に絞る）
@@ -43,8 +50,20 @@ export default function TodayDispatchSummary({ today }: TodayDispatchSummaryProp
 
     for (const d of data.dispatches) {
       if (d.isDraft) continue // 下書きは集計対象外
-      if (ACTIVE_STATUSES.has(d.status)) active++
-      if (COMPLETED_STATUSES.has(d.status)) completed++
+
+      if (ACTIVE_STATUSES.has(d.status)) {
+        active++
+      } else if (d.status === 'COMPLETED' && d.returnTime === null) {
+        // 帰社中（COMPLETED && returnTime IS NULL）は進行中に含める
+        active++
+      } else if (
+        d.status === 'COMPLETED' ||
+        d.status === 'RETURNED' ||
+        d.status === 'STORED'
+      ) {
+        completed++
+      }
+
       if (d.billedAt === null) unbilled++
     }
 
