@@ -450,7 +450,7 @@ npm run dev
   - **期待結果**: 約 10 秒間隔で再取得（ReactQuery 設定）
   - **関連ファイル**: `hooks/useMembersStatus.ts`, `AdminQueryProvider.tsx`
 
-- [ ] D-06 業務6ステータスバッジ（色+アイコン）表示確認
+- [x] D-06 業務6ステータスバッジ（色+アイコン）表示確認
   - **手順**: status と subPhase を組み合わせ、6 ステータス各々の隊員を用意して `/admin/dashboard` を表示
   - **期待結果**: 各カードが以下の色+アイコンのピル型バッジで表示される
 
@@ -466,7 +466,7 @@ npm run dev
   - **関連ファイル**: `components/admin/MemberStatusBadge.tsx`, `MemberStatusCard.tsx`, `lib/admin/business-status.ts`
   - **既知**: Seed に DISPATCHING 系（特に subPhase=ONSITE/TRANSPORTING/RETURNING_TO_BASE）の案件がないため、dispatch/work/transport/return の 4 状態は実データ投入後検証
 
-- [ ] D-07 当日案件サマリ
+- [x] D-07 当日案件サマリ
   - **手順**: TodayDispatchSummary の数字
   - **期待結果**: 当日（業務日: `businessDayStartMinutes` 基準）の出動件数 / 完了件数等が表示
   - **関連ファイル**: `TodayDispatchSummary.tsx`, `lib/admin/business-day.ts`
