@@ -12,6 +12,10 @@ vi.mock('@/lib/prisma', () => ({
     tenant: {
       findUnique: vi.fn(),
     },
+    breakRecord: {
+      findMany: vi.fn(),
+      update: vi.fn(),
+    },
   },
 }))
 
@@ -19,10 +23,17 @@ import { GET } from '@/app/api/admin/members-status/route'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/prisma'
 import { getBusinessDayDate } from '@/lib/admin/business-day'
+import { BREAK_DURATION_SECONDS } from '@/lib/constants/break'
 
 const mockedAuth = auth as unknown as ReturnType<typeof vi.fn>
 const mockedFindMany = prisma.user.findMany as unknown as ReturnType<typeof vi.fn>
 const mockedTenantFindUnique = prisma.tenant.findUnique as unknown as ReturnType<
+  typeof vi.fn
+>
+const mockedBreakFindMany = prisma.breakRecord.findMany as unknown as ReturnType<
+  typeof vi.fn
+>
+const mockedBreakUpdate = prisma.breakRecord.update as unknown as ReturnType<
   typeof vi.fn
 >
 
@@ -39,6 +50,9 @@ describe('GET /api/admin/members-status', () => {
     vi.clearAllMocks()
     // 業務日開始は 0:00（JST 当日）をデフォルトに
     mockedTenantFindUnique.mockResolvedValue({ businessDayStartMinutes: 0 })
+    // closeStaleBreaksForTenant のデフォルト挙動: 孤児なし（既存テストへの影響をゼロにする）
+    mockedBreakFindMany.mockResolvedValue([])
+    mockedBreakUpdate.mockResolvedValue({})
   })
 
   it('未認証の場合は 401 を返す', async () => {
@@ -357,6 +371,158 @@ describe('GET /api/admin/members-status', () => {
       expect(json.members[0].status).toBe('STANDBY')
       expect(json.members[0].activeDispatch).toBeNull()
       expect(json.members[0].activeBreak).toBeNull()
+    })
+  })
+
+  /**
+   * 孤児 BreakRecord の自動クローズ（closeStaleBreaksForTenant 経由）
+   *
+   * ダッシュボード経路では users 取得前に tenant 単位で
+   * 上限超過した endTime=null を一括クローズする。
+   * モック上は user.findMany と breakRecord.findMany が独立しているため、
+   * 「クローズ後の状態」を user.findMany の戻り値で再現する。
+   */
+  describe('孤児 BreakRecord の自動クローズ（closeStaleBreaksForTenant）', () => {
+    const limitMs = BREAK_DURATION_SECONDS * 1000
+
+    it('上限超過した endTime=null の BreakRecord は endTime がセットされ、status は STANDBY で返る', async () => {
+      mockedAuth.mockResolvedValueOnce(adminSession())
+
+      // 孤児: 90 分前開始 + 80 分前 pause（上限超過）
+      const now = new Date()
+      const startTime = new Date(now.getTime() - 90 * 60 * 1000)
+      const pauseTime = new Date(now.getTime() - 80 * 60 * 1000)
+
+      mockedBreakFindMany.mockResolvedValueOnce([
+        { id: 'orphan-1', startTime, pauseTime },
+      ])
+
+      // クローズ後の状態を user.findMany 側で表現:
+      // breakRecords は endTime=null フィルタなので、クローズ済みなら空配列で返る
+      mockedFindMany.mockResolvedValueOnce([
+        {
+          id: 'u1',
+          name: '管理者',
+          vehicle: null,
+          dispatches: [],
+          breakRecords: [],
+        },
+      ])
+
+      const res = await GET()
+      const json = await res.json()
+
+      // closeStaleBreaksForTenant が tenantId スコープで findMany を呼んでいる
+      expect(mockedBreakFindMany).toHaveBeenCalledTimes(1)
+      const findArg = mockedBreakFindMany.mock.calls[0][0]
+      expect(findArg.where).toEqual({ tenantId: 't1', endTime: null })
+
+      // pauseTime あり → endTime = pauseTime で update
+      expect(mockedBreakUpdate).toHaveBeenCalledTimes(1)
+      expect(mockedBreakUpdate).toHaveBeenCalledWith({
+        where: { id: 'orphan-1' },
+        data: { endTime: pauseTime },
+      })
+
+      // ステータスは STANDBY（孤児がクローズされたため）
+      expect(json.members[0].status).toBe('STANDBY')
+      expect(json.members[0].activeBreak).toBeNull()
+    })
+
+    it('上限内（60 分以内）の endTime=null は触らず、status は BREAK で返る', async () => {
+      mockedAuth.mockResolvedValueOnce(adminSession())
+
+      // 30 分前開始（上限内）
+      const now = new Date()
+      const startTime = new Date(now.getTime() - 30 * 60 * 1000)
+
+      mockedBreakFindMany.mockResolvedValueOnce([
+        { id: 'fresh-1', startTime, pauseTime: null },
+      ])
+
+      // クローズされていないので user.findMany 側でも breakRecords にそのまま残す
+      mockedFindMany.mockResolvedValueOnce([
+        {
+          id: 'u1',
+          name: '隊員A',
+          vehicle: null,
+          dispatches: [],
+          breakRecords: [{ id: 'fresh-1', startTime }],
+        },
+      ])
+
+      const res = await GET()
+      const json = await res.json()
+
+      // findMany は呼ばれるが update は呼ばれない
+      expect(mockedBreakFindMany).toHaveBeenCalledTimes(1)
+      expect(mockedBreakUpdate).not.toHaveBeenCalled()
+
+      // ステータスは BREAK（上限内の未終了レコードは生きている）
+      expect(json.members[0].status).toBe('BREAK')
+      expect(json.members[0].activeBreak).toEqual({
+        id: 'fresh-1',
+        startTime: startTime.toISOString(),
+      })
+    })
+
+    it('同 tenant の複数 user の孤児レコードを一度に処理できる', async () => {
+      mockedAuth.mockResolvedValueOnce(adminSession())
+
+      const now = new Date()
+      // user1 の孤児: 90 分前開始 + 80 分前 pause → endTime = pauseTime
+      const start1 = new Date(now.getTime() - 90 * 60 * 1000)
+      const pause1 = new Date(now.getTime() - 80 * 60 * 1000)
+      // user2 の孤児: 75 分前開始 + pauseTime なし → endTime = startTime + 60min
+      const start2 = new Date(now.getTime() - 75 * 60 * 1000)
+
+      mockedBreakFindMany.mockResolvedValueOnce([
+        { id: 'orphan-u1', startTime: start1, pauseTime: pause1 },
+        { id: 'orphan-u2', startTime: start2, pauseTime: null },
+      ])
+
+      mockedFindMany.mockResolvedValueOnce([
+        {
+          id: 'u1',
+          name: '隊員A',
+          vehicle: null,
+          dispatches: [],
+          breakRecords: [], // クローズ済み
+        },
+        {
+          id: 'u2',
+          name: '隊員B',
+          vehicle: null,
+          dispatches: [],
+          breakRecords: [], // クローズ済み
+        },
+      ])
+
+      const res = await GET()
+      const json = await res.json()
+
+      // findMany は 1 回（tenant 一括）
+      expect(mockedBreakFindMany).toHaveBeenCalledTimes(1)
+      // update は 2 回（孤児 2 件）
+      expect(mockedBreakUpdate).toHaveBeenCalledTimes(2)
+
+      // 1 件目: orphan-u1 → endTime = pauseTime
+      expect(mockedBreakUpdate).toHaveBeenNthCalledWith(1, {
+        where: { id: 'orphan-u1' },
+        data: { endTime: pause1 },
+      })
+
+      // 2 件目: orphan-u2 → endTime = startTime + limitMs
+      const call2 = mockedBreakUpdate.mock.calls[1][0]
+      expect(call2.where).toEqual({ id: 'orphan-u2' })
+      expect((call2.data.endTime as Date).getTime()).toBe(
+        start2.getTime() + limitMs,
+      )
+
+      // 両 user とも STANDBY
+      expect(json.members).toHaveLength(2)
+      expect(json.members[0].status).toBe('STANDBY')
+      expect(json.members[1].status).toBe('STANDBY')
     })
   })
 })

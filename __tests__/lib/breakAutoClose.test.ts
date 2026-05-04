@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { closeStaleBreaks } from '@/lib/breakAutoClose'
+import {
+  closeStaleBreaks,
+  closeStaleBreaksForTenant,
+} from '@/lib/breakAutoClose'
 import { BREAK_DURATION_SECONDS } from '@/lib/constants/break'
 
 /**
@@ -179,6 +182,118 @@ describe('closeStaleBreaks', () => {
     ])
 
     await closeStaleBreaks(client as never, { userId, tenantId })
+
+    expect(client.breakRecord.update).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('closeStaleBreaksForTenant', () => {
+  const tenantId = 't1'
+  const limitMs = BREAK_DURATION_SECONDS * 1000
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('findMany には tenantId / endTime: null のみが渡され、userId は含まれない', async () => {
+    const now = new Date('2026-05-02T12:00:00.000Z')
+    const client = createFakeClient([])
+
+    await closeStaleBreaksForTenant(
+      client as never,
+      { tenantId: 'target-t', now },
+    )
+
+    expect(client.breakRecord.findMany).toHaveBeenCalledTimes(1)
+    const arg = client.breakRecord.findMany.mock.calls[0][0]
+    expect(arg.where).toEqual({
+      tenantId: 'target-t',
+      endTime: null,
+    })
+    expect(arg.where).not.toHaveProperty('userId')
+    expect(arg.select).toEqual({
+      id: true,
+      startTime: true,
+      pauseTime: true,
+    })
+  })
+
+  it('該当レコードがない場合は update を呼ばない', async () => {
+    const now = new Date('2026-05-02T12:00:00.000Z')
+    const client = createFakeClient([])
+
+    await closeStaleBreaksForTenant(client as never, { tenantId, now })
+
+    expect(client.breakRecord.update).not.toHaveBeenCalled()
+  })
+
+  it('上限内（60 分以内）のレコードは触らない', async () => {
+    const now = new Date('2026-05-02T12:00:00.000Z')
+    const startTime = new Date(now.getTime() - 30 * 60 * 1000) // 30 分前
+    const client = createFakeClient([
+      { id: 'r1', startTime, pauseTime: null },
+    ])
+
+    await closeStaleBreaksForTenant(client as never, { tenantId, now })
+
+    expect(client.breakRecord.update).not.toHaveBeenCalled()
+  })
+
+  it('複数 user の孤児レコードを一括処理する（pauseTime あり / なしの混在）', async () => {
+    const now = new Date('2026-05-02T12:00:00.000Z')
+    // user1: 90 分前開始 + 80 分前 pause → endTime = pauseTime
+    const start1 = new Date(now.getTime() - 90 * 60 * 1000)
+    const pause1 = new Date(now.getTime() - 80 * 60 * 1000)
+    // user2: 70 分前開始 + pauseTime なし → endTime = startTime + 60min
+    const start2 = new Date(now.getTime() - 70 * 60 * 1000)
+    // user3: 30 分前開始（上限内、触らない）
+    const start3 = new Date(now.getTime() - 30 * 60 * 1000)
+
+    const client = createFakeClient([
+      { id: 'r-u1', startTime: start1, pauseTime: pause1 },
+      { id: 'r-u2', startTime: start2, pauseTime: null },
+      { id: 'r-u3', startTime: start3, pauseTime: null },
+    ])
+
+    await closeStaleBreaksForTenant(client as never, { tenantId, now })
+
+    // 上限超過は 2 件のみ
+    expect(client.breakRecord.update).toHaveBeenCalledTimes(2)
+
+    // 1 件目: user1 → endTime = pauseTime
+    expect(client.breakRecord.update).toHaveBeenNthCalledWith(1, {
+      where: { id: 'r-u1' },
+      data: { endTime: pause1 },
+    })
+
+    // 2 件目: user2 → endTime = startTime + limitMs
+    const call2 = client.breakRecord.update.mock.calls[1][0]
+    expect(call2.where).toEqual({ id: 'r-u2' })
+    expect((call2.data.endTime as Date).getTime()).toBe(
+      start2.getTime() + limitMs,
+    )
+  })
+
+  it('境界: ちょうど 60 分経過のレコードはクローズされない（既存 closeStaleBreaks と同条件）', async () => {
+    const now = new Date('2026-05-02T12:00:00.000Z')
+    const startTime = new Date(now.getTime() - limitMs)
+    const client = createFakeClient([
+      { id: 'r-boundary', startTime, pauseTime: null },
+    ])
+
+    await closeStaleBreaksForTenant(client as never, { tenantId, now })
+
+    expect(client.breakRecord.update).not.toHaveBeenCalled()
+  })
+
+  it('now 引数を省略した場合は new Date() が使われる', async () => {
+    const realNow = new Date()
+    const startTime = new Date(realNow.getTime() - 90 * 60 * 1000)
+    const client = createFakeClient([
+      { id: 'r1', startTime, pauseTime: null },
+    ])
+
+    await closeStaleBreaksForTenant(client as never, { tenantId })
 
     expect(client.breakRecord.update).toHaveBeenCalledTimes(1)
   })

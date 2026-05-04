@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import { prisma } from '@/lib/prisma'
 import { deriveStatus } from '@/lib/admin/status-derivation'
 import { getBusinessDayDate } from '@/lib/admin/business-day'
+import { closeStaleBreaksForTenant } from '@/lib/breakAutoClose'
 
 /**
  * GET /api/admin/members-status
@@ -40,6 +41,14 @@ export async function GET() {
     select: { businessDayStartMinutes: true },
   })
   const startMinutes = tenant?.businessDayStartMinutes ?? 0
+
+  // 上限超過した古い未終了 BreakRecord をテナント単位で一括クローズしてから users を取得する。
+  // /api/breaks 系（POST / GET active）はユーザー単位で closeStaleBreaks を実行しているが、
+  // ここは 10 秒ポーリングで全隊員ステータスを返す経路のため、休憩中にブラウザを閉じる等で
+  // 残った endTime=null の孤児がダッシュボードに「休憩中」として永続表示されないよう、
+  // 取得前にテナント全体の孤児を一括クローズする（N+1 を避けるため tenant 単位 1 クエリ）。
+  await closeStaleBreaksForTenant(prisma, { tenantId })
+
   const todayStr = getBusinessDayDate(new Date(), startMinutes)
   const todayStart = new Date(`${todayStr}T00:00:00.000+09:00`)
   const tomorrowStart = new Date(todayStart)
