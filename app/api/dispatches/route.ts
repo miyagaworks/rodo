@@ -111,14 +111,26 @@ export async function POST(req: Request) {
     const jstDate = new Date(now.getTime() + jstOffset)
     const dateStr = jstDate.toISOString().slice(0, 10).replace(/-/g, '') // YYYYMMDD
 
-    const count = await tx.dispatch.count({
+    // 同日内の最大メイン番号を採用して +1 する方式（堅牢化）。
+    // count+1 方式は CANCELLED 案件を欠番として扱うと衝突するリスクがあるが、
+    // 「同日内最大メイン番号 + 1」方式なら欠番が出ても衝突しない。
+    // サフィックス（-2/-3/-T）が混入した dispatchNumber を除外するため
+    // dispatchNumber に '-' を含むものを NOT 条件で外す。
+    const lastSameDay = await tx.dispatch.findFirst({
       where: {
         tenantId: session.user.tenantId,
         dispatchNumber: { startsWith: dateStr },
+        NOT: { dispatchNumber: { contains: '-' } },
       },
+      orderBy: { dispatchNumber: 'desc' },
+      select: { dispatchNumber: true },
     })
 
-    const sequence = String(count + 1).padStart(3, '0')
+    const lastSeq = lastSameDay
+      ? Number(lastSameDay.dispatchNumber.slice(-3))
+      : 0
+    const nextSeq = Number.isFinite(lastSeq) ? lastSeq + 1 : 1
+    const sequence = String(nextSeq).padStart(3, '0')
     const newDispatchNumber = `${dateStr}${sequence}`
 
     // 2次搬送の場合、親の案件情報を引き継ぐ
