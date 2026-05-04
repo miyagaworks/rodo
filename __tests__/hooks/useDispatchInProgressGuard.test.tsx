@@ -219,6 +219,21 @@ describe('useDispatchInProgressGuard', () => {
     expect(pushStateSpy).toHaveBeenCalledTimes(1)
   })
 
+  it('inProgress=true で popstate 発火 → onAttemptHome が呼び出される（A-1 結合）', () => {
+    const onAttemptHome = vi.fn().mockReturnValue(false)
+    renderHook(() =>
+      useDispatchInProgressGuard({ inProgress: true, onAttemptHome }),
+    )
+    onAttemptHome.mockClear()
+
+    act(() => {
+      window.dispatchEvent(new PopStateEvent('popstate'))
+    })
+
+    // popstate ハンドラ内で tryAttempt() → onAttemptHome が呼ばれることを検証
+    expect(onAttemptHome).toHaveBeenCalledTimes(1)
+  })
+
   it('inProgress=false で popstate 発火 → pushState は呼ばれない', () => {
     renderHook(() => useDispatchInProgressGuard({ inProgress: false }))
     pushStateSpy.mockClear()
@@ -243,6 +258,33 @@ describe('useDispatchInProgressGuard', () => {
     })
 
     expect(preventSpy).toHaveBeenCalled()
+  })
+
+  it('inProgress=true で beforeunload 発火 → returnValue に空文字を設定する（A-2 結合）', () => {
+    renderHook(() => useDispatchInProgressGuard({ inProgress: true }))
+
+    // jsdom の Event.returnValue は boolean（legacy DOM 仕様）であり、
+    // 実装が想定する BeforeUnloadEvent.returnValue (DOMString) を直接観察できない。
+    // そこで returnValue プロパティを Object.defineProperty で差し替え、
+    // 実装が代入した値を捕捉する。
+    const event = new Event('beforeunload', { cancelable: true })
+    let assigned: unknown = undefined
+    Object.defineProperty(event, 'returnValue', {
+      configurable: true,
+      get() {
+        return assigned
+      },
+      set(value) {
+        assigned = value
+      },
+    })
+
+    act(() => {
+      window.dispatchEvent(event)
+    })
+
+    // 実装の `e.returnValue = ''` が実行されたことを検証
+    expect(assigned).toBe('')
   })
 
   it('inProgress=false で beforeunload 発火 → preventDefault を呼ばない', () => {
@@ -290,5 +332,24 @@ describe('useDispatchInProgressGuard', () => {
     rerender({ inProgress: true })
 
     expect(pushStateSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('inProgress true → false → true サイクル: virtualEntryPushedRef がリセットされ再 push される（A-4）', () => {
+    pushStateSpy.mockClear()
+    const { rerender } = renderHook(
+      ({ inProgress }) => useDispatchInProgressGuard({ inProgress }),
+      { initialProps: { inProgress: true } },
+    )
+
+    // 初回マウント (inProgress=true) で 1 回 push
+    expect(pushStateSpy).toHaveBeenCalledTimes(1)
+
+    // false に遷移: push しない（virtualEntryPushedRef=false にリセットされる）
+    rerender({ inProgress: false })
+    expect(pushStateSpy).toHaveBeenCalledTimes(1)
+
+    // 再度 true に: リセット済みなので再 push される
+    rerender({ inProgress: true })
+    expect(pushStateSpy).toHaveBeenCalledTimes(2)
   })
 })
