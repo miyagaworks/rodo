@@ -148,3 +148,84 @@ export async function closeStaleBreaksForTenant(
     await applyAutoCloseToRecord(client, record, now)
   }
 }
+
+/**
+ * 出動開始による中断で active な BreakRecord を即時クローズする。
+ *
+ * ## 業務シナリオ（2026-05-04 ユーザー確認済み仕様）
+ *
+ * 救援業務において、隊員が休憩中に出動要請が入り、休憩を中断して出動するシナリオは
+ * 業務上あり得る。その場合、休憩は自動的に終了したことになる（隊員が手で「休憩終了」を
+ * 押さなくても、出動開始時に自動で終了する仕様が業務的に正しい）。
+ *
+ * ## closeStaleBreaks との違い
+ *
+ * - 上限判定（経過 > 60 分）を行わない。出動開始時刻でそのまま即時クローズする。
+ * - pauseTime があれば endTime = pauseTime（pause した時点で実消化が止まっている扱い）
+ * - pauseTime が無ければ endTime = interruptedAt（呼び出し元から渡される出動開始時刻）
+ *
+ * 「タイマー満了による終了」と「出動開始による中断終了」は業務概念として異なるため、
+ * resolveAutoCloseEndTime / applyAutoCloseToRecord は流用しない（上限判定込みのため）。
+ *
+ * ## 防御
+ *
+ * 同 user に複数 active break が存在する想定外の状態でも、findMany で取得できた
+ * 全件をクローズする。POST /api/breaks 側で 409 を返してはいるが、過去の事故・
+ * 並行リクエスト等で複数残ってしまった場合の整合性復旧手段としても機能させる。
+ *
+ * ## 既知のエッジケース（過剰防御は実装しない）
+ *
+ * createDispatchSchema の dispatchTime は z.string().nullable().optional() で過去日時を
+ * 検証なしに受け入れる。クライアントが過去日時を渡した場合、呼び出し元が
+ * interruptedAt = new Date(dispatchTime) を採用すると interruptedAt < BreakRecord.startTime
+ * となる稀なケースが起こりうる。本関数はこの前後関係をチェックせず、渡された
+ * interruptedAt をそのまま endTime にセットする。業務 UI 上は隊員が dispatchTime を
+ * 任意指定する経路は無く、実害は想定していない（API 仕様としてのみ許容される状態）。
+ *
+ * ## 使用例
+ *
+ * POST /api/dispatches の prisma.$transaction 内で Dispatch.create の前に呼ぶ。
+ * 同一トランザクションで処理することで途中失敗時の整合性を確保する。
+ *
+ * ```ts
+ * const dispatch = await prisma.$transaction(async (tx) => {
+ *   const now = new Date(dispatchTime ?? new Date())
+ *   await closeActiveBreakOnDispatchStart(tx, {
+ *     userId: session.user.userId,
+ *     tenantId: session.user.tenantId,
+ *     interruptedAt: now,
+ *   })
+ *   // ...Dispatch.create
+ * })
+ * ```
+ *
+ * ## エラー方針
+ *
+ * closeStaleBreaks と同様、例外は握りつぶさず呼び出し側に伝播させる。
+ * BreakRecord の更新が失敗した場合は $transaction 全体が rollback され、
+ * Dispatch も作成されないことで整合性を確保する。
+ */
+export async function closeActiveBreakOnDispatchStart(
+  client: Prisma.TransactionClient | typeof prisma,
+  args: { userId: string; tenantId: string; interruptedAt: Date },
+): Promise<void> {
+  const active = await client.breakRecord.findMany({
+    where: {
+      userId: args.userId,
+      tenantId: args.tenantId,
+      endTime: null,
+    },
+    select: {
+      id: true,
+      pauseTime: true,
+    },
+  })
+
+  for (const record of active) {
+    const endTime = record.pauseTime ?? args.interruptedAt
+    await client.breakRecord.update({
+      where: { id: record.id },
+      data: { endTime },
+    })
+  }
+}

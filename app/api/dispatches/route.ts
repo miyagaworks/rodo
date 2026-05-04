@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/prisma'
 import { createDispatchSchema } from '@/lib/validations'
+import { closeActiveBreakOnDispatchStart } from '@/lib/breakAutoClose'
 import type { Prisma } from '@prisma/client'
 
 export async function GET(req: Request) {
@@ -93,6 +94,18 @@ export async function POST(req: Request) {
   // 出動番号採番: YYYYMMDD + 3桁連番（テナントごと・同日内でリセット）
   const dispatch = await prisma.$transaction(async (tx) => {
     const now = new Date(dispatchTime ?? new Date())
+
+    // 出動開始による休憩中断: active な BreakRecord を即時クローズする。
+    // 業務仕様（2026-05-04 ユーザー確認済み）: 隊員が休憩中に出動要請を受けて出動を
+    // 開始した場合、休憩は自動的に終了したことになる。BreakRecord の更新と
+    // Dispatch.create を同一トランザクションで実行することで、途中失敗時の整合性
+    // （break が閉じたのに dispatch が作られない / 逆）を防ぐ。
+    await closeActiveBreakOnDispatchStart(tx, {
+      userId: session.user.userId,
+      tenantId: session.user.tenantId,
+      interruptedAt: now,
+    })
+
     // JSTでの日付文字列を生成
     const jstOffset = 9 * 60 * 60 * 1000
     const jstDate = new Date(now.getTime() + jstOffset)
