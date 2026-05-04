@@ -9,6 +9,8 @@ import ClockPicker from './ClockPicker'
 import OdoDialInput from '@/components/common/OdoDialInput'
 import { offlineFetch } from '@/lib/offline-fetch'
 import { usePhotoCapture } from '@/hooks/usePhotoCapture'
+import { useDispatchInProgressGuard } from '@/hooks/useDispatchInProgressGuard'
+import { BackToHomeConfirmModal } from '@/components/dispatch/BackToHomeConfirmModal'
 import AppFooter from '@/components/common/AppFooter'
 
 // -------------------------------------------------------
@@ -307,6 +309,26 @@ export default function DispatchClient({
   const [transferCompleted, setTransferCompleted] = useState(false)
   const isTransferred = initialDispatch?.status === 'TRANSFERRED'
   const isTransferredIn = !!initialDispatch?.transferredFromId
+
+  // ── 進行中（active）ガード（Phase 3）──
+  // 根拠: getInitialStep（L60-69）により帰社後は onsite=4 / transport=5。
+  //   step 0 は未出動。step 1〜帰社直前が「現場対応中」= active。
+  //   isActiveDispatchStatus を使わない理由: 新規出動シナリオでは initialDispatch=null のため
+  //   サーバ status を持たない。step ベースが両シナリオを一意にカバーする。
+  const inProgress =
+    dispatchId !== null &&
+    step >= 1 &&
+    step < (mode === 'transport' ? 5 : 4)
+
+  const [showGuardModal, setShowGuardModal] = useState(false)
+  const { safeNavigateHome } = useDispatchInProgressGuard({
+    inProgress,
+    onAttemptHome: () => {
+      setShowGuardModal(true)
+      // 戻れない仕様のため常にブロック
+      return false
+    },
+  })
 
   // ── 前回帰社 ODO 取得（出発 ODO の placeholder 初期値） ──
   useEffect(() => {
@@ -896,7 +918,7 @@ export default function DispatchClient({
         style={{ backgroundColor: '#1C2948' }}
       >
         <button
-          onClick={() => router.push('/')}
+          onClick={() => { void safeNavigateHome(router) }}
           className="text-white p-1 -ml-1 rounded-md active:opacity-60"
         >
           <IoIosArrowBack className="w-6 h-6" />
@@ -1537,6 +1559,12 @@ export default function DispatchClient({
           />
         )
       })()}
+
+      {/* ─── 進行中ガードモーダル（Phase 3）─── */}
+      <BackToHomeConfirmModal
+        open={showGuardModal}
+        onClose={() => setShowGuardModal(false)}
+      />
     </div>
   )
 }

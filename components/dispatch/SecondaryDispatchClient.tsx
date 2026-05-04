@@ -7,6 +7,8 @@ import { IoIosArrowBack, IoIosArrowForward } from 'react-icons/io'
 import ClockPicker from './ClockPicker'
 import OdoDialInput from '@/components/common/OdoDialInput'
 import { offlineFetch } from '@/lib/offline-fetch'
+import { useDispatchInProgressGuard } from '@/hooks/useDispatchInProgressGuard'
+import { BackToHomeConfirmModal } from '@/components/dispatch/BackToHomeConfirmModal'
 import AppFooter from '@/components/common/AppFooter'
 
 // -------------------------------------------------------
@@ -214,6 +216,23 @@ export default function SecondaryDispatchClient({ parentDispatch, initialSeconda
 
   const [step, setStep] = useState(getInitialStep(initialSecondary))
   const [secondaryId, setSecondaryId] = useState<string | null>(initialSecondary?.id ?? null)
+
+  // ── 進行中（active）ガード（Phase 3）──
+  // 根拠: getInitialStep（L53-60）により step 4 = 帰社後。step 1〜3 が active。
+  const inProgress =
+    secondaryId !== null &&
+    step >= 1 &&
+    step < 4
+
+  const [showGuardModal, setShowGuardModal] = useState(false)
+  const { safeNavigateHome } = useDispatchInProgressGuard({
+    inProgress,
+    onAttemptHome: () => {
+      setShowGuardModal(true)
+      return false
+    },
+  })
+
   const [departureOdo, setDepartureOdo] = useState<number | null>(initialSecondary?.departureOdo ?? null)
   const [arrivalOdo, setArrivalOdo] = useState<number | null>(initialSecondary?.arrivalOdo ?? null)
   const [completionOdo, setCompletionOdo] = useState<number | null>(initialSecondary?.completionOdo ?? null)
@@ -579,7 +598,7 @@ export default function SecondaryDispatchClient({ parentDispatch, initialSeconda
         style={{ backgroundColor: '#1C2948' }}
       >
         <button
-          onClick={() => router.push('/')}
+          onClick={() => { void safeNavigateHome(router) }}
           className="text-white p-1 -ml-1 rounded-md active:opacity-60"
         >
           <IoIosArrowBack className="w-6 h-6" />
@@ -776,6 +795,12 @@ export default function SecondaryDispatchClient({ parentDispatch, initialSeconda
           />
         )
       })()}
+
+      {/* ─── 進行中ガードモーダル（Phase 3）─── */}
+      <BackToHomeConfirmModal
+        open={showGuardModal}
+        onClose={() => setShowGuardModal(false)}
+      />
     </div>
   )
 }
