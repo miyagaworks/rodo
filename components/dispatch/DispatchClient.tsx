@@ -11,6 +11,7 @@ import { offlineFetch } from '@/lib/offline-fetch'
 import { usePhotoCapture } from '@/hooks/usePhotoCapture'
 import { useDispatchInProgressGuard } from '@/hooks/useDispatchInProgressGuard'
 import { BackToHomeConfirmModal } from '@/components/dispatch/BackToHomeConfirmModal'
+import { CancelDispatchButton } from '@/components/dispatch/CancelDispatchButton'
 import AppFooter from '@/components/common/AppFooter'
 
 // -------------------------------------------------------
@@ -924,6 +925,19 @@ export default function DispatchClient({
           <IoIosArrowBack className="w-6 h-6" />
         </button>
         <span className="text-white text-sm opacity-50 font-medium">出動画面</span>
+        {/* 案件キャンセル（Phase 4） — inProgress=true && !isTransferred のときのみ表示。
+            §9.0-A: 現場対応 2 画面のみ。§9.0-B: TRANSFERRED は対象外。
+            onCancelled では Phase 3 ガード経由ではなく router.push を直接呼ぶ
+            （CancelDispatchButton 経由は信頼できる遷移であり二重ガード不要）。 */}
+        {inProgress && !isTransferred && dispatchId && dispatchNumber && (
+          <div className="ml-auto">
+            <CancelDispatchButton
+              dispatchId={dispatchId}
+              dispatchNumber={dispatchNumber}
+              onCancelled={() => router.push('/')}
+            />
+          </div>
+        )}
       </header>
 
       {/* ─── Status bar (固定) ─── */}
