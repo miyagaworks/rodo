@@ -264,7 +264,6 @@ export default function RecordClient({ dispatch, userName, report }: RecordClien
   })
   const [showWorkStartPicker, setShowWorkStartPicker] = useState(false)
   const [showWorkEndPicker, setShowWorkEndPicker] = useState(false)
-  const [showBackConfirm, setShowBackConfirm] = useState(false)
 
   // ── 写真（Phase 10） ──
   const { photos, removePhoto } = usePhotoCapture(dispatch.id)
@@ -413,9 +412,30 @@ export default function RecordClient({ dispatch, userName, report }: RecordClien
         {/* 1行目: ホーム / タイトル / バッジ / 日付 */}
         <div className="flex items-center gap-2 mb-2.5">
           <button
-            onClick={() => setShowBackConfirm(true)}
+            onClick={async () => {
+              if (loading) return
+              setLoading(true)
+              try {
+                const res = await offlineFetch(`/api/dispatches/${dispatch.id}`, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(buildPayload(true)),
+                  offlineActionType: 'dispatch_update',
+                  offlineDispatchId: dispatch.id,
+                })
+                if (!res.ok) throw new Error('下書きの保存に失敗しました')
+                await clearDraft()
+                router.push('/')
+              } catch (e) {
+                console.error(e)
+                alert(e instanceof Error ? e.message : '保存に失敗しました')
+              } finally {
+                setLoading(false)
+              }
+            }}
+            disabled={loading}
             aria-label="ホームに戻る"
-            className="inline-flex items-center justify-center p-2 rounded-md active:opacity-70"
+            className="inline-flex items-center justify-center p-2 rounded-md active:opacity-70 disabled:opacity-50"
             style={{ backgroundColor: '#71A9F7', color: '#FFFFFF' }}
           >
             <TiHome className="w-4 h-4" />
@@ -1008,74 +1028,6 @@ export default function RecordClient({ dispatch, userName, report }: RecordClien
         }}
       />
 
-      {/* ─── 出動画面に戻る確認モーダル ─── */}
-      {showBackConfirm && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center"
-          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-          onClick={() => setShowBackConfirm(false)}
-        >
-          <div
-            className="mx-6 w-full max-w-sm rounded-xl p-5 space-y-4"
-            style={{ backgroundColor: '#FFFFFF' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <p className="text-sm font-bold text-center" style={{ color: '#1C2948' }}>
-              保存していないデータがあります。<br />下書き保存しますか？
-            </p>
-            <div className="space-y-2">
-              <button
-                onClick={async () => {
-                  if (loading) return
-                  setLoading(true)
-                  try {
-                    const res = await offlineFetch(`/api/dispatches/${dispatch.id}`, {
-                      method: 'PATCH',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify(buildPayload(true)),
-                      offlineActionType: 'dispatch_update',
-                      offlineDispatchId: dispatch.id,
-                    })
-                    if (!res.ok) throw new Error('下書きの保存に失敗しました')
-                    await clearDraft()
-                    router.push('/')
-                  } catch (e) {
-                    console.error(e)
-                    alert(e instanceof Error ? e.message : '保存に失敗しました')
-                  } finally {
-                    setLoading(false)
-                    setShowBackConfirm(false)
-                  }
-                }}
-                disabled={loading}
-                className="w-full py-3 rounded-md font-bold text-sm text-white active:opacity-80"
-                style={{ backgroundColor: '#1C2948' }}
-              >
-                {loading ? '保存中...' : '下書き保存して戻る'}
-              </button>
-              <button
-                onClick={() => {
-                  setShowBackConfirm(false)
-                  router.push('/')
-                }}
-                disabled={loading}
-                className="w-full py-3 rounded-md font-bold text-sm active:opacity-80 border"
-                style={{ color: '#D3170A', borderColor: '#D3170A' }}
-              >
-                保存せずに戻る
-              </button>
-              <button
-                onClick={() => setShowBackConfirm(false)}
-                disabled={loading}
-                className="w-full py-3 rounded-md font-bold text-sm active:opacity-80"
-                style={{ color: '#6B7280' }}
-              >
-                キャンセル
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
