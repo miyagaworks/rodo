@@ -750,7 +750,7 @@ npm run dev
 
 ---
 
-### カテゴリ I: dispatch floating prevention（Phase 1-7 検証）（31 項目）
+### カテゴリ I: dispatch floating prevention（Phase 1-7 検証 + reviewer 派生）（32 項目）
 
 実装根拠: `docs/plans/dispatch-floating-prevention.md` §7 / Phase 5.5 補強（コミット `9259cb6`）/ Phase 7 改訂スコープ（コミット `fe73de7`）
 
@@ -957,6 +957,20 @@ npm run dev
   - **関連ファイル**: `components/dispatch/DispatchClient.tsx` L368-393
   - **失敗時**: コンソールに React の「router.push called after unmount」警告、または意図しないホーム遷移
   - **既知**: 関連テスト `__tests__/components/dispatch/DispatchClient.transfer-cleanup.test.tsx` で自動検証済み
+
+#### I-9. PR #10 reviewer 派生: TRANSFERRED 状態ガード挙動（1 項目）
+
+実装根拠: コミット `e44d81c`（Phase 3）/ PR #10 reviewer レビュー観点 E
+
+- [ ] I-9.1 [E.12] TRANSFERRED 状態 + step 中間値でのガード残存有無
+  - **手順**:
+    1. 振替フローを実行し元案件を `Dispatch.status=TRANSFERRED` に遷移させる
+    2. 元案件側 DispatchClient で `step` が中間値（`mode='transport'` なら 1〜4、それ以外なら 1〜3 の途中）の状態を作る
+    3. ブラウザバック / 戻るボタン / ヘッダーホームボタンを押下
+  - **期待結果**: [業務仕様未確認] 振替済み案件はガード対象外として扱われ、ホームへ戻れることが想定される。業務仕様としての挙動はユーザー確認待ちのため、検証時に実機挙動を観察し結果欄に記録する
+  - **検証ポイント**: `components/dispatch/DispatchClient.tsx` の `inProgress` 計算が `dispatchId !== null && step >= 1 && step < (mode === 'transport' ? 5 : 4)` のみで `isTransferred` を含まないため、TRANSFERRED 状態かつ step 中間値でガードが残る可能性
+  - **失敗時**: 「進行中の出動があります」モーダルが表示されホーム遷移できない場合、`inProgress` 計算ロジックに `&& !isTransferred` 条件を追加する独立タスクを起票
+  - **関連**: 引き継ぎノート §E.12（`docs/handover/2026-05-04-dispatch-floating-prevention-impl.md`）, PR #10 reviewer レビュー観点 E
 
 ---
 
