@@ -5,12 +5,14 @@ import { Session } from 'next-auth'
 import { useRouter } from 'next/navigation'
 import { useAtomValue } from 'jotai'
 import { FaCoffee } from 'react-icons/fa'
+import ActiveDispatchBanner from '@/components/ActiveDispatchBanner'
 import AssistanceButton from '@/components/AssistanceButton'
 import ProcessingBar from '@/components/ProcessingBar'
 import BreakBar from '@/components/BreakBar'
 import AdminShell from '@/components/admin/AdminShell'
 import AppFooter from '@/components/common/AppFooter'
 import AppHeader from '@/components/common/AppHeader'
+import { useActiveDispatch } from '@/hooks/useActiveDispatch'
 import { breakStateAtom } from '@/store/breakAtom'
 
 // displayAbbreviation → ロゴ・表示設定のマッピング
@@ -51,6 +53,11 @@ export default function HomeClient({ session }: HomeClientProps) {
   // 管理者用ドロワー（ADMIN のみ ☰ ボタンから開く）
   const [adminDrawerOpen, setAdminDrawerOpen] = useState(false)
   const isAdmin = session.user.role === 'ADMIN'
+  // 進行中の出動（浮き案件防止 Phase 5）。
+  // loading / error は使わない＝計画書 §3 Phase 5 ステップ4 のフェイルクローズ方針。
+  // 取得失敗時は activeDispatch === null のままなのでバナー非表示・抑止なし
+  // （業務妨害を避けるため。alert は出さない）。
+  const { activeDispatch } = useActiveDispatch()
 
   useEffect(() => {
     let cancelled = false
@@ -148,6 +155,18 @@ export default function HomeClient({ session }: HomeClientProps) {
       {/* メインコンテンツ */}
       <main className="flex-1 p-4">
         <div className="max-w-md mx-auto w-full">
+          {/* 進行中バナー（出動中の浮き案件防止 Phase 5）。
+              BreakBar より上に配置して最も目立つ位置に置く。
+              ProcessingBar は fixed bottom-0 のため重ならない。 */}
+          {activeDispatch && (
+            <div className="mb-3">
+              <ActiveDispatchBanner
+                dispatchNumber={activeDispatch.dispatchNumber}
+                onClick={() => router.push(`/dispatch/${activeDispatch.id}`)}
+              />
+            </div>
+          )}
+
           {/* 休憩中バー（ポーズ中のみ表示） */}
           <div className="mb-3">
             <BreakBar />
@@ -157,7 +176,12 @@ export default function HomeClient({ session }: HomeClientProps) {
           {displayAssistances.length > 0 ? (
             <div className="grid grid-cols-2 gap-3 mb-3">
               {displayAssistances.map((assistance) => (
-                <AssistanceButton key={assistance.id} assistance={assistance} />
+                <AssistanceButton
+                  key={assistance.id}
+                  assistance={assistance}
+                  disabled={!!activeDispatch}
+                  onDisabledClick={() => alert('進行中の案件があります')}
+                />
               ))}
             </div>
           ) : fetchError ? (
@@ -194,14 +218,14 @@ export default function HomeClient({ session }: HomeClientProps) {
             </div>
           )}
 
-          {/* 休憩ボタン（ポーズ中 / 取得中 / 消化済みは非表示） */}
-          {breakState.status !== 'paused' && canStartBreak === true && (
+          {/* 休憩ボタン（ポーズ中 / 取得中 / 消化済み / 進行中出動ありは非表示） */}
+          {breakState.status !== 'paused' && canStartBreak === true && !activeDispatch && (
             <button
-              className="w-full flex items-center justify-center gap-3 py-5 rounded-lg text-white text-xl font-bold"
+              className="w-full h-[72px] flex items-center justify-center gap-4 rounded-lg text-white text-3xl font-bold"
               style={{ backgroundColor: '#888888' }}
               onClick={() => router.push('/break')}
             >
-              <FaCoffee className="text-3xl" />
+              <FaCoffee className="text-4xl" />
               <span style={{ letterSpacing: '0.25em', paddingLeft: '0.25em' }}>休憩</span>
             </button>
           )}

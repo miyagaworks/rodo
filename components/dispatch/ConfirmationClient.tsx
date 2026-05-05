@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { IoIosArrowBack } from 'react-icons/io'
 import SignatureCanvas from 'react-signature-canvas'
@@ -142,12 +142,50 @@ function SignaturePad({
   }, [scaleCanvas])
 
   // Load initial data
+  // P0-13: initialData は DataURL（旧）または HTTPS URL（新: Vercel Blob）の両方を受け付ける。
+  // URL の場合は fetch → Blob → DataURL → fromDataURL のチェーンで読み込む。
   useEffect(() => {
-    if (initialData && sigRef.current) {
-      const w = containerRef.current?.offsetWidth || 300
+    if (!initialData || !sigRef.current) return
+
+    const w = containerRef.current?.offsetWidth || 300
+
+    if (initialData.startsWith('data:')) {
+      // 旧経路: DataURL は同期的にロード可能
       sigRef.current.fromDataURL(initialData, { width: w, height: SIG_HEIGHT })
       dataRef.current = initialData
       setIsEmpty(false)
+      return
+    }
+
+    if (initialData.startsWith('http')) {
+      let cancelled = false
+      ;(async () => {
+        try {
+          const res = await fetch(initialData)
+          if (!res.ok) throw new Error(`fetch ${initialData} failed: ${res.status}`)
+          const blob = await res.blob()
+          const dataUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader()
+            reader.onload = () => resolve(reader.result as string)
+            reader.onerror = () => reject(reader.error ?? new Error('FileReader error'))
+            reader.readAsDataURL(blob)
+          })
+          if (cancelled || !sigRef.current) return
+          sigRef.current.fromDataURL(dataUrl, { width: w, height: SIG_HEIGHT })
+          dataRef.current = dataUrl
+          setIsEmpty(false)
+        } catch (err) {
+          // フォールバック: 編集ロード失敗時は空のままにし、ユーザーに再署名を促す
+          console.error('Failed to load signature from URL:', err)
+          if (!cancelled) {
+            dataRef.current = null
+            setIsEmpty(true)
+          }
+        }
+      })()
+      return () => {
+        cancelled = true
+      }
     }
   }, [initialData])
 
@@ -304,6 +342,7 @@ function ToggleButton({
 
 export default function ConfirmationClient({ dispatchId, confirmation, userName }: Props) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [saving, setSaving] = useState(false)
   const [qrToken, setQrToken] = useState<string | null>(null)
 
@@ -405,7 +444,8 @@ export default function ConfirmationClient({ dispatchId, confirmation, userName 
         }
       }
 
-      router.push(`/dispatch/${dispatchId}`)
+      const fromRecord = searchParams.get('from') === 'record'
+      router.push(fromRecord ? `/dispatch/${dispatchId}/record` : `/dispatch/${dispatchId}`)
     } catch (err) {
       console.error('Save confirmation error:', err)
     } finally {
@@ -414,12 +454,13 @@ export default function ConfirmationClient({ dispatchId, confirmation, userName 
   }, [
     confirmation, dispatchId, workDate, preChecks, customerSig,
     vehicleType, regNumber, workContent, shopCompany,
-    shopSig, postCheck, postSig, userName, battery, notes, router,
+    shopSig, postCheck, postSig, userName, battery, notes, router, searchParams,
   ])
 
   const handleCancel = useCallback(() => {
-    router.push(`/dispatch/${dispatchId}`)
-  }, [router, dispatchId])
+    const fromRecord = searchParams.get('from') === 'record'
+    router.push(fromRecord ? `/dispatch/${dispatchId}/record` : `/dispatch/${dispatchId}`)
+  }, [router, dispatchId, searchParams])
 
   // --- Pre-approval checkbox texts ---
   const preCheckLabels = [
@@ -770,7 +811,8 @@ export default function ConfirmationClient({ dispatchId, confirmation, userName 
           token={qrToken}
           onClose={() => {
             setQrToken(null)
-            router.push(`/dispatch/${dispatchId}?focus=confirmation`)
+            const fromRecord = searchParams.get('from') === 'record'
+            router.push(fromRecord ? `/dispatch/${dispatchId}/record` : `/dispatch/${dispatchId}?focus=confirmation`)
           }}
         />
       )}

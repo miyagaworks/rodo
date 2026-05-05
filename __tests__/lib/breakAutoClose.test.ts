@@ -1,0 +1,453 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import {
+  closeStaleBreaks,
+  closeStaleBreaksForTenant,
+  closeActiveBreakOnDispatchStart,
+} from '@/lib/breakAutoClose'
+import { BREAK_DURATION_SECONDS } from '@/lib/constants/break'
+
+/**
+ * closeStaleBreaks の単体テスト。
+ *
+ * 引数 client は Prisma.TransactionClient の最小サブセットを持つオブジェクト。
+ * モック関数 findMany / update を持たせて呼び出しを検証する。
+ */
+
+type FakeClient = {
+  breakRecord: {
+    findMany: ReturnType<typeof vi.fn>
+    update: ReturnType<typeof vi.fn>
+  }
+}
+
+function createFakeClient(stale: Array<{
+  id: string
+  startTime: Date
+  pauseTime: Date | null
+}>): FakeClient {
+  return {
+    breakRecord: {
+      findMany: vi.fn().mockResolvedValue(stale),
+      update: vi.fn().mockResolvedValue({}),
+    },
+  }
+}
+
+describe('closeStaleBreaks', () => {
+  const userId = 'u1'
+  const tenantId = 't1'
+  const limitMs = BREAK_DURATION_SECONDS * 1000
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('60 分未満の未終了レコードはクローズされない', async () => {
+    const now = new Date('2026-05-02T12:00:00.000Z')
+    // 30 分前に開始（経過 30 分 < 60 分）
+    const startTime = new Date(now.getTime() - 30 * 60 * 1000)
+    const client = createFakeClient([
+      { id: 'r1', startTime, pauseTime: null },
+    ])
+
+    await closeStaleBreaks(
+      client as never,
+      { userId, tenantId, now },
+    )
+
+    expect(client.breakRecord.update).not.toHaveBeenCalled()
+  })
+
+  it('60 分超過 + pauseTime あり → endTime = pauseTime', async () => {
+    const now = new Date('2026-05-02T12:00:00.000Z')
+    // 90 分前に開始 → 経過 90 分 > 60 分
+    const startTime = new Date(now.getTime() - 90 * 60 * 1000)
+    // 80 分前に pause
+    const pauseTime = new Date(now.getTime() - 80 * 60 * 1000)
+    const client = createFakeClient([
+      { id: 'r-pause', startTime, pauseTime },
+    ])
+
+    await closeStaleBreaks(
+      client as never,
+      { userId, tenantId, now },
+    )
+
+    expect(client.breakRecord.update).toHaveBeenCalledTimes(1)
+    expect(client.breakRecord.update).toHaveBeenCalledWith({
+      where: { id: 'r-pause' },
+      data: { endTime: pauseTime },
+    })
+  })
+
+  it('60 分超過 + pauseTime なし → endTime = startTime + BREAK_DURATION_SECONDS * 1000', async () => {
+    const now = new Date('2026-05-02T12:00:00.000Z')
+    // 90 分前に開始 → 経過 90 分 > 60 分
+    const startTime = new Date(now.getTime() - 90 * 60 * 1000)
+    const client = createFakeClient([
+      { id: 'r-no-pause', startTime, pauseTime: null },
+    ])
+
+    await closeStaleBreaks(
+      client as never,
+      { userId, tenantId, now },
+    )
+
+    expect(client.breakRecord.update).toHaveBeenCalledTimes(1)
+    const call = client.breakRecord.update.mock.calls[0][0]
+    expect(call.where).toEqual({ id: 'r-no-pause' })
+    // endTime は startTime + limitMs（タイマー満了時刻）
+    const expectedEndMs = startTime.getTime() + limitMs
+    expect((call.data.endTime as Date).getTime()).toBe(expectedEndMs)
+  })
+
+  it('境界: 経過時間がちょうど 60 分の場合はクローズされない（>= ではなく > の判定）', async () => {
+    // 仕様: elapsedMs <= limitMs は continue（クローズしない）。
+    // ちょうど 3600 秒経過のレコードはまだ「上限ぴったり」で、上限超過には該当しない。
+    const now = new Date('2026-05-02T12:00:00.000Z')
+    const startTime = new Date(now.getTime() - limitMs)
+    const client = createFakeClient([
+      { id: 'r-boundary', startTime, pauseTime: null },
+    ])
+
+    await closeStaleBreaks(
+      client as never,
+      { userId, tenantId, now },
+    )
+
+    expect(client.breakRecord.update).not.toHaveBeenCalled()
+  })
+
+  it('複数レコード混在: 上限超過のみ更新される', async () => {
+    const now = new Date('2026-05-02T12:00:00.000Z')
+    const fresh = new Date(now.getTime() - 10 * 60 * 1000) // 10 分前
+    const stale = new Date(now.getTime() - 70 * 60 * 1000) // 70 分前
+    const client = createFakeClient([
+      { id: 'r-fresh', startTime: fresh, pauseTime: null },
+      { id: 'r-stale', startTime: stale, pauseTime: null },
+    ])
+
+    await closeStaleBreaks(
+      client as never,
+      { userId, tenantId, now },
+    )
+
+    expect(client.breakRecord.update).toHaveBeenCalledTimes(1)
+    expect(client.breakRecord.update.mock.calls[0][0].where).toEqual({
+      id: 'r-stale',
+    })
+  })
+
+  it('findMany には userId / tenantId / endTime: null の where が渡される', async () => {
+    const now = new Date('2026-05-02T12:00:00.000Z')
+    const client = createFakeClient([])
+
+    await closeStaleBreaks(
+      client as never,
+      { userId: 'target-u', tenantId: 'target-t', now },
+    )
+
+    expect(client.breakRecord.findMany).toHaveBeenCalledTimes(1)
+    const arg = client.breakRecord.findMany.mock.calls[0][0]
+    expect(arg.where).toEqual({
+      userId: 'target-u',
+      tenantId: 'target-t',
+      endTime: null,
+    })
+    // select で id / startTime / pauseTime のみ取得していること
+    expect(arg.select).toEqual({
+      id: true,
+      startTime: true,
+      pauseTime: true,
+    })
+  })
+
+  it('該当レコードがない場合は update を呼ばない', async () => {
+    const now = new Date('2026-05-02T12:00:00.000Z')
+    const client = createFakeClient([])
+
+    await closeStaleBreaks(
+      client as never,
+      { userId, tenantId, now },
+    )
+
+    expect(client.breakRecord.update).not.toHaveBeenCalled()
+  })
+
+  it('now 引数を省略した場合は new Date() が使われる（モック時刻でも動作する）', async () => {
+    const realNow = new Date()
+    // 90 分前
+    const startTime = new Date(realNow.getTime() - 90 * 60 * 1000)
+    const client = createFakeClient([
+      { id: 'r1', startTime, pauseTime: null },
+    ])
+
+    await closeStaleBreaks(client as never, { userId, tenantId })
+
+    expect(client.breakRecord.update).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('closeStaleBreaksForTenant', () => {
+  const tenantId = 't1'
+  const limitMs = BREAK_DURATION_SECONDS * 1000
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('findMany には tenantId / endTime: null のみが渡され、userId は含まれない', async () => {
+    const now = new Date('2026-05-02T12:00:00.000Z')
+    const client = createFakeClient([])
+
+    await closeStaleBreaksForTenant(
+      client as never,
+      { tenantId: 'target-t', now },
+    )
+
+    expect(client.breakRecord.findMany).toHaveBeenCalledTimes(1)
+    const arg = client.breakRecord.findMany.mock.calls[0][0]
+    expect(arg.where).toEqual({
+      tenantId: 'target-t',
+      endTime: null,
+    })
+    expect(arg.where).not.toHaveProperty('userId')
+    expect(arg.select).toEqual({
+      id: true,
+      startTime: true,
+      pauseTime: true,
+    })
+  })
+
+  it('該当レコードがない場合は update を呼ばない', async () => {
+    const now = new Date('2026-05-02T12:00:00.000Z')
+    const client = createFakeClient([])
+
+    await closeStaleBreaksForTenant(client as never, { tenantId, now })
+
+    expect(client.breakRecord.update).not.toHaveBeenCalled()
+  })
+
+  it('上限内（60 分以内）のレコードは触らない', async () => {
+    const now = new Date('2026-05-02T12:00:00.000Z')
+    const startTime = new Date(now.getTime() - 30 * 60 * 1000) // 30 分前
+    const client = createFakeClient([
+      { id: 'r1', startTime, pauseTime: null },
+    ])
+
+    await closeStaleBreaksForTenant(client as never, { tenantId, now })
+
+    expect(client.breakRecord.update).not.toHaveBeenCalled()
+  })
+
+  it('複数 user の孤児レコードを一括処理する（pauseTime あり / なしの混在）', async () => {
+    const now = new Date('2026-05-02T12:00:00.000Z')
+    // user1: 90 分前開始 + 80 分前 pause → endTime = pauseTime
+    const start1 = new Date(now.getTime() - 90 * 60 * 1000)
+    const pause1 = new Date(now.getTime() - 80 * 60 * 1000)
+    // user2: 70 分前開始 + pauseTime なし → endTime = startTime + 60min
+    const start2 = new Date(now.getTime() - 70 * 60 * 1000)
+    // user3: 30 分前開始（上限内、触らない）
+    const start3 = new Date(now.getTime() - 30 * 60 * 1000)
+
+    const client = createFakeClient([
+      { id: 'r-u1', startTime: start1, pauseTime: pause1 },
+      { id: 'r-u2', startTime: start2, pauseTime: null },
+      { id: 'r-u3', startTime: start3, pauseTime: null },
+    ])
+
+    await closeStaleBreaksForTenant(client as never, { tenantId, now })
+
+    // 上限超過は 2 件のみ
+    expect(client.breakRecord.update).toHaveBeenCalledTimes(2)
+
+    // 1 件目: user1 → endTime = pauseTime
+    expect(client.breakRecord.update).toHaveBeenNthCalledWith(1, {
+      where: { id: 'r-u1' },
+      data: { endTime: pause1 },
+    })
+
+    // 2 件目: user2 → endTime = startTime + limitMs
+    const call2 = client.breakRecord.update.mock.calls[1][0]
+    expect(call2.where).toEqual({ id: 'r-u2' })
+    expect((call2.data.endTime as Date).getTime()).toBe(
+      start2.getTime() + limitMs,
+    )
+  })
+
+  it('境界: ちょうど 60 分経過のレコードはクローズされない（既存 closeStaleBreaks と同条件）', async () => {
+    const now = new Date('2026-05-02T12:00:00.000Z')
+    const startTime = new Date(now.getTime() - limitMs)
+    const client = createFakeClient([
+      { id: 'r-boundary', startTime, pauseTime: null },
+    ])
+
+    await closeStaleBreaksForTenant(client as never, { tenantId, now })
+
+    expect(client.breakRecord.update).not.toHaveBeenCalled()
+  })
+
+  it('now 引数を省略した場合は new Date() が使われる', async () => {
+    const realNow = new Date()
+    const startTime = new Date(realNow.getTime() - 90 * 60 * 1000)
+    const client = createFakeClient([
+      { id: 'r1', startTime, pauseTime: null },
+    ])
+
+    await closeStaleBreaksForTenant(client as never, { tenantId })
+
+    expect(client.breakRecord.update).toHaveBeenCalledTimes(1)
+  })
+})
+
+/**
+ * closeActiveBreakOnDispatchStart の単体テスト。
+ *
+ * 業務シナリオ: 隊員が休憩中に出動要請を受けて出動を開始した際、active な
+ * BreakRecord を即時クローズする（タイマー満了判定は行わない）。
+ *
+ * 既存 closeStaleBreaks との違い:
+ * - 上限判定（経過 > 60 分）を行わない
+ * - pauseTime があれば endTime = pauseTime
+ * - pauseTime が無ければ endTime = interruptedAt（呼び出し元から渡される）
+ */
+describe('closeActiveBreakOnDispatchStart', () => {
+  const userId = 'u1'
+  const tenantId = 't1'
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('active break あり、pause 中（pauseTime あり） → endTime = pauseTime', async () => {
+    const interruptedAt = new Date('2026-05-04T11:49:38.000Z')
+    // pauseTime あり: pause した時点で実消化が止まっている扱い
+    const pauseTime = new Date('2026-05-04T11:48:55.000Z')
+    const startTime = new Date('2026-05-04T11:48:40.000Z')
+    const client = createFakeClient([
+      { id: 'r-paused', startTime, pauseTime },
+    ])
+
+    await closeActiveBreakOnDispatchStart(client as never, {
+      userId,
+      tenantId,
+      interruptedAt,
+    })
+
+    expect(client.breakRecord.update).toHaveBeenCalledTimes(1)
+    expect(client.breakRecord.update).toHaveBeenCalledWith({
+      where: { id: 'r-paused' },
+      data: { endTime: pauseTime },
+    })
+  })
+
+  it('active break あり、pause 中でない（pauseTime なし） → endTime = interruptedAt', async () => {
+    const interruptedAt = new Date('2026-05-04T11:49:38.000Z')
+    const startTime = new Date('2026-05-04T11:48:40.000Z')
+    const client = createFakeClient([
+      { id: 'r-active', startTime, pauseTime: null },
+    ])
+
+    await closeActiveBreakOnDispatchStart(client as never, {
+      userId,
+      tenantId,
+      interruptedAt,
+    })
+
+    expect(client.breakRecord.update).toHaveBeenCalledTimes(1)
+    expect(client.breakRecord.update).toHaveBeenCalledWith({
+      where: { id: 'r-active' },
+      data: { endTime: interruptedAt },
+    })
+  })
+
+  it('active break なし → update は呼ばれず、例外も投げない', async () => {
+    const interruptedAt = new Date('2026-05-04T11:49:38.000Z')
+    const client = createFakeClient([])
+
+    await expect(
+      closeActiveBreakOnDispatchStart(client as never, {
+        userId,
+        tenantId,
+        interruptedAt,
+      }),
+    ).resolves.toBeUndefined()
+
+    expect(client.breakRecord.update).not.toHaveBeenCalled()
+  })
+
+  it('同 user に複数 active break（防御）→ 全件クローズ', async () => {
+    const interruptedAt = new Date('2026-05-04T11:49:38.000Z')
+    const start1 = new Date('2026-05-04T11:00:00.000Z')
+    const start2 = new Date('2026-05-04T11:30:00.000Z')
+    const pause2 = new Date('2026-05-04T11:35:00.000Z')
+    const client = createFakeClient([
+      // 1件目: pause なし → endTime = interruptedAt
+      { id: 'r-multi-1', startTime: start1, pauseTime: null },
+      // 2件目: pause あり → endTime = pauseTime
+      { id: 'r-multi-2', startTime: start2, pauseTime: pause2 },
+    ])
+
+    await closeActiveBreakOnDispatchStart(client as never, {
+      userId,
+      tenantId,
+      interruptedAt,
+    })
+
+    expect(client.breakRecord.update).toHaveBeenCalledTimes(2)
+    expect(client.breakRecord.update).toHaveBeenNthCalledWith(1, {
+      where: { id: 'r-multi-1' },
+      data: { endTime: interruptedAt },
+    })
+    expect(client.breakRecord.update).toHaveBeenNthCalledWith(2, {
+      where: { id: 'r-multi-2' },
+      data: { endTime: pause2 },
+    })
+  })
+
+  it('findMany には userId / tenantId / endTime: null の where が渡される', async () => {
+    const interruptedAt = new Date('2026-05-04T11:49:38.000Z')
+    const client = createFakeClient([])
+
+    await closeActiveBreakOnDispatchStart(client as never, {
+      userId: 'target-u',
+      tenantId: 'target-t',
+      interruptedAt,
+    })
+
+    expect(client.breakRecord.findMany).toHaveBeenCalledTimes(1)
+    const arg = client.breakRecord.findMany.mock.calls[0][0]
+    expect(arg.where).toEqual({
+      userId: 'target-u',
+      tenantId: 'target-t',
+      endTime: null,
+    })
+    // select で id / pauseTime のみ取得（startTime は判定不要なので含まない）
+    expect(arg.select).toEqual({
+      id: true,
+      pauseTime: true,
+    })
+  })
+
+  it('上限判定を行わない: 経過 5 秒の active break でも即時クローズされる', async () => {
+    // closeStaleBreaks との明確な差分テスト。
+    // closeStaleBreaks は経過 <= 60 分を触らないが、本関数は時間に関係なく即時クローズ。
+    const interruptedAt = new Date('2026-05-04T11:49:38.000Z')
+    const startTime = new Date('2026-05-04T11:49:33.000Z') // 5 秒前
+    const client = createFakeClient([
+      { id: 'r-fresh', startTime, pauseTime: null },
+    ])
+
+    await closeActiveBreakOnDispatchStart(client as never, {
+      userId,
+      tenantId,
+      interruptedAt,
+    })
+
+    expect(client.breakRecord.update).toHaveBeenCalledTimes(1)
+    expect(client.breakRecord.update).toHaveBeenCalledWith({
+      where: { id: 'r-fresh' },
+      data: { endTime: interruptedAt },
+    })
+  })
+})

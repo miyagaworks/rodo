@@ -1,8 +1,8 @@
 /// <reference lib="webworker" />
 
-const CACHE_NAME = 'rodo-v6'
-const STATIC_CACHE = 'rodo-static-v6'
-const IMAGE_CACHE = 'rodo-images-v6'
+const CACHE_NAME = 'rodo-v7'
+const STATIC_CACHE = 'rodo-static-v7'
+const IMAGE_CACHE = 'rodo-images-v7'
 
 // 静的アセット（Cache First）
 // 注意: '/' は動的ページ（セッション依存）なのでプリキャッシュしない
@@ -50,6 +50,11 @@ self.addEventListener('fetch', (event) => {
   // （認証不要・PWAキャッシュ不要）
   if (url.pathname.startsWith('/c/') || url.pathname.startsWith('/api/c/')) return
 
+  // /api/health は SW のフォールバックを通さず素のネットワーク fetch を透過させる。
+  // useOnlineStatus.probeHealth が真のネット断を確実に検出できるよう、
+  // ネット失敗時はブラウザに reject させる必要がある（503 を返してはいけない）。
+  if (url.pathname === '/api/health') return
+
   // POST/PATCH はキャッシュしない
   if (request.method !== 'GET') return
 
@@ -90,20 +95,38 @@ async function networkOnly(request) {
   try {
     return await fetch(request)
   } catch {
-    // オフライン時のフォールバック
+    // オフライン時のフォールバック。
+    // SW 由来のオフライン応答であることを `X-SW-Offline: 1` ヘッダで示し、
+    // クライアント側（lib/offline-fetch.ts, hooks/useOnlineStatus.ts）が
+    // 実サーバーの 5xx と区別できるようにする。
     if (request.mode === 'navigate') {
       return new Response(
         '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body><p>オフラインです。ネットワーク接続を確認してください。</p></body></html>',
-        { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+        {
+          status: 503,
+          headers: {
+            'Content-Type': 'text/html; charset=utf-8',
+            'X-SW-Offline': '1',
+          },
+        }
       )
     }
     if (new URL(request.url).pathname.startsWith('/api/')) {
       return new Response(
         JSON.stringify({ error: 'offline', message: 'オフラインです' }),
-        { status: 503, headers: { 'Content-Type': 'application/json' } }
+        {
+          status: 503,
+          headers: {
+            'Content-Type': 'application/json',
+            'X-SW-Offline': '1',
+          },
+        }
       )
     }
-    return new Response('Offline', { status: 503 })
+    return new Response('Offline', {
+      status: 503,
+      headers: { 'X-SW-Offline': '1' },
+    })
   }
 }
 
@@ -118,18 +141,28 @@ async function networkFirst(request) {
   } catch {
     const cached = await caches.match(request)
     if (cached) return cached
-    // API のオフラインフォールバック
+    // API のオフラインフォールバック。
+    // SW 由来であることを `X-SW-Offline: 1` ヘッダで示す（networkOnly と一貫させる）。
     if (new URL(request.url).pathname.startsWith('/api/')) {
       return new Response(
         JSON.stringify({ error: 'offline', message: 'オフラインです' }),
         {
           status: 503,
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'X-SW-Offline': '1',
+          },
         }
       )
     }
     const fallback = await caches.match('/')
-    return fallback || new Response('Offline', { status: 503 })
+    return (
+      fallback ||
+      new Response('Offline', {
+        status: 503,
+        headers: { 'X-SW-Offline': '1' },
+      })
+    )
   }
 }
 

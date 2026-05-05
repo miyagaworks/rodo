@@ -51,15 +51,22 @@ export default function BreakScreen() {
         }
         const active = await activeRes.json()
 
-        // 経過時間を逆算して残り秒を計算（サーバーの startTime 起点）
-        const serverStartMs = new Date(active.startTime).getTime()
-        const elapsedSec = Math.max(0, (Date.now() - serverStartMs) / 1000)
-        const remaining = Math.max(0, BREAK_DURATION - elapsedSec)
+        // サーバー側で pause を考慮した残り秒（remainingSeconds）を計算済み。
+        // クライアントは独自に startTime からの経過時間を計算せず、その値をそのまま使う。
+        if (typeof active.remainingSeconds !== 'number') {
+          console.error(
+            'Active break response missing remainingSeconds:',
+            active,
+          )
+          return
+        }
 
+        // TODO: active.pauseTime 非null && resumeTime null の場合は pause 状態として復元すべき
+        // 現状は問答無用で 'breaking' をセットしている。pause 復元の責務は BreakBar 側。
         setBreakState({
           status: 'breaking',
           startTime: Date.now(),
-          remainingSeconds: remaining,
+          remainingSeconds: active.remainingSeconds,
           pausedAt: null,
           breakRecordId: active.id,
         })

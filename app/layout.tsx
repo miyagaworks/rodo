@@ -24,6 +24,12 @@ const lineSeedJP = localFont({
   ],
   variable: '--font-line-seed-jp',
   display: 'swap',
+  // LINE Seed JP のベースライン位置を補正（テキスト中央配置の上付き対策）
+  // 値を 100% より大きくすると文字が下方向に移動する
+  // 105% は控えめな初期値、実機確認後に 108 / 110 / 112% で微調整想定
+  declarations: [
+    { prop: 'ascent-override', value: '125%' },
+  ],
 })
 
 export const metadata: Metadata = {

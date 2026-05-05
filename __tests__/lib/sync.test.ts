@@ -48,7 +48,6 @@ describe('sync', () => {
       type: 'dispatch_create' as const,
       dispatchId: null,
       timestamp: Date.now(),
-      gps: null,
       data: { name: 'test' },
       endpoint,
       method: 'POST' as const,

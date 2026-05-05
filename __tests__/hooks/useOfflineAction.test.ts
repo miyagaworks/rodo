@@ -39,7 +39,6 @@ describe('useOfflineAction', () => {
   const baseParams = {
     type: 'dispatch_create' as const,
     dispatchId: 'disp-1',
-    gps: null,
     data: { name: 'test' },
     endpoint: '/api/dispatches',
     method: 'POST' as const,

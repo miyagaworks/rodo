@@ -1,7 +1,5 @@
 import { z } from 'zod/v4'
 import {
-  gpsLat,
-  gpsLng,
   odometerReading,
   dateString,
   nullableString,
@@ -16,8 +14,6 @@ export const createDispatchSchema = z.object({
   transportStartOdo: odometerReading,
   returnOdo: odometerReading,
   dispatchTime: dateString,
-  dispatchGpsLat: gpsLat,
-  dispatchGpsLng: gpsLng,
   parentDispatchId: z.string().nullable().optional(),
   isSecondaryTransport: z.boolean().optional(),
 })
@@ -50,10 +46,6 @@ export const updateDispatchSchema = z.object({
   transportStartTime: dateString,
   returnTime: dateString,
   dispatchTime: dateString,
-
-  // GPS
-  arrivalGpsLat: gpsLat,
-  arrivalGpsLng: gpsLng,
 
   // 距離 (ODO)
   departureOdo: odometerReading,
@@ -122,12 +114,6 @@ export const adminUpdateDispatchSchema = z.object({
   transportStartTime: dateString,
   returnTime: dateString,
   dispatchTime: dateString,
-
-  // GPS
-  dispatchGpsLat: gpsLat,
-  dispatchGpsLng: gpsLng,
-  arrivalGpsLat: gpsLat,
-  arrivalGpsLng: gpsLng,
 
   // 距離 (ODO)
   departureOdo: odometerReading,

@@ -121,8 +121,6 @@ export async function PATCH(
 
   // 出動画面フィールド
   if (body.arrivalTime !== undefined) allowed.arrivalTime = body.arrivalTime ? new Date(body.arrivalTime) : null
-  if (body.arrivalGpsLat !== undefined) allowed.arrivalGpsLat = body.arrivalGpsLat
-  if (body.arrivalGpsLng !== undefined) allowed.arrivalGpsLng = body.arrivalGpsLng
   if (body.completionTime !== undefined) allowed.completionTime = body.completionTime ? new Date(body.completionTime) : null
   if (body.transportStartTime !== undefined) allowed.transportStartTime = body.transportStartTime ? new Date(body.transportStartTime) : null
   if (body.departureOdo !== undefined) allowed.departureOdo = body.departureOdo

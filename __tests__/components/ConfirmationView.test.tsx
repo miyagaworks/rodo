@@ -25,7 +25,8 @@ function makeConfirmation(
     dispatchId: 'd1',
     workDate: new Date('2026-04-26'),
     preApprovalChecks: [true, true, false, false, false],
-    customerSignature: 'data:image/png;base64,sigCustomer',
+    customerSignature:
+      'https://example.public.blob.vercel-storage.com/signatures/t1/d1/customer-1.png',
     customerName: null,
     customerDate: null,
     vehicleType: 'トヨタ プリウス',
@@ -35,7 +36,8 @@ function makeConfirmation(
     shopContactName: null,
     shopSignature: null,
     postApprovalCheck: true,
-    postApprovalSignature: 'data:image/png;base64,sigPost',
+    postApprovalSignature:
+      'https://example.public.blob.vercel-storage.com/signatures/t1/d1/postApproval-1.png',
     postApprovalName: '宮川 清美',
     batteryDetails: null,
     notes: null,
@@ -104,11 +106,15 @@ describe('ConfirmationView', () => {
 
     const customerImg = screen.getByAltText('お客様署名') as HTMLImageElement
     expect(customerImg).toBeInTheDocument()
-    expect(customerImg.src).toBe('data:image/png;base64,sigCustomer')
+    expect(customerImg.src).toBe(
+      'https://example.public.blob.vercel-storage.com/signatures/t1/d1/customer-1.png',
+    )
 
     const postImg = screen.getByAltText('お客様署名（作業後）') as HTMLImageElement
     expect(postImg).toBeInTheDocument()
-    expect(postImg.src).toBe('data:image/png;base64,sigPost')
+    expect(postImg.src).toBe(
+      'https://example.public.blob.vercel-storage.com/signatures/t1/d1/postApproval-1.png',
+    )
   })
 
   it('署名なしの場合は「（署名なし）」が表示される', () => {

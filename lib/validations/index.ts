@@ -52,8 +52,6 @@ export {
 
 // Helpers
 export {
-  gpsLat,
-  gpsLng,
   odometerReading,
   monetaryAmount,
   distance,
@@ -61,6 +59,7 @@ export {
   dateString,
   nonEmptyString,
   nullableString,
+  signatureValue,
   cuid,
   parseBody,
 } from './helpers'

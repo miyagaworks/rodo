@@ -68,7 +68,7 @@ const baseUpserted = {
   dispatchId: 'abc',
   shareToken: null as string | null,
   sharedAt: null as Date | null,
-  postApprovalSignature: 'data:image/png;base64,sig',
+  postApprovalSignature: 'https://example.public.blob.vercel-storage.com/signatures/t1/abc/postApproval-1.png',
   customerSignature: null,
   workDate: new Date('2026-04-26'),
   preApprovalChecks: null,
@@ -113,7 +113,7 @@ describe('POST/PATCH /api/dispatches/[id]/confirmation - shareToken 生成', () 
 
       const res = await POST(
         makeRequest(
-          { postApprovalSignature: 'data:image/png;base64,sig' },
+          { postApprovalSignature: 'https://example.public.blob.vercel-storage.com/signatures/t1/abc/postApproval-1.png' },
           'POST',
         ),
         makeParams(),
@@ -141,7 +141,7 @@ describe('POST/PATCH /api/dispatches/[id]/confirmation - shareToken 生成', () 
       })
 
       const res = await PATCH(
-        makeRequest({ postApprovalSignature: 'data:image/png;base64,sig' }),
+        makeRequest({ postApprovalSignature: 'https://example.public.blob.vercel-storage.com/signatures/t1/abc/postApproval-1.png' }),
         makeParams(),
       )
 
@@ -166,7 +166,7 @@ describe('POST/PATCH /api/dispatches/[id]/confirmation - shareToken 生成', () 
 
       const res = await POST(
         makeRequest(
-          { postApprovalSignature: 'data:image/png;base64,sig' },
+          { postApprovalSignature: 'https://example.public.blob.vercel-storage.com/signatures/t1/abc/postApproval-1.png' },
           'POST',
         ),
         makeParams(),
@@ -188,7 +188,7 @@ describe('POST/PATCH /api/dispatches/[id]/confirmation - shareToken 生成', () 
       })
 
       const res = await PATCH(
-        makeRequest({ postApprovalSignature: 'data:image/png;base64,sig' }),
+        makeRequest({ postApprovalSignature: 'https://example.public.blob.vercel-storage.com/signatures/t1/abc/postApproval-1.png' }),
         makeParams(),
       )
 

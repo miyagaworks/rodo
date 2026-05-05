@@ -57,6 +57,17 @@ shimoda.rodo.run の本番リリース前にやるべきタスクを **一元管
 | J-12 | ロールバック判断基準の事前合意 → `docs/rollback-criteria.md` | **ドラフト作成済み**（2026-04-29、宮川承認待ち） | super-agent + 宮川 | - | 0.25人日 | 「ログイン不可・書込不可・p95>5秒のいずれかが30分継続でロールバック」を文書化 |
 | P2-03 | スモークテスト実施（本番環境で主要機能を実機検証） | 未着手 | tester | P2-01 | 1〜2人日 | ログイン・出動・写真・PDF・ETC・振替・帰社・オフライン同期 |
 
+### 2.3A コード品質負債（既存、本番影響なし）
+
+| ID | タスク | 状態 | 担当 | 依存 | 推定 | 根拠 |
+|---|---|---|---|---|---|---|
+| Q-01 | ESLint エラー 58件 / warnings 46件の修正（既存負債） | 未着手 | 修正CC | - | 1〜2人日 | `feature/p0-13-signature-blob` のスモークテスト準備時に発覚（2026-04-30）。PR #10 で導入されたものはゼロ（同 PR の `d3bb47c` 時点で同件数を確認）。本番動作には影響しないため、PR #10 とは別 PR で段階的に解消する。主要エラー: `react-hooks/set-state-in-effect`（`hooks/usePhotoCapture.ts:49`）/ `react-hooks/immutability` 系（複数）/ `@typescript-eslint/no-unused-vars` 多数 / `jsx-a11y/alt-text`（`lib/pdf/confirmation-template.tsx:74`） |
+
+**運用方針**:
+- CLAUDE.md グローバルルール「push 前の lint 確認」は厳格運用するが、Q-01 は **既存負債**のため本 PR では例外的に push を許容（2026-04-30 super-agent 判断 + 宮川承認）
+- 別 PR でカテゴリ別（react-hooks 系 / unused-vars 系 / a11y 系）に分割対応
+- CI で lint を強制化する前に Q-01 を解消すること
+
 ### 2.4 着手順序（推奨）
 
 ```
@@ -183,3 +194,4 @@ shimoda.rodo.run の本番リリース前にやるべきタスクを **一元管
 | 2026-04-29 | rollback-criteria.md を v2 に改訂（初日 vs 運用フェーズ分離、Level 0 追加）。C 群に 3.3A 障害時の業務継続合意（AG-01〜AG-07）を追加 | super-agent |
 | 2026-04-29 | P0-13 設計書（`docs/plans/p0-13-signature-blob-migration.md`）作成完了 | super-agent |
 | 2026-04-29 | P0-13 設計書承認（Option C + varchar(2048) + P0-15 同一PR + Vercel Preview検証）。実装プロンプト2本（P0-13/15/16統合、P0-17独立）を出力 | super-agent（宮川承認） |
+| 2026-04-30 | スモークテスト準備中に既存 lint 負債（58 errors / 46 warnings）を発見。§2.3A「コード品質負債」を新設し Q-01 として記録。本 PR (#10) では例外プッシュを許容、別 PR で段階解消の方針を決定 | super-agent（宮川承認） |

@@ -49,8 +49,20 @@ const reportFields = {
 /** Report POST/PATCH (upsert) */
 export const upsertReportSchema = z.object(reportFields)
 
-/** Report complete POST (isDraft強制false、transport系フィールド除外) */
+/** Report complete POST
+ * - isDraft: complete 時は強制 false（クライアント値を無視）
+ * - transportDistance: サーバー側で resolveOdos / computeDistances により自動計算するため、
+ *   クライアント送信値は使わない（/report/complete/route.ts L80-84 参照）
+ * - storageType: 現状クライアント (ReportTransportClient.tsx) から送信されていない。
+ *   将来送信されるようになる場合はここから外して buildReportData にも追記すること
+ *
+ * 上記 3 件以外の transport* 系（PlaceName/ShopName/Phone/Address/Contact/Memo/Highway）は
+ * TRANSPORT 案件の必須情報なので omit しない（過去 silent drop の主因。2026-05-02 修正）。
+ */
 export const completeReportSchema = z.object({
   ...reportFields,
-  // complete時はisDraftを受け付けない（サーバー側でfalse固定）
-}).omit({ isDraft: true, transportDistance: true, transportHighway: true, transportPlaceName: true, transportShopName: true, transportPhone: true, transportAddress: true, transportContact: true, transportMemo: true, storageType: true })
+}).omit({
+  isDraft: true,
+  transportDistance: true,
+  storageType: true,
+})

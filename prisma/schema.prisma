@@ -138,11 +138,6 @@ model Dispatch {
   completionTime DateTime?
   returnTime     DateTime?
 
-  dispatchGpsLat Float?
-  dispatchGpsLng Float?
-  arrivalGpsLat  Float?
-  arrivalGpsLng  Float?
-
   address          String?
   highwayName      String?
   highwayDirection HighwayDirection?
@@ -368,7 +363,8 @@ model WorkConfirmation {
   workDate DateTime @default(now())
 
   preApprovalChecks Json?
-  customerSignature String?
+  // P0-13: 旧 PNG DataURL → 新 Vercel Blob HTTPS URL に変更（保存内容のみ、フィールド名は維持）。
+  customerSignature String?   @db.VarChar(2048)
   customerName      String?
   customerDate      DateTime?
 
@@ -379,10 +375,10 @@ model WorkConfirmation {
 
   shopCompanyName String?
   shopContactName String?
-  shopSignature   String?
+  shopSignature   String?   @db.VarChar(2048)
 
   postApprovalCheck     Boolean @default(false)
-  postApprovalSignature String?
+  postApprovalSignature String? @db.VarChar(2048)
   postApprovalName      String?
 
   batteryDetails Json?

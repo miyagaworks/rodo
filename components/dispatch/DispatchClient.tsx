@@ -9,6 +9,9 @@ import ClockPicker from './ClockPicker'
 import OdoDialInput from '@/components/common/OdoDialInput'
 import { offlineFetch } from '@/lib/offline-fetch'
 import { usePhotoCapture } from '@/hooks/usePhotoCapture'
+import { useDispatchInProgressGuard } from '@/hooks/useDispatchInProgressGuard'
+import { BackToHomeConfirmModal } from '@/components/dispatch/BackToHomeConfirmModal'
+import { CancelDispatchButton } from '@/components/dispatch/CancelDispatchButton'
 import AppFooter from '@/components/common/AppFooter'
 
 // -------------------------------------------------------
@@ -17,8 +20,6 @@ import AppFooter from '@/components/common/AppFooter'
 
 interface TimeRecord {
   time: Date
-  gpsLat?: number | null
-  gpsLng?: number | null
 }
 
 interface SerializedDispatch {
@@ -35,10 +36,6 @@ interface SerializedDispatch {
   arrivalTime: string | null
   completionTime: string | null
   returnTime: string | null
-  dispatchGpsLat: number | null
-  dispatchGpsLng: number | null
-  arrivalGpsLat: number | null
-  arrivalGpsLng: number | null
   transportStartTime: string | null
   deliveryType: 'DIRECT' | 'STORAGE' | null
   transferStatus: string | null
@@ -47,6 +44,11 @@ interface SerializedDispatch {
   transferredToDispatchNumber: string | null
   transferredFromUserName: string | null
   vehicleId: string | null
+  /**
+   * 書類作成中フラグ（2026-05-05 仕様変更）。
+   * 出動記録ボタン押下時に true をセット。帰社後でも false の間は active 継続でガード。
+   */
+  isDraft: boolean
 }
 
 interface DispatchClientProps {
@@ -238,16 +240,6 @@ function ActionButton({
 }
 
 // -------------------------------------------------------
-// GPS helper
-// -------------------------------------------------------
-
-function getGPS(): Promise<{ lat: number; lng: number } | null> {
-  // GPS 自動取得は廃止（ODO メーター手動記録に変更）。
-  // 関数シグネチャは維持し、常に null を返す no-op 実装。
-  return Promise.resolve(null)
-}
-
-// -------------------------------------------------------
 // Main component
 // -------------------------------------------------------
 
@@ -279,6 +271,10 @@ export default function DispatchClient({
   const [transportStartOdo, setTransportStartOdo] = useState<number | null>(
     initialDispatch?.transportStartOdo ?? null
   )
+  // -T レコードでは「搬開ODO が DB に保存済みか」を独立に追跡し、搬送開始ボタンの活性化に用いる
+  const [isTransportStartOdoSaved, setIsTransportStartOdoSaved] = useState<boolean>(
+    initialDispatch?.transportStartOdo != null
+  )
   const [completionOdo, setCompletionOdo] = useState<number | null>(
     initialDispatch?.completionOdo ?? null
   )
@@ -287,22 +283,10 @@ export default function DispatchClient({
   )
   const [lastReturnOdo, setLastReturnOdo] = useState<number | null>(null)
   const [dispatchTime, setDispatchTime] = useState<TimeRecord | null>(
-    initialDispatch?.dispatchTime
-      ? {
-          time: new Date(initialDispatch.dispatchTime),
-          gpsLat: initialDispatch.dispatchGpsLat,
-          gpsLng: initialDispatch.dispatchGpsLng,
-        }
-      : null
+    initialDispatch?.dispatchTime ? { time: new Date(initialDispatch.dispatchTime) } : null
   )
   const [arrivalTime, setArrivalTime] = useState<TimeRecord | null>(
-    initialDispatch?.arrivalTime
-      ? {
-          time: new Date(initialDispatch.arrivalTime),
-          gpsLat: initialDispatch.arrivalGpsLat,
-          gpsLng: initialDispatch.arrivalGpsLng,
-        }
-      : null
+    initialDispatch?.arrivalTime ? { time: new Date(initialDispatch.arrivalTime) } : null
   )
   const [transportStartTime, setTransportStartTime] = useState<TimeRecord | null>(
     initialDispatch?.transportStartTime ? { time: new Date(initialDispatch.transportStartTime) } : null
@@ -332,6 +316,33 @@ export default function DispatchClient({
   const isTransferred = initialDispatch?.status === 'TRANSFERRED'
   const isTransferredIn = !!initialDispatch?.transferredFromId
 
+  // ── 進行中（active）ガード（Phase 3 / Phase 5.5 拡張）──
+  // 根拠: getInitialStep（L63-72）により帰社後は onsite=4 / transport=5。
+  //   step 0 は未出動。step 1〜帰社直前が「現場対応中」= active。
+  //   isActiveDispatchStatus を使わない理由: 新規出動シナリオでは initialDispatch=null のため
+  //   サーバ status を持たない。step ベースが両シナリオを一意にカバーする。
+  //
+  // Phase 5.5（2026-05-05 ユーザー確定）:
+  //   帰社後（step=4 onsite / step=5 transport）でも `isDraft === false` の間は
+  //   「書類作成画面に未着手」とみなしガード継続する。出動記録ボタン押下で
+  //   PATCH /api/dispatches/[id] により isDraft=true となった時点でガード解除。
+  const [isDraft, setIsDraft] = useState<boolean>(initialDispatch?.isDraft ?? false)
+  const finalStep = mode === 'transport' ? 5 : 4
+  const inProgress =
+    dispatchId !== null &&
+    step >= 1 &&
+    (step < finalStep || (step >= finalStep && isDraft === false))
+
+  const [showGuardModal, setShowGuardModal] = useState(false)
+  const { safeNavigateHome } = useDispatchInProgressGuard({
+    inProgress,
+    onAttemptHome: () => {
+      setShowGuardModal(true)
+      // 戻れない仕様のため常にブロック
+      return false
+    },
+  })
+
   // ── 前回帰社 ODO 取得（出発 ODO の placeholder 初期値） ──
   useEffect(() => {
     if (!vehicleId) return
@@ -356,6 +367,7 @@ export default function DispatchClient({
   // 振替完了ポーリング（30秒間隔、PENDING 時のみ）
   useEffect(() => {
     if (!transferPending || !dispatchId) return
+    let redirectTimeoutId: ReturnType<typeof setTimeout> | null = null
     const poll = setInterval(async () => {
       try {
         const res = await fetch(`/api/dispatches/${dispatchId}`)
@@ -364,11 +376,18 @@ export default function DispatchClient({
         if (data.status === 'TRANSFERRED') {
           setTransferCompleted(true)
           clearInterval(poll)
-          setTimeout(() => router.push('/'), 3000)
+          // Phase 7 改訂スコープ A-1: アンマウント時の暴走防止のため timeout id を保持し
+          // cleanup で clearTimeout する。コンポーネント破棄後の router.push を防ぐ。
+          redirectTimeoutId = setTimeout(() => router.push('/'), 3000)
         }
       } catch { /* ignore */ }
     }, 30000)
-    return () => clearInterval(poll)
+    return () => {
+      clearInterval(poll)
+      if (redirectTimeoutId !== null) {
+        clearTimeout(redirectTimeoutId)
+      }
+    }
   }, [transferPending, dispatchId, router])
 
   // ── 写真（Phase 10） ──
@@ -440,8 +459,13 @@ export default function DispatchClient({
     departureOdo ?? (lastReturnOdo !== null ? lastReturnOdo : 0)
   const arrivalPlaceholder: number =
     arrivalOdo ?? departurePlaceholder
+  // 振替先 -T では受諾者車両の最終 returnOdo を直接 placeholder に流す
+  // （1次値を継承する chain をバイパス）
   const transportStartPlaceholder: number =
-    transportStartOdo ?? arrivalPlaceholder
+    transportStartOdo ??
+    (isTransferredIn && lastReturnOdo !== null
+      ? lastReturnOdo
+      : arrivalPlaceholder)
   const completionPlaceholder: number = mode === 'transport'
     ? (completionOdo ?? transportStartPlaceholder)
     : (completionOdo ?? arrivalPlaceholder)
@@ -465,7 +489,6 @@ export default function DispatchClient({
     setLoading(true)
     try {
       const now = new Date()
-      const gps = await getGPS()
 
       // 取消後の再出動: 既存レコードを再利用して欠番を防ぐ
       if (dispatchId) {
@@ -474,17 +497,14 @@ export default function DispatchClient({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             dispatchTime: now.toISOString(),
-            dispatchGpsLat: gps?.lat ?? null,
-            dispatchGpsLng: gps?.lng ?? null,
             departureOdo: departureOdo ?? null,
             status: 'DISPATCHED',
           }),
           offlineActionType: 'dispatch_update',
           offlineDispatchId: dispatchId,
-          offlineGps: gps,
         })
         if (!res.ok) throw new Error('dispatch update failed')
-        setDispatchTime({ time: now, gpsLat: gps?.lat, gpsLng: gps?.lng })
+        setDispatchTime({ time: now })
         setStep(1)
       } else {
         // 初回出動: 新規作成
@@ -496,12 +516,9 @@ export default function DispatchClient({
             type: mode,
             departureOdo: departureOdo ?? null,
             dispatchTime: now.toISOString(),
-            dispatchGpsLat: gps?.lat ?? null,
-            dispatchGpsLng: gps?.lng ?? null,
           }),
           offlineActionType: 'dispatch_create',
           offlineDispatchId: null,
-          offlineGps: gps,
           offlineOptimisticData: { id: `offline-${Date.now()}`, dispatchNumber: '---' },
         })
 
@@ -510,7 +527,7 @@ export default function DispatchClient({
 
         setDispatchId(data.id)
         setDispatchNumber(data.dispatchNumber)
-        setDispatchTime({ time: now, gpsLat: gps?.lat, gpsLng: gps?.lng })
+        setDispatchTime({ time: now })
         setStep(1)
         router.replace(`/dispatch/${data.id}`)
       }
@@ -526,21 +543,17 @@ export default function DispatchClient({
     setLoading(true)
     try {
       const now = new Date()
-      const gps = await getGPS()
 
       await offlineFetch(`/api/dispatches/${dispatchId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           arrivalTime: now.toISOString(),
-          arrivalGpsLat: gps?.lat ?? null,
-          arrivalGpsLng: gps?.lng ?? null,
           arrivalOdo: arrivalOdo ?? null,
           status: 'ONSITE',
         }),
         offlineActionType: 'dispatch_update',
         offlineDispatchId: dispatchId,
-        offlineGps: gps,
       })
 
       // 回送高速が入力されていればReportへ保存
@@ -554,7 +567,7 @@ export default function DispatchClient({
         }).catch(console.error)
       }
 
-      setArrivalTime({ time: now, gpsLat: gps?.lat, gpsLng: gps?.lng })
+      setArrivalTime({ time: now })
       setStep(2)
     } catch (e) {
       console.error(e)
@@ -608,14 +621,18 @@ export default function DispatchClient({
     setLoading(true)
     try {
       const now = new Date()
+      // 振替先 -T では transportStartOdo は OdoDialInput 確定時に既に保存済みのため body から除外
+      const body: Record<string, unknown> = {
+        transportStartTime: now.toISOString(),
+        status: 'TRANSPORTING',
+      }
+      if (!isTransferredIn) {
+        body.transportStartOdo = transportStartOdo ?? null
+      }
       await offlineFetch(`/api/dispatches/${dispatchId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          transportStartTime: now.toISOString(),
-          transportStartOdo: transportStartOdo ?? null,
-          status: 'TRANSPORTING',
-        }),
+        body: JSON.stringify(body),
         offlineActionType: 'dispatch_update',
         offlineDispatchId: dispatchId,
       })
@@ -626,7 +643,7 @@ export default function DispatchClient({
     } finally {
       setLoading(false)
     }
-  }, [step, dispatchId, loading, transportStartOdo])
+  }, [step, dispatchId, loading, transportStartOdo, isTransferredIn])
 
   // 搬送専用: 完了（搬送高速を保存）
   const handleTransportComplete = useCallback(async () => {
@@ -795,14 +812,18 @@ export default function DispatchClient({
           resetState: () => setDispatchTime(null),
         },
         arrival: {
-          fields: { arrivalTime: null, arrivalGpsLat: null, arrivalGpsLng: null, arrivalOdo: null, status: 'DISPATCHED' },
+          fields: { arrivalTime: null, arrivalOdo: null, status: 'DISPATCHED' },
           prevStep: 1,
           resetState: () => { setArrivalTime(null); setArrivalOdo(null) },
         },
         transportStart: {
           fields: { transportStartTime: null, transportStartOdo: null, status: 'ONSITE' },
           prevStep: 2,
-          resetState: () => { setTransportStartTime(null); setTransportStartOdo(null) },
+          resetState: () => {
+            setTransportStartTime(null)
+            setTransportStartOdo(null)
+            setIsTransportStartOdoSaved(false)
+          },
         },
         completion: {
           fields: {
@@ -908,6 +929,52 @@ export default function DispatchClient({
   // 出動記録へボタンの有効条件: 帰社済み
   const recordReady = mode === 'transport' ? step >= 5 : step >= 4
 
+  // 出動記録ボタン押下中（PATCH 中の連打防止）
+  const [recordSubmitting, setRecordSubmitting] = useState(false)
+
+  /**
+   * 出動記録ボタン onClick（Phase 5.5 / 2026-05-05 ユーザー確定）。
+   *
+   * PATCH /api/dispatches/[id] で `isDraft: true` を送信し、成功時のみ
+   * `/dispatch/[id]/record` へ遷移する。これにより active 判定（GET /active /
+   * isActiveDispatchStatus）が「帰社後 isDraft=false → active」から
+   * 「isDraft=true → 非 active」に切り替わり、書類作成画面でホームに戻れる
+   * ようになる。
+   *
+   * AGENTS.md「サイレント故障チェック」準拠:
+   *   - 楽観的更新は行わない（offlineFetch ではなく素の `fetch` を使用）
+   *   - res.ok 必須チェック → 失敗なら遷移せず alert
+   *   - catch 句でユーザー通知（alert）
+   *   - 連打防止: PATCH 中は disabled / setRecordSubmitting で多重起動を防ぐ
+   *
+   * オフライン時: SW フォールバック等で res.ok=false / catch のいずれかに落ちる。
+   *   isDraft 更新を保留したまま遷移する（楽観的更新）と、ホームに戻った後の
+   *   バナー表示と DB 状態が乖離するため不採用。オフラインなら alert で再操作を促す。
+   */
+  const handleClickRecord = useCallback(async () => {
+    if (!recordReady || !dispatchId || recordSubmitting) return
+    setRecordSubmitting(true)
+    try {
+      const res = await fetch(`/api/dispatches/${dispatchId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isDraft: true }),
+      })
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string }
+        alert(body?.error ?? '書類作成への遷移に失敗しました')
+        return
+      }
+      // PATCH 成功 → ローカル isDraft 反映 → ガード解除 → 遷移
+      setIsDraft(true)
+      router.push(`/dispatch/${dispatchId}/record`)
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '書類作成への遷移に失敗しました')
+    } finally {
+      setRecordSubmitting(false)
+    }
+  }, [dispatchId, recordReady, recordSubmitting, router])
+
   // ── Render ──
 
   return (
@@ -918,12 +985,25 @@ export default function DispatchClient({
         style={{ backgroundColor: '#1C2948' }}
       >
         <button
-          onClick={() => router.push('/')}
+          onClick={() => { void safeNavigateHome(router) }}
           className="text-white p-1 -ml-1 rounded-md active:opacity-60"
         >
           <IoIosArrowBack className="w-6 h-6" />
         </button>
         <span className="text-white text-sm opacity-50 font-medium">出動画面</span>
+        {/* 案件キャンセル（Phase 4） — inProgress=true && !isTransferred のときのみ表示。
+            §9.0-A: 現場対応 2 画面のみ。§9.0-B: TRANSFERRED は対象外。
+            onCancelled では Phase 3 ガード経由ではなく router.push を直接呼ぶ
+            （CancelDispatchButton 経由は信頼できる遷移であり二重ガード不要）。 */}
+        {inProgress && !isTransferred && dispatchId && dispatchNumber && (
+          <div className="ml-auto">
+            <CancelDispatchButton
+              dispatchId={dispatchId}
+              dispatchNumber={dispatchNumber}
+              onCancelled={() => router.push('/')}
+            />
+          </div>
+        )}
       </header>
 
       {/* ─── Status bar (固定) ─── */}
@@ -1079,7 +1159,8 @@ export default function DispatchClient({
             time={dispatchTime?.time}
             onPress={handleDispatch}
             onCorrect={() => setClockTarget('dispatch')}
-            onCancel={() => handleCancelStep('dispatch')}
+            // -T レコードでは出動の取消は 1次データを破壊するため非表示
+            onCancel={isTransferredIn ? undefined : () => handleCancelStep('dispatch')}
             loading={loading && step === 0}
           />
         </div>
@@ -1118,7 +1199,8 @@ export default function DispatchClient({
             time={arrivalTime?.time}
             onPress={handleArrival}
             onCorrect={() => setClockTarget('arrival')}
-            onCancel={() => handleCancelStep('arrival')}
+            // -T レコードでは現着の取消は 1次データを破壊するため非表示
+            onCancel={isTransferredIn ? undefined : () => handleCancelStep('arrival')}
             loading={loading && step === 1}
           />
         </div>
@@ -1219,7 +1301,7 @@ export default function DispatchClient({
           <span className="text-white" style={{ letterSpacing: '0.25em', paddingLeft: '0.25em' }}>写真</span>
           {photoCount > 0 && (
             <span
-              className="flex items-center justify-center w-7 h-7 rounded-full bg-white text-sm font-bold flex-shrink-0"
+              className="flex items-center justify-center w-8 h-8 rounded-full bg-white text-lg font-bold flex-shrink-0"
               style={{ color: '#71A9F7' }}
             >
               {photoCount}
@@ -1287,7 +1369,24 @@ export default function DispatchClient({
             <OdoDialInput
               label="搬開"
               value={transportStartOdo}
-              onChange={setTransportStartOdo}
+              onChange={async (v) => {
+                setTransportStartOdo(v)
+                // 振替先 -T では確定時に DB へ即時保存（搬送開始ボタンの活性化条件）
+                if (isTransferredIn && dispatchId) {
+                  try {
+                    await offlineFetch(`/api/dispatches/${dispatchId}`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ transportStartOdo: v }),
+                      offlineActionType: 'dispatch_update',
+                      offlineDispatchId: dispatchId,
+                    })
+                    setIsTransportStartOdoSaved(true)
+                  } catch (e) {
+                    console.error(e)
+                  }
+                }
+              }}
               disabled={step !== 2}
               placeholder={transportStartPlaceholder}
             />
@@ -1304,7 +1403,13 @@ export default function DispatchClient({
                 label="搬送開始"
                 isActive={step === 2}
                 isPressed={step >= 3}
-                isDisabled={step !== 2 || (step === 2 && transportStartOdo === null)}
+                isDisabled={
+                  step !== 2 ||
+                  (step === 2 &&
+                    (isTransferredIn
+                      ? !isTransportStartOdoSaved // -T: DB 保存済み必須
+                      : transportStartOdo === null))
+                }
                 time={transportStartTime?.time}
                 onPress={handleTransportStart}
                 onCorrect={() => setClockTarget('transportStart')}
@@ -1361,13 +1466,15 @@ export default function DispatchClient({
                       >
                         修正
                       </button>
-                      <button
-                        className="flex-1 bg-white rounded-md py-2 text-center font-bold text-lg shadow-sm border-2 border-red-300 active:bg-red-50"
-                        style={{ color: '#D3170A', letterSpacing: '0.25em', paddingLeft: '0.25em' }}
-                        onClick={() => handleCancelStep('completion')}
-                      >
-                        取消
-                      </button>
+                      {step === 4 && (
+                        <button
+                          className="flex-1 bg-white rounded-md py-2 text-center font-bold text-lg shadow-sm border-2 border-red-300 active:bg-red-50"
+                          style={{ color: '#D3170A', letterSpacing: '0.25em', paddingLeft: '0.25em' }}
+                          onClick={() => handleCancelStep('completion')}
+                        >
+                          取消
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1396,7 +1503,7 @@ export default function DispatchClient({
                       <button
                         className="flex-1 bg-white rounded-md py-2 text-center font-bold text-lg shadow-sm border-2 border-red-300 active:bg-red-50"
                         style={{ color: '#D3170A', letterSpacing: '0.25em', paddingLeft: '0.25em' }}
-                        onClick={() => handleCancelStep('completion')}
+                        onClick={() => handleCancelStep('return')}
                       >
                         取消
                       </button>
@@ -1500,14 +1607,14 @@ export default function DispatchClient({
         {dispatchId && (
           <div ref={recordBtnRef}>
             <button
-              onClick={recordReady ? () => router.push(`/dispatch/${dispatchId}/record`) : undefined}
-              disabled={!recordReady}
+              onClick={recordReady ? handleClickRecord : undefined}
+              disabled={!recordReady || recordSubmitting}
               className="w-full flex items-center justify-center gap-3 rounded-lg py-5 font-bold text-2xl transition-opacity"
               style={{
                 backgroundColor: '#D7AF70',
                 color: '#1C2948',
-                opacity: recordReady ? 1 : 0.35,
-                cursor: recordReady ? 'pointer' : 'not-allowed',
+                opacity: recordReady && !recordSubmitting ? 1 : 0.35,
+                cursor: recordReady && !recordSubmitting ? 'pointer' : 'not-allowed',
               }}
             >
               <span>出動記録へ</span>
@@ -1532,6 +1639,12 @@ export default function DispatchClient({
           />
         )
       })()}
+
+      {/* ─── 進行中ガードモーダル（Phase 3）─── */}
+      <BackToHomeConfirmModal
+        open={showGuardModal}
+        onClose={() => setShowGuardModal(false)}
+      />
     </div>
   )
 }

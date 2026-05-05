@@ -7,6 +7,9 @@ import { IoIosArrowBack, IoIosArrowForward } from 'react-icons/io'
 import ClockPicker from './ClockPicker'
 import OdoDialInput from '@/components/common/OdoDialInput'
 import { offlineFetch } from '@/lib/offline-fetch'
+import { useDispatchInProgressGuard } from '@/hooks/useDispatchInProgressGuard'
+import { BackToHomeConfirmModal } from '@/components/dispatch/BackToHomeConfirmModal'
+import { CancelDispatchButton } from '@/components/dispatch/CancelDispatchButton'
 import AppFooter from '@/components/common/AppFooter'
 
 // -------------------------------------------------------
@@ -214,6 +217,31 @@ export default function SecondaryDispatchClient({ parentDispatch, initialSeconda
 
   const [step, setStep] = useState(getInitialStep(initialSecondary))
   const [secondaryId, setSecondaryId] = useState<string | null>(initialSecondary?.id ?? null)
+
+  // ── 進行中（active）ガード（Phase 3）──
+  // 根拠: getInitialStep（L53-60）により step 4 = 帰社後。step 1〜3 が active。
+  const inProgress =
+    secondaryId !== null &&
+    step >= 1 &&
+    step < 4
+
+  // ── 振替済み判定（Phase 4 §9.0-B）──
+  // 振替済み（status=TRANSFERRED）の元案件はキャンセル対象外。
+  // SecondaryDispatch でも safety net として追加（業務上は想定外だが UI ガードを揃える）。
+  const isTransferred = initialSecondary?.status === 'TRANSFERRED'
+
+  // 案件キャンセル UI 用の dispatchNumber（自身の番号）
+  const secondaryDispatchNumber = initialSecondary?.dispatchNumber ?? null
+
+  const [showGuardModal, setShowGuardModal] = useState(false)
+  const { safeNavigateHome } = useDispatchInProgressGuard({
+    inProgress,
+    onAttemptHome: () => {
+      setShowGuardModal(true)
+      return false
+    },
+  })
+
   const [departureOdo, setDepartureOdo] = useState<number | null>(initialSecondary?.departureOdo ?? null)
   const [arrivalOdo, setArrivalOdo] = useState<number | null>(initialSecondary?.arrivalOdo ?? null)
   const [completionOdo, setCompletionOdo] = useState<number | null>(initialSecondary?.completionOdo ?? null)
@@ -579,12 +607,25 @@ export default function SecondaryDispatchClient({ parentDispatch, initialSeconda
         style={{ backgroundColor: '#1C2948' }}
       >
         <button
-          onClick={() => router.push('/')}
+          onClick={() => { void safeNavigateHome(router) }}
           className="text-white p-1 -ml-1 rounded-md active:opacity-60"
         >
           <IoIosArrowBack className="w-6 h-6" />
         </button>
         <span className="text-white text-sm opacity-50 font-medium">出動画面</span>
+        {/* 案件キャンセル（Phase 4） — inProgress=true && !isTransferred のときのみ表示。
+            §9.0-A: 現場対応 2 画面のみ。§9.0-B: TRANSFERRED は対象外。
+            onCancelled では Phase 3 ガード経由ではなく router.push を直接呼ぶ
+            （CancelDispatchButton 経由は信頼できる遷移であり二重ガード不要）。 */}
+        {inProgress && !isTransferred && secondaryId && secondaryDispatchNumber && (
+          <div className="ml-auto">
+            <CancelDispatchButton
+              dispatchId={secondaryId}
+              dispatchNumber={secondaryDispatchNumber}
+              onCancelled={() => router.push('/')}
+            />
+          </div>
+        )}
       </header>
 
       {/* ─── Status bar (固定) ─── */}
@@ -776,6 +817,12 @@ export default function SecondaryDispatchClient({ parentDispatch, initialSeconda
           />
         )
       })()}
+
+      {/* ─── 進行中ガードモーダル（Phase 3）─── */}
+      <BackToHomeConfirmModal
+        open={showGuardModal}
+        onClose={() => setShowGuardModal(false)}
+      />
     </div>
   )
 }

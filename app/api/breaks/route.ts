@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { Prisma } from '@prisma/client'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/prisma'
+import { closeStaleBreaks } from '@/lib/breakAutoClose'
 
 /**
  * 休憩を新規開始する。
@@ -22,6 +23,14 @@ export async function POST() {
   try {
     const breakRecord = await prisma.$transaction(
       async (tx) => {
+        // 上限超過した古い未終了レコードを先にクローズしておく。
+        // これにより「DB に古い endTime=null が残っているせいで POST が常に 409」になる
+        // 詰まり状態を解消する。同じ tx 内で実行することで、後続の findFirst と整合する。
+        await closeStaleBreaks(tx, {
+          userId: session.user.userId,
+          tenantId: session.user.tenantId,
+        })
+
         const activeBreak = await tx.breakRecord.findFirst({
           where: {
             userId: session.user.userId,

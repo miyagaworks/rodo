@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/prisma'
 import { deriveStatus } from '@/lib/admin/status-derivation'
+import { getBusinessDayDate } from '@/lib/admin/business-day'
+import { closeStaleBreaksForTenant } from '@/lib/breakAutoClose'
 
 /**
  * GET /api/admin/members-status
@@ -16,6 +18,9 @@ import { deriveStatus } from '@/lib/admin/status-derivation'
  *   - status が 'COMPLETED' の場合は returnTime IS NULL のみ（帰社済みは除外）
  *   ただし returnTime の絞り込みは派生関数側でも再度ハンドリングする。
  *   （複合 OR が複雑になるため SQL 側は status だけで広めに取り、関数で確定させる）
+ *   - isDraft: false（下書きは判定対象外。TodayDispatchSummary §設計判断 5 と同じ条件）
+ *   - dispatchTime が「業務日の今日」の範囲内（前日以前の残置レコードは判定対象外）
+ *     業務日は tenant.businessDayStartMinutes に基づき lib/admin/business-day.ts で計算する。
  *
  * 「アクティブな BreakRecord」: endTime IS NULL のみ。
  */
@@ -29,6 +34,25 @@ export async function GET() {
   }
 
   const tenantId = session.user.tenantId
+
+  // 業務日の範囲を算出（テナント設定の businessDayStartMinutes を反映）
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: tenantId },
+    select: { businessDayStartMinutes: true },
+  })
+  const startMinutes = tenant?.businessDayStartMinutes ?? 0
+
+  // 上限超過した古い未終了 BreakRecord をテナント単位で一括クローズしてから users を取得する。
+  // /api/breaks 系（POST / GET active）はユーザー単位で closeStaleBreaks を実行しているが、
+  // ここは 10 秒ポーリングで全隊員ステータスを返す経路のため、休憩中にブラウザを閉じる等で
+  // 残った endTime=null の孤児がダッシュボードに「休憩中」として永続表示されないよう、
+  // 取得前にテナント全体の孤児を一括クローズする（N+1 を避けるため tenant 単位 1 クエリ）。
+  await closeStaleBreaksForTenant(prisma, { tenantId })
+
+  const todayStr = getBusinessDayDate(new Date(), startMinutes)
+  const todayStart = new Date(`${todayStr}T00:00:00.000+09:00`)
+  const tomorrowStart = new Date(todayStart)
+  tomorrowStart.setUTCDate(tomorrowStart.getUTCDate() + 1)
 
   const users = await prisma.user.findMany({
     where: { tenantId },
@@ -44,6 +68,8 @@ export async function GET() {
           status: {
             in: ['DISPATCHED', 'ONSITE', 'TRANSPORTING', 'COMPLETED'],
           },
+          isDraft: false,
+          dispatchTime: { gte: todayStart, lt: tomorrowStart },
         },
         select: {
           id: true,

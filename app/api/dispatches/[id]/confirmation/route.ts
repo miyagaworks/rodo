@@ -4,6 +4,10 @@ import { createId } from '@paralleldrive/cuid2'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/prisma'
 import { upsertConfirmationSchema } from '@/lib/validations'
+import {
+  convertConfirmationSignatures,
+  SignatureValidationError,
+} from '@/lib/blob/signature-storage'
 
 type ConfirmationBody = z.infer<typeof upsertConfirmationSchema>
 
@@ -30,6 +34,17 @@ function buildData(body: ConfirmationBody) {
 
 async function verifyDispatch(id: string, tenantId: string) {
   return prisma.dispatch.findFirst({ where: { id, tenantId } })
+}
+
+/**
+ * P0-13: body 内の署名 3 フィールドを「DataURL なら Blob にアップロードして URL に差し替え」
+ * て新しい body を返す。SignatureValidationError は呼び元で 400 に変換する。
+ */
+async function convertSignatures(
+  body: ConfirmationBody,
+  ctx: { tenantId: string; dispatchId: string },
+): Promise<ConfirmationBody> {
+  return convertConfirmationSignatures(body, ctx) as Promise<ConfirmationBody>
 }
 
 export async function GET(
@@ -69,7 +84,21 @@ export async function POST(
       { status: 400 }
     )
   }
-  const body: ConfirmationBody = parsed.data
+
+  let body: ConfirmationBody
+  try {
+    body = await convertSignatures(parsed.data, {
+      tenantId: session.user.tenantId,
+      dispatchId: id,
+    })
+  } catch (err) {
+    if (err instanceof SignatureValidationError) {
+      return NextResponse.json({ error: err.message }, { status: 400 })
+    }
+    console.error('POST /api/dispatches/[id]/confirmation signature conversion error:', err)
+    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+  }
+
   const data = buildData(body)
 
   try {
@@ -118,7 +147,21 @@ export async function PATCH(
       { status: 400 }
     )
   }
-  const body: ConfirmationBody = parsed.data
+
+  let body: ConfirmationBody
+  try {
+    body = await convertSignatures(parsed.data, {
+      tenantId: session.user.tenantId,
+      dispatchId: id,
+    })
+  } catch (err) {
+    if (err instanceof SignatureValidationError) {
+      return NextResponse.json({ error: err.message }, { status: 400 })
+    }
+    console.error('PATCH /api/dispatches/[id]/confirmation signature conversion error:', err)
+    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+  }
+
   const data = buildData(body)
 
   try {

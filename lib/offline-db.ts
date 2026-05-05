@@ -7,7 +7,6 @@ export interface PendingAction {
   type: 'dispatch_create' | 'dispatch_update' | 'report_save' | 'report_complete' | 'confirmation_save' | 'transfer_request' | 'transfer_cancel'
   dispatchId: string | null
   timestamp: number
-  gps: { lat: number; lng: number } | null
   data: Record<string, unknown>
   /** API endpoint path (e.g. /api/dispatches/xxx) */
   endpoint: string

@@ -2,12 +2,6 @@ import { z } from 'zod/v4'
 
 // --- 再利用可能なカスタムスキーマ ---
 
-/** GPS緯度 (-90 ~ 90) */
-export const gpsLat = z.number().min(-90).max(90).nullable().optional()
-
-/** GPS経度 (-180 ~ 180) */
-export const gpsLng = z.number().min(-180).max(180).nullable().optional()
-
 /** 走行距離メーター (0以上の整数、文字列からの自動変換対応) */
 export const odometerReading = z.union([
   z.number().int().nonnegative(),
@@ -37,6 +31,35 @@ export const nonEmptyString = z.string().min(1)
 
 /** nullable な文字列 (空文字許容) */
 export const nullableString = z.string().nullable().optional()
+
+/**
+ * 署名フィールド用バリデーション。
+ *
+ * 設計書: docs/plans/p0-13-signature-blob-migration.md (4.5 節)
+ *
+ * 受け入れる値:
+ *   - 空文字 ''（フロントが署名クリア時に送る）
+ *   - null
+ *   - PNG DataURL（base64 部分は最大 120000 文字 ≒ 90KB）
+ *   - HTTPS URL（Vercel Blob URL を想定、最大 2048 文字）
+ *
+ * サーバー側で convertSignatureIfDataUrl により DataURL → URL に変換される。
+ */
+export const signatureValue = z
+  .union([
+    z.literal(''),
+    z.null(),
+    z
+      .string()
+      .regex(
+        /^data:image\/png;base64,[A-Za-z0-9+/=]+$/,
+        'Signature DataURL must be PNG base64',
+      )
+      .max(120_000 + 'data:image/png;base64,'.length),
+    z.string().url().startsWith('https://').max(2048),
+  ])
+  .optional()
+  .nullable()
 
 /** CUID形式のID */
 export const cuid = z.string().min(1)

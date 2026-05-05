@@ -14,6 +14,11 @@ export interface DispatchItem {
   status: string
   isDraft: boolean
   billedAt: string | null
+  /**
+   * 帰社時刻 (ISO 文字列)。null = 未帰社。
+   * `status === 'COMPLETED' && returnTime === null` のとき「帰社中」を表す。
+   */
+  returnTime: string | null
   /** 二次搬送予定日時 (ISO 文字列)。null = 未定。Phase 3.5 で追加。 */
   scheduledSecondaryAt: string | null
   type: 'ONSITE' | 'TRANSPORT'

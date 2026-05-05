@@ -18,18 +18,25 @@ export function usePhotoCapture(dispatchId: string | null) {
   const loadPhotos = useCallback(async () => {
     if (!dispatchId) return
 
+    // 'offline-' プレフィックス付き ID は実ネット断時に
+    // DispatchClient が生成した楽観的な仮 ID。サーバーには存在しないため
+    // photos エンドポイントを叩くと 404 になる。IndexedDB のみから取得する。
+    const isOfflineDraft = dispatchId.startsWith('offline-')
+
     // サーバーから取得
     const serverPhotos: PhotoItem[] = []
-    try {
-      const res = await fetch(`/api/dispatches/${dispatchId}/photos`)
-      if (res.ok) {
-        const data = await res.json()
-        for (const p of data.photos) {
-          serverPhotos.push({ id: p.id, url: p.url, isLocal: false })
+    if (!isOfflineDraft) {
+      try {
+        const res = await fetch(`/api/dispatches/${dispatchId}/photos`)
+        if (res.ok) {
+          const data = await res.json()
+          for (const p of data.photos) {
+            serverPhotos.push({ id: p.id, url: p.url, isLocal: false })
+          }
         }
+      } catch {
+        // オフライン
       }
-    } catch {
-      // オフライン
     }
 
     // IndexedDBから取得

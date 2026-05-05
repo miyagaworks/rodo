@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Pencil, Check } from 'lucide-react'
 import { FaPen } from 'react-icons/fa'
 import { IoIosArrowForward } from 'react-icons/io'
+import { TiHome } from 'react-icons/ti'
 import NumberPlateInput, { PlateValue } from './NumberPlateInput'
 import ClockPicker from './ClockPicker'
 import VehicleSelector from './VehicleSelector'
@@ -60,6 +61,8 @@ export interface SerializedDispatch {
 interface RecordClientProps {
   dispatch: SerializedDispatch
   userName: string
+  /** 報告書が確定済みかどうかの判定に使う。null = 未作成。 */
+  report?: { isDraft: boolean } | null
 }
 
 interface InsuranceCompany {
@@ -189,7 +192,7 @@ function ToggleButton({
 // Main Component
 // -------------------------------------------------------
 
-export default function RecordClient({ dispatch, userName }: RecordClientProps) {
+export default function RecordClient({ dispatch, userName, report }: RecordClientProps) {
   const router = useRouter()
 
   // ── State ──
@@ -261,7 +264,6 @@ export default function RecordClient({ dispatch, userName }: RecordClientProps) 
   })
   const [showWorkStartPicker, setShowWorkStartPicker] = useState(false)
   const [showWorkEndPicker, setShowWorkEndPicker] = useState(false)
-  const [showBackConfirm, setShowBackConfirm] = useState(false)
 
   // ── 写真（Phase 10） ──
   const { photos, removePhoto } = usePhotoCapture(dispatch.id)
@@ -363,6 +365,27 @@ export default function RecordClient({ dispatch, userName }: RecordClientProps) 
       })
       if (!res.ok) throw new Error('下書きの保存に失敗しました')
       await clearDraft()
+
+      // Phase 7 改訂スコープ A-2c: 想定外状態の assert（サイレント故障防止 / AGENTS.md 準拠）
+      // dispatch.isDraft は出動記録ボタン押下時に true がセットされ、Phase 5.5 補強により
+      // 本経路でも buildPayload(true) で isDraft=true を維持する。保存後レスポンスで
+      // false が返ってきたら異常（経路バグ / レース）として遷移停止する。
+      const isOptimistic = res.headers.get('X-SW-Offline') === '1'
+      if (!isOptimistic) {
+        const updatedDispatch = (await res.clone().json().catch(() => null)) as
+          | { isDraft?: boolean }
+          | null
+        if (updatedDispatch && updatedDispatch.isDraft !== true) {
+          console.error('[RecordClient.handleDraftSave] Unexpected dispatch.isDraft after save', {
+            dispatchId: dispatch.id,
+            expected: true,
+            actual: updatedDispatch.isDraft,
+          })
+          alert('保存後の状態が想定外です。ホームに戻れません。サポートに連絡してください。')
+          return
+        }
+      }
+
       // ルーターキャッシュをクリアして処理バーを確実に更新する
       window.location.href = '/'
     } catch (e) {
@@ -378,17 +401,21 @@ export default function RecordClient({ dispatch, userName }: RecordClientProps) 
     if (!isComplete || loading) return
     setLoading(true)
     try {
-      await offlineFetch(`/api/dispatches/${dispatch.id}`, {
+      // dispatch.isDraft は維持（true）。最終確定は報告兼請求項目ページの完了押下で
+      // report.isDraft=false となった時点に統一する。
+      const res = await offlineFetch(`/api/dispatches/${dispatch.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(buildPayload(false)),
+        body: JSON.stringify(buildPayload(true)),
         offlineActionType: 'dispatch_update',
         offlineDispatchId: dispatch.id,
       })
+      if (!res.ok) throw new Error('保存に失敗しました')
       await clearDraft()
       router.push(`/dispatch/${dispatch.id}/report`)
     } catch (e) {
       console.error(e)
+      alert(e instanceof Error ? e.message : '保存に失敗しました')
     } finally {
       setLoading(false)
     }
@@ -399,21 +426,51 @@ export default function RecordClient({ dispatch, userName }: RecordClientProps) 
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: '#E5E5E5' }}>
 
       {/* ─── Header ─── */}
-      <header
-        className="flex-shrink-0 px-4 pt-3 pb-3"
+      <div
+        className="px-4 pt-4 pb-3 shadow-sm flex-shrink-0 sticky top-0 z-30"
         style={{ backgroundColor: '#D7AF70' }}
       >
-        {/* タイトル + 日付 */}
-        <div className="flex items-center gap-2 mb-2">
-          <span className="font-bold text-base whitespace-nowrap" style={{ color: '#1C2948' }}>出動記録</span>
-          <div className="flex-1" />
+        {/* 1行目: ホーム / タイトル / バッジ / 日付 */}
+        <div className="flex items-center gap-2 mb-2.5">
           <button
-            onClick={() => setShowBackConfirm(true)}
-            className="px-3 py-1.5 rounded-md text-xs font-bold active:opacity-60 whitespace-nowrap"
-            style={{ backgroundColor: '#1C2948', color: '#FFFFFF' }}
+            onClick={async () => {
+              if (loading) return
+              setLoading(true)
+              try {
+                const res = await offlineFetch(`/api/dispatches/${dispatch.id}`, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(buildPayload(true)),
+                  offlineActionType: 'dispatch_update',
+                  offlineDispatchId: dispatch.id,
+                })
+                if (!res.ok) throw new Error('下書きの保存に失敗しました')
+                await clearDraft()
+                router.push('/')
+              } catch (e) {
+                console.error(e)
+                alert(e instanceof Error ? e.message : '保存に失敗しました')
+              } finally {
+                setLoading(false)
+              }
+            }}
+            disabled={loading}
+            aria-label="ホームに戻る"
+            className="inline-flex items-center justify-center p-2 rounded-md active:opacity-70 disabled:opacity-50"
+            style={{ backgroundColor: '#71A9F7', color: '#FFFFFF' }}
           >
-            出動画面に戻る
+            <TiHome className="w-4 h-4" />
           </button>
+          <span className="text-lg font-bold whitespace-nowrap" style={{ color: '#1C2948' }}>出動記録</span>
+          <span
+            className="text-sm font-bold px-3 py-1 rounded-full whitespace-nowrap"
+            style={{
+              backgroundColor: dispatch.type === 'ONSITE' ? '#ea7600' : '#1C2948',
+              color: 'white',
+            }}
+          >
+            {dispatch.type === 'ONSITE' ? '現場対応' : '搬送'}
+          </span>
           <div className="flex-1" />
           <span className="text-xs whitespace-nowrap" style={{ color: '#1C2948' }}>
             {formatDate(dispatch.dispatchTime)}
@@ -461,7 +518,7 @@ export default function RecordClient({ dispatch, userName }: RecordClientProps) 
             </>
           )}
         </div>
-      </header>
+      </div>
 
       {/* ─── スクロールコンテンツ ─── */}
       <div className="flex-1 overflow-y-auto pb-28 px-3 py-3 space-y-3">
@@ -690,6 +747,21 @@ export default function RecordClient({ dispatch, userName }: RecordClientProps) 
               </span>
             )}
           </div>
+
+          {/* 作業確認書ボタン: 現着済み（arrivalTime あり）のときのみ表示。
+              振替済みは page.tsx 側で /dispatch/[id] へリダイレクトするため
+              record ページでは isTransferred を考慮不要。 */}
+          {dispatch.arrivalTime && (
+            <button
+              onClick={() => router.push(`/dispatch/${dispatch.id}/confirmation?from=record`)}
+              className="mt-3 w-full h-12 flex items-center justify-center gap-2 rounded-md font-bold text-base active:opacity-80"
+              style={{ backgroundColor: '#71A9F7', color: '#FFFFFF' }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/icons/confirmation.svg" alt="" className="w-5 h-5" />
+              作業確認書
+            </button>
+          )}
         </Section>
 
         {/* ─── 自走・搬送（搬送のみ表示） ─── */}
@@ -883,22 +955,24 @@ export default function RecordClient({ dispatch, userName }: RecordClientProps) 
         className="fixed bottom-0 left-0 right-0 flex gap-3 px-3 py-3"
         style={{ backgroundColor: '#E5E5E5' }}
       >
-        {/* 下書き保存 */}
-        <button
-          onClick={handleDraftSave}
-          disabled={loading}
-          className="flex-none flex items-center gap-2 px-5 py-4 rounded-md font-bold text-white text-sm active:opacity-80 transition-opacity"
-          style={{ backgroundColor: '#D3170A' }}
-        >
-          <FaPen className="text-base" />
-          <span>下書き保存</span>
-        </button>
+        {/* 下書き保存（報告書未確定なら表示。report 未作成 or report.isDraft=true のとき） */}
+        {(!report || report.isDraft) && (
+          <button
+            onClick={handleDraftSave}
+            disabled={loading}
+            className="flex-none flex items-center gap-2 px-6 py-4 rounded-md font-bold text-white text-base active:opacity-80 transition-opacity"
+            style={{ backgroundColor: '#D3170A' }}
+          >
+            <FaPen className="text-lg" />
+            <span>下書き保存</span>
+          </button>
+        )}
 
         {/* 報告兼請求項目へ */}
         <button
           onClick={handleProceed}
           disabled={!isComplete || loading}
-          className="flex-1 flex items-center justify-center gap-2 py-4 rounded-md font-bold text-sm transition-all"
+          className="flex-1 flex items-center justify-center gap-2 py-4 rounded-md font-bold text-base transition-all"
           style={{
             backgroundColor: isComplete ? '#1C2948' : '#9CA3AF',
             color: 'white',
@@ -975,74 +1049,6 @@ export default function RecordClient({ dispatch, userName }: RecordClientProps) 
         }}
       />
 
-      {/* ─── 出動画面に戻る確認モーダル ─── */}
-      {showBackConfirm && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center"
-          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-          onClick={() => setShowBackConfirm(false)}
-        >
-          <div
-            className="mx-6 w-full max-w-sm rounded-xl p-5 space-y-4"
-            style={{ backgroundColor: '#FFFFFF' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <p className="text-sm font-bold text-center" style={{ color: '#1C2948' }}>
-              保存していないデータがあります。<br />下書き保存しますか？
-            </p>
-            <div className="space-y-2">
-              <button
-                onClick={async () => {
-                  if (loading) return
-                  setLoading(true)
-                  try {
-                    const res = await offlineFetch(`/api/dispatches/${dispatch.id}`, {
-                      method: 'PATCH',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify(buildPayload(true)),
-                      offlineActionType: 'dispatch_update',
-                      offlineDispatchId: dispatch.id,
-                    })
-                    if (!res.ok) throw new Error('下書きの保存に失敗しました')
-                    await clearDraft()
-                    router.push(`/dispatch/${dispatch.id}`)
-                  } catch (e) {
-                    console.error(e)
-                    alert(e instanceof Error ? e.message : '保存に失敗しました')
-                  } finally {
-                    setLoading(false)
-                    setShowBackConfirm(false)
-                  }
-                }}
-                disabled={loading}
-                className="w-full py-3 rounded-md font-bold text-sm text-white active:opacity-80"
-                style={{ backgroundColor: '#1C2948' }}
-              >
-                {loading ? '保存中...' : '下書き保存して戻る'}
-              </button>
-              <button
-                onClick={() => {
-                  setShowBackConfirm(false)
-                  router.push(`/dispatch/${dispatch.id}`)
-                }}
-                disabled={loading}
-                className="w-full py-3 rounded-md font-bold text-sm active:opacity-80 border"
-                style={{ color: '#D3170A', borderColor: '#D3170A' }}
-              >
-                保存せずに戻る
-              </button>
-              <button
-                onClick={() => setShowBackConfirm(false)}
-                disabled={loading}
-                className="w-full py-3 rounded-md font-bold text-sm active:opacity-80"
-                style={{ color: '#6B7280' }}
-              >
-                キャンセル
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

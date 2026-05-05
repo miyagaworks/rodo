@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { FaPen, FaCheckSquare } from 'react-icons/fa'
 import { FaCircleArrowRight } from 'react-icons/fa6'
 import { IoIosArrowBack } from 'react-icons/io'
+import { TiHome } from 'react-icons/ti'
 import { Check } from 'lucide-react'
 import ClockPicker from './ClockPicker'
 import VehicleSelector from './VehicleSelector'
@@ -27,16 +28,21 @@ export interface SerializedDispatchForReport {
   completionTime: string | null
   returnTime: string | null
   departureOdo: number | null
+  arrivalOdo: number | null
+  transportStartOdo: number | null
   completionOdo: number | null
   returnOdo: number | null
   vehicleId: string | null
   vehicle: { plateNumber: string; displayName: string | null } | null
   deliveryType?: 'DIRECT' | 'STORAGE' | null
+  transferredFromId: string | null
 }
 
 export interface SerializedReport {
   id: string | null
   departureOdo: number | null
+  arrivalOdo: number | null
+  transportStartOdo: number | null
   recoveryDistance: number | null
   transportDistance?: number | null
   returnDistance: number | null
@@ -81,6 +87,15 @@ type TimeField = 'dispatch' | 'arrival' | 'completion' | 'return'
 function formatTime(d: Date | null): string {
   if (!d) return '--:--'
   return d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false })
+}
+
+function formatDate(iso: string | null): string {
+  const d = iso ? new Date(iso) : new Date()
+  const days = ['日', '月', '火', '水', '木', '金', '土']
+  const y = d.getFullYear()
+  const m = d.getMonth() + 1
+  const day = d.getDate()
+  return `${y}年${m}月${day}日（${days[d.getDay()]}）`
 }
 
 // -------------------------------------------------------
@@ -242,13 +257,16 @@ export default function ReportOnsiteClient({ dispatch, report, userName }: Props
   }
 
   // ── ペイロード ──
-  const buildDispatchPayload = (isDraft: boolean) => ({
+  // dispatch.isDraft は出動記録ボタン押下（DispatchClient.handleClickRecord）と
+  // 2 次搬送帰社時（SecondaryDispatchClient L454）でのみ更新される。
+  // Report 系の handleSave からは isDraft を送らないことで、Phase 5.5 の
+  // active 判定との整合性を維持する。
+  const buildDispatchPayload = () => ({
     dispatchTime: dispatchTime?.toISOString() ?? null,
     arrivalTime: arrivalTime?.toISOString() ?? null,
     completionTime: completionTime?.toISOString() ?? null,
     returnTime: returnTime?.toISOString() ?? null,
     vehicleId: vehicleId,
-    isDraft,
   })
 
   const buildReportPayload = (isDraft: boolean) => ({
@@ -275,7 +293,7 @@ export default function ReportOnsiteClient({ dispatch, report, userName }: Props
 
   useEffect(() => {
     saveFormData({
-      dispatch: buildDispatchPayload(true),
+      dispatch: buildDispatchPayload(),
       report: buildReportPayload(true),
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -296,7 +314,7 @@ export default function ReportOnsiteClient({ dispatch, report, userName }: Props
       const dispatchRes = await offlineFetch(`/api/dispatches/${dispatch.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(buildDispatchPayload(isDraft)),
+        body: JSON.stringify(buildDispatchPayload()),
         offlineActionType: 'dispatch_update',
         offlineDispatchId: dispatch.id,
       })
@@ -316,6 +334,27 @@ export default function ReportOnsiteClient({ dispatch, report, userName }: Props
       if (!reportRes.ok) throw new Error('報告の保存に失敗しました')
 
       await clearDraft()
+
+      // Phase 7 改訂スコープ A-2a: 想定外状態の assert（サイレント故障防止 / AGENTS.md 準拠）
+      // dispatch.isDraft は出動記録ボタン押下時に true がセットされ、Phase 5.5 補強により
+      // 報告画面の handleSave からは更新されない。書類画面に到達した時点で true のはずなので、
+      // 保存後レスポンスで false が返ってきたら異常（経路バグ / レース）として遷移停止する。
+      const isOptimistic = dispatchRes.headers.get('X-SW-Offline') === '1'
+      if (!isOptimistic) {
+        const updatedDispatch = (await dispatchRes.clone().json().catch(() => null)) as
+          | { isDraft?: boolean }
+          | null
+        if (updatedDispatch && updatedDispatch.isDraft !== true) {
+          console.error('[ReportOnsiteClient.handleSave] Unexpected dispatch.isDraft after save', {
+            dispatchId: dispatch.id,
+            expected: true,
+            actual: updatedDispatch.isDraft,
+          })
+          alert('保存後の状態が想定外です。ホームに戻れません。サポートに連絡してください。')
+          return
+        }
+      }
+
       // ルーターキャッシュをクリアして処理バーを確実に更新する
       window.location.href = '/'
     } catch (e) {
@@ -365,21 +404,30 @@ export default function ReportOnsiteClient({ dispatch, report, userName }: Props
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: '#E5E5E5' }}>
 
       {/* ─── ヘッダー ─── */}
-      <div className="px-4 pt-4 pb-3 shadow-sm flex-shrink-0" style={{ backgroundColor: '#D7AF70' }}>
-        {/* タイトル行 */}
-        <div className="flex items-center justify-between mb-2.5">
-          <div className="flex items-center gap-2">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/rodo-square-logo.svg" alt="RODO" className="w-8 h-8" />
-            <span className="text-lg font-bold" style={{ color: '#1C2948' }}>
-              報告兼請求項目
-            </span>
-          </div>
+      <div className="px-4 pt-4 pb-3 shadow-sm flex-shrink-0 sticky top-0 z-30" style={{ backgroundColor: '#D7AF70' }}>
+        {/* 1行目: ホーム / タイトル / バッジ / 日付 */}
+        <div className="flex items-center gap-2 mb-2.5">
+          <button
+            onClick={() => { void handleSave(true) }}
+            disabled={loading}
+            aria-label="ホームに戻る"
+            className="inline-flex items-center justify-center p-2 rounded-md active:opacity-70 disabled:opacity-50"
+            style={{ backgroundColor: '#71A9F7', color: 'white' }}
+          >
+            <TiHome className="w-4 h-4" />
+          </button>
+          <span className="text-lg font-bold whitespace-nowrap" style={{ color: '#1C2948' }}>
+            報告/請求
+          </span>
           <span
-            className="text-xs font-bold px-2.5 py-1 rounded-full"
-            style={{ backgroundColor: '#2FBF71', color: 'white' }}
+            className="text-sm font-bold px-3 py-1 rounded-full whitespace-nowrap"
+            style={{ backgroundColor: '#ea7600', color: 'white' }}
           >
             現場対応
+          </span>
+          <div className="flex-1" />
+          <span className="text-xs whitespace-nowrap" style={{ color: '#1C2948' }}>
+            {formatDate(dispatch.dispatchTime)}
           </span>
         </div>
 
@@ -759,29 +807,31 @@ export default function ReportOnsiteClient({ dispatch, report, userName }: Props
       >
         {/* Row 1: 下書き保存 + 完了 */}
         <div className="flex gap-3">
-          <button
-            type="button"
-            onClick={() => handleSave(true)}
-            disabled={loading}
-            className="flex-none flex items-center gap-2 px-5 py-3.5 rounded-md font-bold text-white text-sm active:opacity-80 transition-opacity"
-            style={{ backgroundColor: '#D3170A' }}
-          >
-            <FaPen />
-            <span>下書き保存</span>
-          </button>
+          {report.isDraft && (
+            <button
+              type="button"
+              onClick={() => handleSave(true)}
+              disabled={loading}
+              className="flex-none flex items-center gap-2 px-6 py-3.5 rounded-md font-bold text-white text-base active:opacity-80 transition-opacity"
+              style={{ backgroundColor: '#D3170A' }}
+            >
+              <FaPen className="text-lg" />
+              <span>下書き保存</span>
+            </button>
+          )}
 
           <button
             type="button"
             onClick={() => handleSave(false)}
             disabled={!isComplete || loading}
-            className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-md font-bold text-sm transition-all active:opacity-80"
+            className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-md font-bold text-lg transition-all active:opacity-80"
             style={{
               backgroundColor: isComplete ? '#1C2948' : '#9CA3AF',
               color: isComplete ? '#D7AF70' : 'white',
               cursor: isComplete ? 'pointer' : 'not-allowed',
             }}
           >
-            <FaCheckSquare className="text-base" />
+            <FaCheckSquare className="text-xl" />
             <span>完　了</span>
           </button>
         </div>
@@ -790,7 +840,7 @@ export default function ReportOnsiteClient({ dispatch, report, userName }: Props
         <button
           type="button"
           onClick={() => router.push(`/dispatch/${dispatch.id}/record`)}
-          className="w-full flex items-center gap-2 px-4 py-3 rounded-md font-bold text-white text-sm active:opacity-80"
+          className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-md font-bold text-white text-base active:opacity-80"
           style={{ backgroundColor: '#1C2948' }}
         >
           <IoIosArrowBack className="text-lg" />

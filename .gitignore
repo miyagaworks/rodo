@@ -43,3 +43,6 @@ next-env.d.ts
 
 # Claude Code local settings
 .claude/
+
+# AI agent working notes (research, audits, handovers)
+research/

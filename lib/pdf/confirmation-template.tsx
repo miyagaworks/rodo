@@ -53,6 +53,22 @@ function hasBatteryData(details: Record<string, unknown> | null): boolean {
 // Components
 // -------------------------------------------------------
 
+/**
+ * 署名ブロック。
+ *
+ * P0-13 (2026-04-29): src は DataURL（旧）/ HTTPS URL（新: Vercel Blob `access:'public'`）
+ *   のどちらでも `@react-pdf/renderer` の <Image> がサーバー側 fetch して描画する。
+ *
+ * P0-14 対応予告: Blob を private 化（access:'private' + 署名付きURL）した場合、
+ *   ここで HTTPS URL のまま渡すと 401/403 で fetch 失敗する。対応案は以下のいずれか：
+ *
+ *   A. PDF 生成時にサーバー側で `getDownloadUrl(pathname)` を呼び、
+ *      短期署名 URL を生成してテンプレートに渡す。
+ *   B. PDF 生成時にサーバー側で `fetch(blob_url)` してバッファを取り、
+ *      `<Image src={Buffer}>` に渡す（@react-pdf は Buffer も受け付ける）。
+ *
+ *   いずれも実装は P0-14 のスコープ。本テンプレートでは src の型を `string | null` のまま維持する。
+ */
 function SignatureBlock({ src, label }: { src: string | null; label?: string }) {
   if (src) {
     return <Image src={src} style={styles.signatureImage} />

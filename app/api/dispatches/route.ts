@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/prisma'
 import { createDispatchSchema } from '@/lib/validations'
+import { closeActiveBreakOnDispatchStart } from '@/lib/breakAutoClose'
 import type { Prisma } from '@prisma/client'
 
 export async function GET(req: Request) {
@@ -73,7 +74,7 @@ export async function POST(req: Request) {
       { status: 400 }
     )
   }
-  const { assistanceId, type, departureOdo, dispatchTime, dispatchGpsLat, dispatchGpsLng, parentDispatchId, isSecondaryTransport } = parsed.data
+  const { assistanceId, type, departureOdo, dispatchTime, parentDispatchId, isSecondaryTransport } = parsed.data
 
   // assistanceId のテナント検証
   const assistance = await prisma.assistance.findFirst({
@@ -93,19 +94,43 @@ export async function POST(req: Request) {
   // 出動番号採番: YYYYMMDD + 3桁連番（テナントごと・同日内でリセット）
   const dispatch = await prisma.$transaction(async (tx) => {
     const now = new Date(dispatchTime ?? new Date())
+
+    // 出動開始による休憩中断: active な BreakRecord を即時クローズする。
+    // 業務仕様（2026-05-04 ユーザー確認済み）: 隊員が休憩中に出動要請を受けて出動を
+    // 開始した場合、休憩は自動的に終了したことになる。BreakRecord の更新と
+    // Dispatch.create を同一トランザクションで実行することで、途中失敗時の整合性
+    // （break が閉じたのに dispatch が作られない / 逆）を防ぐ。
+    await closeActiveBreakOnDispatchStart(tx, {
+      userId: session.user.userId,
+      tenantId: session.user.tenantId,
+      interruptedAt: now,
+    })
+
     // JSTでの日付文字列を生成
     const jstOffset = 9 * 60 * 60 * 1000
     const jstDate = new Date(now.getTime() + jstOffset)
     const dateStr = jstDate.toISOString().slice(0, 10).replace(/-/g, '') // YYYYMMDD
 
-    const count = await tx.dispatch.count({
+    // 同日内の最大メイン番号を採用して +1 する方式（堅牢化）。
+    // count+1 方式は CANCELLED 案件を欠番として扱うと衝突するリスクがあるが、
+    // 「同日内最大メイン番号 + 1」方式なら欠番が出ても衝突しない。
+    // サフィックス（-2/-3/-T）が混入した dispatchNumber を除外するため
+    // dispatchNumber に '-' を含むものを NOT 条件で外す。
+    const lastSameDay = await tx.dispatch.findFirst({
       where: {
         tenantId: session.user.tenantId,
         dispatchNumber: { startsWith: dateStr },
+        NOT: { dispatchNumber: { contains: '-' } },
       },
+      orderBy: { dispatchNumber: 'desc' },
+      select: { dispatchNumber: true },
     })
 
-    const sequence = String(count + 1).padStart(3, '0')
+    const lastSeq = lastSameDay
+      ? Number(lastSameDay.dispatchNumber.slice(-3))
+      : 0
+    const nextSeq = Number.isFinite(lastSeq) ? lastSeq + 1 : 1
+    const sequence = String(nextSeq).padStart(3, '0')
     const newDispatchNumber = `${dateStr}${sequence}`
 
     // 2次搬送の場合、親の案件情報を引き継ぐ
@@ -162,8 +187,6 @@ export async function POST(req: Request) {
         vehicleId: currentUser?.vehicleId ?? null,
         departureOdo: departureOdo != null ? parseInt(String(departureOdo)) : null,
         dispatchTime: now,
-        dispatchGpsLat: dispatchGpsLat ?? null,
-        dispatchGpsLng: dispatchGpsLng ?? null,
         parentDispatchId: parentDispatchId ?? null,
         isSecondaryTransport: isSecondaryTransport ?? false,
         // 親の案件情報を上書き（dispatchNumber はサフィックス付き）

@@ -497,8 +497,11 @@ function BottomSheet({
         {/* 現在値（大きく表示） */}
         <div className="px-4 pt-2 pb-3 text-center">
           <span
-            className="font-mono font-semibold text-2xl tracking-widest text-white"
-            style={{ fontVariantNumeric: 'tabular-nums' }}
+            className="font-semibold text-2xl tracking-widest text-white"
+            style={{
+              fontFamily: 'var(--font-metrophobic), sans-serif',
+              fontVariantNumeric: 'tabular-nums',
+            }}
           >
             {formatNumber(currentNumber)}
           </span>

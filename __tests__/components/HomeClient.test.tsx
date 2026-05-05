@@ -9,7 +9,7 @@
  *   休憩ボタンの表示/非表示を切り替える（フェイルクローズ）
  */
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import HomeClient from '@/components/HomeClient'
 import type { BreakState } from '@/store/breakAtom'
 
@@ -25,6 +25,24 @@ vi.mock('next/navigation', () => ({
 // next-auth/react モック
 vi.mock('next-auth/react', () => ({
   signOut: vi.fn(),
+}))
+
+// useActiveDispatch モック（Phase 5）。
+// テストごとに戻り値を差し替えられるようモジュール変数で保持。
+type ActiveDispatchMock = {
+  activeDispatch: { id: string; dispatchNumber: string } | null
+  loading: boolean
+  error: Error | null
+  refresh: () => Promise<void>
+}
+let activeDispatchMockValue: ActiveDispatchMock = {
+  activeDispatch: null,
+  loading: false,
+  error: null,
+  refresh: async () => {},
+}
+vi.mock('@/hooks/useActiveDispatch', () => ({
+  useActiveDispatch: () => activeDispatchMockValue,
 }))
 
 // jotai モック（breakStateAtom で atom() を使うため importOriginal が必要）
@@ -157,6 +175,13 @@ describe('HomeClient', () => {
       remainingSeconds: 3600,
       pausedAt: null,
       breakRecordId: null,
+    }
+    // 既定の useActiveDispatch モックに戻す
+    activeDispatchMockValue = {
+      activeDispatch: null,
+      loading: false,
+      error: null,
+      refresh: async () => {},
     }
   })
 
@@ -440,6 +465,123 @@ describe('HomeClient', () => {
         ).length
         expect(limitStatusCalls).toBe(3)
       })
+    })
+  })
+
+  // ── 進行中バナー / アシスタンス抑止（Phase 5: 出動中の浮き案件防止） ──
+
+  describe('進行中バナー（Phase 5）', () => {
+    it('activeDispatch === null のとき、バナーは表示されずアシスタンスは活性のまま', async () => {
+      activeDispatchMockValue = {
+        activeDispatch: null,
+        loading: false,
+        error: null,
+        refresh: async () => {},
+      }
+      fetchSpy = mockFetchByUrl({
+        assistances: { ok: true, status: 200, data: mockAssistances },
+        limitStatus: { ok: true, status: 200, data: { canStartBreak: true } },
+      })
+
+      render(<HomeClient session={mockSession as any} />)
+
+      await waitFor(() => {
+        expect(screen.getByText('PA')).toBeTruthy()
+      })
+
+      // バナー非表示
+      expect(screen.queryByText(/進行中の出動があります/)).toBeNull()
+
+      // アシスタンスボタン押下で /dispatch/new に遷移する（活性）
+      const paButton = screen.getByText('PA').closest('button')!
+      fireEvent.click(paButton)
+      expect(pushMock).toHaveBeenCalledWith(
+        expect.stringMatching(/^\/dispatch\/new\?assistanceId=1&type=onsite$/),
+      )
+
+      // 休憩ボタンも従来通り表示
+      expect(screen.getByText('休憩')).toBeTruthy()
+    })
+
+    it('activeDispatch !== null のとき、バナー表示・アシスタンス抑止・休憩非表示', async () => {
+      activeDispatchMockValue = {
+        activeDispatch: { id: 'd-1', dispatchNumber: '20260504001' },
+        loading: false,
+        error: null,
+        refresh: async () => {},
+      }
+      fetchSpy = mockFetchByUrl({
+        assistances: { ok: true, status: 200, data: mockAssistances },
+        limitStatus: { ok: true, status: 200, data: { canStartBreak: true } },
+      })
+
+      const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {})
+
+      render(<HomeClient session={mockSession as any} />)
+
+      // バナー表示（dispatchNumber 一致）
+      await waitFor(() => {
+        expect(screen.getByText(/20260504001/)).toBeTruthy()
+      })
+
+      // バナークリックで /dispatch/${id} に遷移
+      const banner = screen.getByLabelText(
+        '進行中の出動があります。クリックで出動画面に戻ります',
+      )
+      fireEvent.click(banner)
+      expect(pushMock).toHaveBeenCalledWith('/dispatch/d-1')
+
+      pushMock.mockClear()
+
+      // アシスタンスボタン押下で alert が出て、router.push は呼ばれない
+      await waitFor(() => {
+        expect(screen.getByText('PA')).toBeTruthy()
+      })
+      const paButton = screen.getByText('PA').closest('button')!
+      fireEvent.click(paButton)
+      expect(alertSpy).toHaveBeenCalledWith('進行中の案件があります')
+      expect(pushMock).not.toHaveBeenCalledWith(
+        expect.stringContaining('/dispatch/new'),
+      )
+
+      // 休憩ボタンは非表示
+      expect(screen.queryByText('休憩')).toBeNull()
+
+      alertSpy.mockRestore()
+    })
+
+    it('error !== null のとき、バナー非表示でアシスタンスは活性（フェイルクローズ＝抑止しない）', async () => {
+      activeDispatchMockValue = {
+        activeDispatch: null,
+        loading: false,
+        error: new Error('active dispatch fetch failed: HTTP 500'),
+        refresh: async () => {},
+      }
+      fetchSpy = mockFetchByUrl({
+        assistances: { ok: true, status: 200, data: mockAssistances },
+        limitStatus: { ok: true, status: 200, data: { canStartBreak: true } },
+      })
+
+      const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {})
+
+      render(<HomeClient session={mockSession as any} />)
+
+      await waitFor(() => {
+        expect(screen.getByText('PA')).toBeTruthy()
+      })
+
+      // バナー非表示（フェイルクローズ）
+      expect(screen.queryByText(/進行中の出動があります/)).toBeNull()
+
+      // アシスタンスボタン押下で /dispatch/new 遷移（活性のまま、alert 出さない）
+      const paButton = screen.getByText('PA').closest('button')!
+      fireEvent.click(paButton)
+      expect(alertSpy).not.toHaveBeenCalled()
+      expect(pushMock).toHaveBeenCalledWith(
+        expect.stringMatching(/^\/dispatch\/new\?assistanceId=1&type=onsite$/),
+      )
+
+      alertSpy.mockRestore()
     })
   })
 })

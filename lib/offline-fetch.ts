@@ -14,8 +14,6 @@ export async function offlineFetch(
     offlineActionType?: PendingAction['type']
     /** 関連する dispatchId */
     offlineDispatchId?: string | null
-    /** GPS座標 */
-    offlineGps?: { lat: number; lng: number } | null
     /** キューイング後に返す楽観的レスポンスデータ */
     offlineOptimisticData?: Record<string, unknown>
   },
@@ -34,8 +32,12 @@ export async function offlineFetch(
       const res = await fetch(input, init)
       if (res.ok) return res
 
-      // 5xx → キューイングしてリトライ可能にする
-      if (res.status >= 500 && init?.offlineActionType) {
+      // SW フォールバックによる 503 のみ実ネット断としてキューイング経路に入る。
+      // 通常の 5xx（サーバ側エラー）はそのまま呼び出し元に返し、エラー処理させる。
+      // 判定は `X-SW-Offline: 1` カスタムヘッダで行う（body を読むと
+      // ストリーム消費の副作用があるため、ヘッダ方式に統一）。
+      const isSwOffline = res.headers.get('X-SW-Offline') === '1'
+      if (isSwOffline && init?.offlineActionType) {
         await queueFromInit(input, init)
         return createOptimisticResponse(init?.offlineOptimisticData)
       }
@@ -64,7 +66,6 @@ async function queueFromInit(
   init: RequestInit & {
     offlineActionType?: PendingAction['type']
     offlineDispatchId?: string | null
-    offlineGps?: { lat: number; lng: number } | null
   },
 ) {
   const body = init.body ? JSON.parse(init.body as string) : {}
@@ -72,7 +73,6 @@ async function queueFromInit(
     type: init.offlineActionType!,
     dispatchId: init.offlineDispatchId ?? null,
     timestamp: Date.now(),
-    gps: init.offlineGps ?? null,
     data: body,
     endpoint,
     method: (init.method?.toUpperCase() ?? 'POST') as 'POST' | 'PATCH',

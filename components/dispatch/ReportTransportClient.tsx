@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { FaPen, FaCheckSquare } from 'react-icons/fa'
 import { FaCircleArrowRight } from 'react-icons/fa6'
 import { IoIosArrowBack } from 'react-icons/io'
+import { TiHome } from 'react-icons/ti'
 import { Check } from 'lucide-react'
 import ClockPicker from './ClockPicker'
 import TransportShopAutocomplete from './TransportShopAutocomplete'
@@ -55,6 +56,7 @@ interface Props {
 }
 
 type TimeField = 'dispatch' | 'arrival' | 'transportStart' | 'completion' | 'return'
+type SecondaryTimeField = 'transportStart' | 'arrival' | 'completion' | 'return'
 
 // -------------------------------------------------------
 // Helpers
@@ -63,6 +65,15 @@ type TimeField = 'dispatch' | 'arrival' | 'transportStart' | 'completion' | 'ret
 function formatTime(d: Date | null): string {
   if (!d) return '--:--'
   return d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false })
+}
+
+function formatDate(iso: string | null): string {
+  const d = iso ? new Date(iso) : new Date()
+  const days = ['日', '月', '火', '水', '木', '金', '土']
+  const y = d.getFullYear()
+  const m = d.getMonth() + 1
+  const day = d.getDate()
+  return `${y}年${m}月${day}日（${days[d.getDay()]}）`
 }
 
 // -------------------------------------------------------
@@ -110,9 +121,13 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
     dispatch.returnTime ? new Date(dispatch.returnTime) : null
   )
   const [clockPickerFor, setClockPickerFor] = useState<TimeField | null>(null)
+  const [secondaryClockPickerFor, setSecondaryClockPickerFor] = useState<SecondaryTimeField | null>(null)
 
   // ── 保管（2次搬送）判定 ──
   const isStored = dispatch.deliveryType === 'STORAGE'
+
+  // ── 振替案件判定（振替先 -T レコードかどうか） ──
+  const isTransferredIn = !!dispatch.transferredFromId
 
   // ── 2次搬送 時間 ──
   const [secondaryTransportStartTime, setSecondaryTransportStartTime] = useState<Date | null>(
@@ -131,6 +146,12 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
   // ── 距離・ODO ──
   const [departureOdo, setDepartureOdo] = useState(
     (report.departureOdo ?? dispatch.departureOdo)?.toString() ?? ''
+  )
+  const [arrivalOdo, setArrivalOdo] = useState(
+    (report.arrivalOdo ?? dispatch.arrivalOdo)?.toString() ?? ''
+  )
+  const [transportStartOdo, setTransportStartOdo] = useState(
+    (report.transportStartOdo ?? dispatch.transportStartOdo)?.toString() ?? ''
   )
   const [recoveryDistance, setRecoveryDistance] = useState(
     report.recoveryDistance?.toString() ?? ''
@@ -151,9 +172,6 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
   // ── 2次距離・ODO ──
   const [secondaryDepartureOdo, setSecondaryDepartureOdo] = useState(
     (secondaryData?.report?.departureOdo ?? secondaryData?.dispatch.departureOdo)?.toString() ?? ''
-  )
-  const [secondaryRecoveryDistance, setSecondaryRecoveryDistance] = useState(
-    secondaryData?.report?.recoveryDistance?.toString() ?? ''
   )
   const [secondaryArrivalOdo, setSecondaryArrivalOdo] = useState(
     (secondaryData?.report?.arrivalOdo ?? secondaryData?.dispatch.arrivalOdo)?.toString() ?? ''
@@ -331,18 +349,59 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
     return { minTime, maxTime }
   }
 
+  // ── 2次 ClockPicker 用 ──
+  const secondaryTimeMap: Record<SecondaryTimeField, Date | null> = {
+    transportStart: secondaryTransportStartTime,
+    arrival: secondaryArrivalTime,
+    completion: secondaryCompletionTime,
+    return: secondaryReturnTime,
+  }
+  const secondarySetTimeMap: Record<SecondaryTimeField, (d: Date) => void> = {
+    transportStart: setSecondaryTransportStartTime,
+    arrival: setSecondaryArrivalTime,
+    completion: setSecondaryCompletionTime,
+    return: setSecondaryReturnTime,
+  }
+
+  const handleSecondaryTimeChange = (field: SecondaryTimeField, date: Date) => {
+    secondarySetTimeMap[field](date)
+    setSecondaryClockPickerFor(null)
+  }
+
+  // ── 2次 時間制約（搬送開始 < 現着 < 完了 < 帰社 の順序を保証） ──
+  const secondaryTimeOrder: SecondaryTimeField[] = ['transportStart', 'arrival', 'completion', 'return']
+  const getSecondaryTimeConstraints = (field: SecondaryTimeField): { minTime: Date | null; maxTime: Date | null } => {
+    const idx = secondaryTimeOrder.indexOf(field)
+    let minTime: Date | null = null
+    let maxTime: Date | null = null
+    // 前方向: 直前の設定済み時刻
+    for (let i = idx - 1; i >= 0; i--) {
+      if (secondaryTimeMap[secondaryTimeOrder[i]]) { minTime = secondaryTimeMap[secondaryTimeOrder[i]]; break }
+    }
+    // 後方向: 直後の設定済み時刻
+    for (let i = idx + 1; i < secondaryTimeOrder.length; i++) {
+      if (secondaryTimeMap[secondaryTimeOrder[i]]) { maxTime = secondaryTimeMap[secondaryTimeOrder[i]]; break }
+    }
+    return { minTime, maxTime }
+  }
+
   // ── ペイロード ──
-  const buildDispatchPayload = (isDraft: boolean) => ({
+  // dispatch.isDraft は出動記録ボタン押下（DispatchClient.handleClickRecord）と
+  // 2 次搬送帰社時（SecondaryDispatchClient L454）でのみ更新される。
+  // Report 系の handleSave からは isDraft を送らないことで、Phase 5.5 の
+  // active 判定との整合性を維持する。
+  const buildDispatchPayload = () => ({
     dispatchTime: dispatchTime?.toISOString() ?? null,
     arrivalTime: arrivalTime?.toISOString() ?? null,
     completionTime: completionTime?.toISOString() ?? null,
     returnTime: returnTime?.toISOString() ?? null,
     vehicleId: vehicleId,
-    isDraft,
   })
 
   const buildReportPayload = (isDraft: boolean) => ({
     departureOdo: departureOdo ? parseInt(departureOdo) : null,
+    arrivalOdo: arrivalOdo ? parseInt(arrivalOdo, 10) : null,
+    transportStartOdo: transportStartOdo ? parseInt(transportStartOdo, 10) : null,
     recoveryDistance: recoveryDistance ? parseFloat(recoveryDistance) : null,
     transportDistance: transportDistance ? parseFloat(transportDistance) : null,
     returnDistance: returnDistance ? parseFloat(returnDistance) : null,
@@ -382,16 +441,16 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
 
   useEffect(() => {
     saveFormData({
-      dispatch: buildDispatchPayload(true),
+      dispatch: buildDispatchPayload(),
       report: buildReportPayload(true),
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     dispatchTime, arrivalTime, transportStartTime, completionTime, returnTime,
-    departureOdo, recoveryDistance, transportDistance, returnDistance, completionOdo, returnOdo,
+    departureOdo, arrivalOdo, transportStartOdo, recoveryDistance, transportDistance, returnDistance, completionOdo, returnOdo,
     recoveryHighway, transportHighway, returnHighway,
     secondaryTransportStartTime, secondaryArrivalTime, secondaryCompletionTime, secondaryReturnTime,
-    secondaryDepartureOdo, secondaryRecoveryDistance, secondaryArrivalOdo, secondaryTransportDistance, secondaryReturnDistance, secondaryCompletionOdo, secondaryReturnOdo,
+    secondaryDepartureOdo, secondaryArrivalOdo, secondaryTransportDistance, secondaryReturnDistance, secondaryCompletionOdo, secondaryReturnOdo,
     secondaryTransportHighway, secondaryReturnHighway,
     departurePlaceName, arrivalPlaceName, transportPlaceName,
     transportShopName, transportPhone, transportAddress, transportContact, transportMemo,
@@ -408,7 +467,7 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
       const dispatchRes = await offlineFetch(`/api/dispatches/${dispatch.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(buildDispatchPayload(isDraft)),
+        body: JSON.stringify(buildDispatchPayload()),
         offlineActionType: 'dispatch_update',
         offlineDispatchId: dispatch.id,
       })
@@ -439,6 +498,27 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
       if (!reportRes.ok) throw new Error('報告の保存に失敗しました')
 
       await clearDraft()
+
+      // Phase 7 改訂スコープ A-2b: 想定外状態の assert（サイレント故障防止 / AGENTS.md 準拠）
+      // dispatch.isDraft は出動記録ボタン押下時に true がセットされ、Phase 5.5 補強により
+      // 報告画面の handleSave からは更新されない。書類画面に到達した時点で true のはずなので、
+      // 保存後レスポンスで false が返ってきたら異常（経路バグ / レース）として遷移停止する。
+      const isOptimistic = dispatchRes.headers.get('X-SW-Offline') === '1'
+      if (!isOptimistic) {
+        const updatedDispatch = (await dispatchRes.clone().json().catch(() => null)) as
+          | { isDraft?: boolean }
+          | null
+        if (updatedDispatch && updatedDispatch.isDraft !== true) {
+          console.error('[ReportTransportClient.handleSave] Unexpected dispatch.isDraft after save', {
+            dispatchId: dispatch.id,
+            expected: true,
+            actual: updatedDispatch.isDraft,
+          })
+          alert('保存後の状態が想定外です。ホームに戻れません。サポートに連絡してください。')
+          return
+        }
+      }
+
       window.location.href = '/'
     } catch (e) {
       console.error(e)
@@ -487,21 +567,30 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: '#E5E5E5' }}>
 
       {/* ─── ヘッダー ─── */}
-      <div className="px-4 pt-4 pb-3 shadow-sm flex-shrink-0" style={{ backgroundColor: '#D7AF70' }}>
-        {/* タイトル行 */}
-        <div className="flex items-center justify-between mb-2.5">
-          <div className="flex items-center gap-2">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/rodo-square-logo.svg" alt="RODO" className="w-8 h-8" />
-            <span className="text-lg font-bold" style={{ color: '#1C2948' }}>
-              報告兼請求項目
-            </span>
-          </div>
+      <div className="px-4 pt-4 pb-3 shadow-sm flex-shrink-0 sticky top-0 z-30" style={{ backgroundColor: '#D7AF70' }}>
+        {/* 1行目: ホーム / タイトル / バッジ / 日付 */}
+        <div className="flex items-center gap-2 mb-2.5">
+          <button
+            onClick={() => { void handleSave(true) }}
+            disabled={loading}
+            aria-label="ホームに戻る"
+            className="inline-flex items-center justify-center p-2 rounded-md active:opacity-70 disabled:opacity-50"
+            style={{ backgroundColor: '#71A9F7', color: 'white' }}
+          >
+            <TiHome className="w-4 h-4" />
+          </button>
+          <span className="text-lg font-bold whitespace-nowrap" style={{ color: '#1C2948' }}>
+            報告/請求
+          </span>
           <span
-            className="text-sm font-bold px-3 py-1 rounded-full"
+            className="text-sm font-bold px-3 py-1 rounded-full whitespace-nowrap"
             style={{ backgroundColor: '#1C2948', color: 'white' }}
           >
             搬送
+          </span>
+          <div className="flex-1" />
+          <span className="text-xs whitespace-nowrap" style={{ color: '#1C2948' }}>
+            {formatDate(dispatch.dispatchTime)}
           </span>
         </div>
 
@@ -640,11 +729,11 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
                 </div>
                 <div className="flex-1 space-y-3 pt-0.5">
                   {[
-                    { label: '搬送開始', value: secondaryTransportStartTime, setter: setSecondaryTransportStartTime },
-                    { label: '現着時間', value: secondaryArrivalTime, setter: setSecondaryArrivalTime },
-                    { label: '完了時間', value: secondaryCompletionTime, setter: setSecondaryCompletionTime },
-                    { label: '帰社時間', value: secondaryReturnTime, setter: setSecondaryReturnTime },
-                  ].map(({ label, value }, i) => (
+                    { label: '搬送開始', field: 'transportStart' as SecondaryTimeField, value: secondaryTransportStartTime },
+                    { label: '現着時間', field: 'arrival' as SecondaryTimeField, value: secondaryArrivalTime },
+                    { label: '完了時間', field: 'completion' as SecondaryTimeField, value: secondaryCompletionTime },
+                    { label: '帰社時間', field: 'return' as SecondaryTimeField, value: secondaryReturnTime },
+                  ].map(({ label, field, value }, i) => (
                     <div key={`secondary-time-${i}`} className="flex items-center gap-2">
                       <RequiredDot />
                       <span className="text-sm flex-shrink-0 w-[72px]" style={{ color: '#1C2948', opacity: 0.65 }}>
@@ -653,6 +742,7 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
                       <span className="text-sm font-bold flex-1" style={{ color: '#1C2948' }}>
                         {formatTime(value)}
                       </span>
+                      <EditButton onClick={() => setSecondaryClockPickerFor(field)} />
                     </div>
                   ))}
                 </div>
@@ -715,6 +805,46 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
                   {[
                     { label: '出発 ODO', key: 'departureOdo', value: departureOdo, setValue: setDepartureOdo, suffix: 'km', decimal: false },
                     { label: '回送距離', key: 'recoveryDistance', value: recoveryDistance, setValue: setRecoveryDistance, suffix: 'km', decimal: true },
+                  ].map(({ label, key, value, setValue, suffix, decimal }) => (
+                    <div key={key} className="flex items-center gap-2">
+                      <RequiredDot />
+                      <span className="text-sm flex-shrink-0 w-[72px]" style={{ color: '#1C2948', opacity: 0.65 }}>
+                        {label}
+                      </span>
+                      <InlineNumericField fieldKey={key} value={value} setValue={setValue} suffix={suffix} decimal={decimal} />
+                      <EditButton onClick={() => setEditingField(editingField === key ? null : key)} />
+                    </div>
+                  ))}
+
+                  {/* 現着 ODO（常時表示） */}
+                  <div className="flex items-center gap-2">
+                    <RequiredDot />
+                    <span className="text-sm flex-shrink-0 w-[72px]" style={{ color: '#1C2948', opacity: 0.65 }}>現着 ODO</span>
+                    <InlineNumericField fieldKey="arrivalOdo" value={arrivalOdo} setValue={setArrivalOdo} suffix="km" decimal={false} />
+                    <EditButton onClick={() => setEditingField(editingField === 'arrivalOdo' ? null : 'arrivalOdo')} />
+                  </div>
+
+                  {/* 振替バッジ（振替案件のみ） */}
+                  {isTransferredIn && (
+                    <div className="flex items-center gap-2 pl-[88px]">
+                      <span
+                        className="text-xs font-bold px-2.5 py-1 rounded-full"
+                        style={{ backgroundColor: '#2FBF71', color: 'white' }}
+                      >
+                        振替
+                      </span>
+                    </div>
+                  )}
+
+                  {/* 搬開 ODO（常時表示） */}
+                  <div className="flex items-center gap-2">
+                    <RequiredDot />
+                    <span className="text-sm flex-shrink-0 w-[72px]" style={{ color: '#1C2948', opacity: 0.65 }}>搬開 ODO</span>
+                    <InlineNumericField fieldKey="transportStartOdo" value={transportStartOdo} setValue={setTransportStartOdo} suffix="km" decimal={false} />
+                    <EditButton onClick={() => setEditingField(editingField === 'transportStartOdo' ? null : 'transportStartOdo')} />
+                  </div>
+
+                  {[
                     { label: '搬送距離', key: 'transportDistance', value: transportDistance, setValue: setTransportDistance, suffix: 'km', decimal: true },
                     { label: '完了 ODO', key: 'completionOdo', value: completionOdo, setValue: setCompletionOdo, suffix: 'km', decimal: false },
                     { label: '帰社距離', key: 'returnDistance', value: returnDistance, setValue: setReturnDistance, suffix: 'km', decimal: true },
@@ -747,9 +877,8 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
                 <div className="flex-1 space-y-3 pt-0.5">
                   {[
                     { label: '搬開 ODO', key: 'sec_departureOdo', value: secondaryDepartureOdo, setValue: setSecondaryDepartureOdo, suffix: 'km', decimal: false },
-                    { label: '回送距離', key: 'sec_recoveryDistance', value: secondaryRecoveryDistance, setValue: setSecondaryRecoveryDistance, suffix: 'km', decimal: true },
-                    { label: '現着 ODO', key: 'sec_arrivalOdo', value: secondaryArrivalOdo, setValue: setSecondaryArrivalOdo, suffix: 'km', decimal: false },
                     { label: '搬送距離', key: 'sec_transportDistance', value: secondaryTransportDistance, setValue: setSecondaryTransportDistance, suffix: 'km', decimal: true },
+                    { label: '現着 ODO', key: 'sec_arrivalOdo', value: secondaryArrivalOdo, setValue: setSecondaryArrivalOdo, suffix: 'km', decimal: false },
                     { label: '完了 ODO', key: 'sec_completionOdo', value: secondaryCompletionOdo, setValue: setSecondaryCompletionOdo, suffix: 'km', decimal: false },
                     { label: '帰社距離', key: 'sec_returnDistance', value: secondaryReturnDistance, setValue: setSecondaryReturnDistance, suffix: 'km', decimal: true },
                     { label: '帰社 ODO', key: 'sec_returnOdo', value: secondaryReturnOdo, setValue: setSecondaryReturnOdo, suffix: 'km', decimal: false },
@@ -782,6 +911,46 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
                 {[
                   { label: '出発 ODO', key: 'departureOdo', value: departureOdo, setValue: setDepartureOdo, suffix: 'km', decimal: false },
                   { label: '回送距離', key: 'recoveryDistance', value: recoveryDistance, setValue: setRecoveryDistance, suffix: 'km', decimal: true },
+                ].map(({ label, key, value, setValue, suffix, decimal }) => (
+                  <div key={key} className="flex items-center gap-2">
+                    <RequiredDot />
+                    <span className="text-sm flex-shrink-0 w-[72px]" style={{ color: '#1C2948', opacity: 0.65 }}>
+                      {label}
+                    </span>
+                    <InlineNumericField fieldKey={key} value={value} setValue={setValue} suffix={suffix} decimal={decimal} />
+                    <EditButton onClick={() => setEditingField(editingField === key ? null : key)} />
+                  </div>
+                ))}
+
+                {/* 現着 ODO（常時表示） */}
+                <div className="flex items-center gap-2">
+                  <RequiredDot />
+                  <span className="text-sm flex-shrink-0 w-[72px]" style={{ color: '#1C2948', opacity: 0.65 }}>現着 ODO</span>
+                  <InlineNumericField fieldKey="arrivalOdo" value={arrivalOdo} setValue={setArrivalOdo} suffix="km" decimal={false} />
+                  <EditButton onClick={() => setEditingField(editingField === 'arrivalOdo' ? null : 'arrivalOdo')} />
+                </div>
+
+                {/* 振替バッジ（振替案件のみ） */}
+                {isTransferredIn && (
+                  <div className="flex items-center gap-2 pl-[88px]">
+                    <span
+                      className="text-xs font-bold px-2.5 py-1 rounded-full"
+                      style={{ backgroundColor: '#2FBF71', color: 'white' }}
+                    >
+                      振替
+                    </span>
+                  </div>
+                )}
+
+                {/* 搬開 ODO（常時表示） */}
+                <div className="flex items-center gap-2">
+                  <RequiredDot />
+                  <span className="text-sm flex-shrink-0 w-[72px]" style={{ color: '#1C2948', opacity: 0.65 }}>搬開 ODO</span>
+                  <InlineNumericField fieldKey="transportStartOdo" value={transportStartOdo} setValue={setTransportStartOdo} suffix="km" decimal={false} />
+                  <EditButton onClick={() => setEditingField(editingField === 'transportStartOdo' ? null : 'transportStartOdo')} />
+                </div>
+
+                {[
                   { label: '搬送距離', key: 'transportDistance', value: transportDistance, setValue: setTransportDistance, suffix: 'km', decimal: true },
                   { label: '完了 ODO', key: 'completionOdo', value: completionOdo, setValue: setCompletionOdo, suffix: 'km', decimal: false },
                   { label: '帰社距離', key: 'returnDistance', value: returnDistance, setValue: setReturnDistance, suffix: 'km', decimal: true },
@@ -1205,29 +1374,31 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
       <div className="fixed bottom-0 left-0 right-0 px-3 py-3 space-y-2" style={{ backgroundColor: '#E5E5E5' }}>
         {/* Row 1: 下書き保存 + 完了 */}
         <div className="flex gap-3">
-          <button
-            type="button"
-            onClick={() => handleSave(true)}
-            disabled={loading}
-            className="flex-none flex items-center gap-2 px-5 py-3.5 rounded-md font-bold text-white text-sm active:opacity-80 transition-opacity"
-            style={{ backgroundColor: '#D3170A' }}
-          >
-            <FaPen />
-            <span>下書き保存</span>
-          </button>
+          {report.isDraft && (
+            <button
+              type="button"
+              onClick={() => handleSave(true)}
+              disabled={loading}
+              className="flex-none flex items-center gap-2 px-6 py-3.5 rounded-md font-bold text-white text-base active:opacity-80 transition-opacity"
+              style={{ backgroundColor: '#D3170A' }}
+            >
+              <FaPen className="text-lg" />
+              <span>下書き保存</span>
+            </button>
+          )}
 
           <button
             type="button"
             onClick={() => handleSave(false)}
             disabled={!isComplete || loading}
-            className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-md font-bold text-sm transition-all active:opacity-80"
+            className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-md font-bold text-lg transition-all active:opacity-80"
             style={{
               backgroundColor: isComplete ? '#1C2948' : '#9CA3AF',
               color: isComplete ? '#D7AF70' : 'white',
               cursor: isComplete ? 'pointer' : 'not-allowed',
             }}
           >
-            <FaCheckSquare className="text-base" />
+            <FaCheckSquare className="text-xl" />
             <span>完　了</span>
           </button>
         </div>
@@ -1236,7 +1407,7 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
         <button
           type="button"
           onClick={() => router.push(`/dispatch/${dispatch.id}/record`)}
-          className="w-full flex items-center gap-2 px-4 py-3 rounded-md font-bold text-white text-sm active:opacity-80"
+          className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-md font-bold text-white text-base active:opacity-80"
           style={{ backgroundColor: '#1C2948' }}
         >
           <IoIosArrowBack className="text-lg" />
@@ -1252,6 +1423,20 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
             value={timeMap[clockPickerFor] ?? new Date()}
             onChange={(date) => handleTimeChange(clockPickerFor, date)}
             onClose={() => setClockPickerFor(null)}
+            minTime={minTime}
+            maxTime={maxTime}
+          />
+        )
+      })()}
+
+      {/* ─── 2次 ClockPicker モーダル ─── */}
+      {secondaryClockPickerFor && (() => {
+        const { minTime, maxTime } = getSecondaryTimeConstraints(secondaryClockPickerFor)
+        return (
+          <ClockPicker
+            value={secondaryTimeMap[secondaryClockPickerFor] ?? new Date()}
+            onChange={(date) => handleSecondaryTimeChange(secondaryClockPickerFor, date)}
+            onClose={() => setSecondaryClockPickerFor(null)}
             minTime={minTime}
             maxTime={maxTime}
           />

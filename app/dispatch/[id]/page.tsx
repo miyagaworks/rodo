@@ -50,10 +50,6 @@ export default async function DispatchPage({ params }: Props) {
     arrivalTime: dispatch.arrivalTime?.toISOString() ?? null,
     completionTime: dispatch.completionTime?.toISOString() ?? null,
     returnTime: dispatch.returnTime?.toISOString() ?? null,
-    dispatchGpsLat: dispatch.dispatchGpsLat,
-    dispatchGpsLng: dispatch.dispatchGpsLng,
-    arrivalGpsLat: dispatch.arrivalGpsLat,
-    arrivalGpsLng: dispatch.arrivalGpsLng,
     transportStartTime: dispatch.transportStartTime?.toISOString() ?? null,
     deliveryType: dispatch.deliveryType as 'DIRECT' | 'STORAGE' | null,
     transferStatus: dispatch.transferStatus,
@@ -62,6 +58,7 @@ export default async function DispatchPage({ params }: Props) {
     transferredToDispatchNumber: dispatch.transferredTo?.dispatchNumber ?? null,
     transferredFromUserName: dispatch.transferredFrom?.user?.name ?? null,
     vehicleId: dispatch.vehicleId,
+    isDraft: dispatch.isDraft,
   }
 
   return (

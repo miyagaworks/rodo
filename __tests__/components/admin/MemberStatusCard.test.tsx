@@ -1,11 +1,13 @@
 /**
- * MemberStatusCard コンポーネントのテスト
+ * MemberStatusCard コンポーネントのテスト（6色アイコンバッジ化対応版）。
  *
- * 各 status (STANDBY/DISPATCHING/BREAK) で正しい表示を検証:
- * - ステータスバッジの色とラベル
- * - 出動中: サブフェーズ表示 + 案件番号 + AS 名
- * - 休憩中: 経過時間表示
- * - 待機中: 補足なし
+ * 旧仕様の bg-blue-500 / bg-amber-500 / bg-gray-300 検証は、
+ * MemberStatusBadge 側に移譲されたため削除。
+ *
+ * このテストでは:
+ * - 派生 status / subPhase に応じた `data-business-status` 属性
+ * - 隊員名 / 案件番号 / AS 名 / 経過時間など補助情報の表示有無
+ * - 待機中の補足非表示
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
@@ -36,10 +38,18 @@ const baseMember: MemberStatusItem = {
 
 describe('MemberStatusCard', () => {
   describe('待機中 (STANDBY)', () => {
-    it('ステータスバッジに「待機中」が表示される', () => {
+    it('バッジに「待機中」が表示される', () => {
       render(<MemberStatusCard member={baseMember} />)
 
       expect(screen.getByTestId('status-badge')).toHaveTextContent('待機中')
+    })
+
+    it('バッジの business-status が "standby"', () => {
+      render(<MemberStatusCard member={baseMember} />)
+
+      expect(
+        screen.getByTestId('status-badge').getAttribute('data-business-status'),
+      ).toBe('standby')
     })
 
     it('隊員名が表示される', () => {
@@ -48,23 +58,16 @@ describe('MemberStatusCard', () => {
       expect(screen.getByText('山田太郎')).toBeTruthy()
     })
 
-    it('サブフェーズは表示されない', () => {
-      render(<MemberStatusCard member={baseMember} />)
-
-      expect(screen.queryByTestId('sub-phase')).toBeNull()
-    })
-
     it('案件番号は表示されない', () => {
       render(<MemberStatusCard member={baseMember} />)
 
       expect(screen.queryByTestId('dispatch-number')).toBeNull()
     })
 
-    it('バッジに gray 系のクラスが適用される', () => {
+    it('経過時間は表示されない', () => {
       render(<MemberStatusCard member={baseMember} />)
 
-      const badge = screen.getByTestId('status-badge')
-      expect(badge.className).toContain('bg-gray-300')
+      expect(screen.queryByTestId('break-duration')).toBeNull()
     })
   })
 
@@ -80,23 +83,18 @@ describe('MemberStatusCard', () => {
       },
     }
 
-    it('ステータスバッジに「出動中」が表示される', () => {
+    it('subPhase=ONSITE → バッジに「作業中」が表示される', () => {
       render(<MemberStatusCard member={dispatchingMember} />)
 
-      expect(screen.getByTestId('status-badge')).toHaveTextContent('出動中')
+      expect(screen.getByTestId('status-badge')).toHaveTextContent('作業中')
     })
 
-    it('バッジに blue 系のクラスが適用される', () => {
+    it('subPhase=ONSITE → business-status が "work"', () => {
       render(<MemberStatusCard member={dispatchingMember} />)
 
-      const badge = screen.getByTestId('status-badge')
-      expect(badge.className).toContain('bg-blue-500')
-    })
-
-    it('サブフェーズ「作業中」が表示される', () => {
-      render(<MemberStatusCard member={dispatchingMember} />)
-
-      expect(screen.getByTestId('sub-phase')).toHaveTextContent('作業中')
+      expect(
+        screen.getByTestId('status-badge').getAttribute('data-business-status'),
+      ).toBe('work')
     })
 
     it('案件番号が表示される', () => {
@@ -114,22 +112,27 @@ describe('MemberStatusCard', () => {
     })
 
     it.each([
-      ['DISPATCHING', '出動中'],
-      ['ONSITE', '作業中'],
-      ['TRANSPORTING', '搬送中'],
-      ['RETURNING_TO_BASE', '帰社中'],
-    ] as const)('サブフェーズ %s のとき「%s」と表示される', (subPhase, label) => {
-      const m: MemberStatusItem = {
-        ...dispatchingMember,
-        activeDispatch: {
-          ...dispatchingMember.activeDispatch!,
-          subPhase,
-        },
-      }
-      render(<MemberStatusCard member={m} />)
+      ['DISPATCHING', '出動中', 'dispatch'],
+      ['ONSITE', '作業中', 'work'],
+      ['TRANSPORTING', '搬送中', 'transport'],
+      ['RETURNING_TO_BASE', '帰社中', 'return'],
+    ] as const)(
+      'subPhase=%s → バッジ「%s」/ business-status=%s',
+      (subPhase, label, businessStatus) => {
+        const m: MemberStatusItem = {
+          ...dispatchingMember,
+          activeDispatch: {
+            ...dispatchingMember.activeDispatch!,
+            subPhase,
+          },
+        }
+        render(<MemberStatusCard member={m} />)
 
-      expect(screen.getByTestId('sub-phase')).toHaveTextContent(label)
-    })
+        const badge = screen.getByTestId('status-badge')
+        expect(badge).toHaveTextContent(label)
+        expect(badge.getAttribute('data-business-status')).toBe(businessStatus)
+      },
+    )
   })
 
   describe('休憩中 (BREAK)', () => {
@@ -142,23 +145,23 @@ describe('MemberStatusCard', () => {
       },
     }
 
-    it('ステータスバッジに「休憩中」が表示される', () => {
+    it('バッジに「休憩中」が表示される', () => {
       render(<MemberStatusCard member={breakMember} />)
 
       expect(screen.getByTestId('status-badge')).toHaveTextContent('休憩中')
     })
 
-    it('バッジに amber 系のクラスが適用される', () => {
+    it('business-status が "break"', () => {
       render(<MemberStatusCard member={breakMember} />)
 
-      const badge = screen.getByTestId('status-badge')
-      expect(badge.className).toContain('bg-amber-500')
+      expect(
+        screen.getByTestId('status-badge').getAttribute('data-business-status'),
+      ).toBe('break')
     })
 
-    it('経過時間が表示される', () => {
+    it('経過時間が表示される（5 分 → 05:00）', () => {
       render(<MemberStatusCard member={breakMember} />)
 
-      // 5 分 = 05:00
       expect(screen.getByTestId('break-duration')).toHaveTextContent('05:00')
     })
 

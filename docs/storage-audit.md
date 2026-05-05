@@ -185,7 +185,6 @@
 - **PDF 生成・保存**: アプリ本体には**なし**。`docs/build-pdf.mjs` はドキュメントビルド用スクリプトでランタイムとは無関係（`jspdf` / `puppeteer` / `@react-pdf` / `pdfkit` の依存なし）
 - **Excel / CSV 入出力**: **なし**（`xlsx` / `exceljs` / `papaparse` 依存なし）。`AGENTS.md` とは別に `docs/Excel` ディレクトリ（ヒアリング用素材置き場と推定）は存在するが、アプリが読み込む経路なし
 - **大容量 JSON**: `WorkConfirmation.preApprovalChecks` / `batteryDetails` は Json 型だが小規模（チェックボックス配列、数十バイト）
-- **GPS ログ・軌跡データ**: 出動時と到着時の 2 点のみ保存（`dispatchGpsLat/Lng`, `arrivalGpsLat/Lng`）→ 大容量化しない
 - **帳票エクスポート機能**: **未実装**。将来「作業確認書 PDF 出力」「月次出動レポート Excel 出力」等を追加する計画があるなら、その時点でサーバー側 Storage の本格設計が必要になる
 
 ---
