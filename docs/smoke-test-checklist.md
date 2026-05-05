@@ -750,6 +750,216 @@ npm run dev
 
 ---
 
+### カテゴリ I: dispatch floating prevention（Phase 1-7 検証）（31 項目）
+
+実装根拠: `docs/plans/dispatch-floating-prevention.md` §7 / Phase 5.5 補強（コミット `9259cb6`）/ Phase 7 改訂スコープ（コミット `fe73de7`）
+
+前提:
+- テストデータ: `Dispatch.id=cmoqlpabf00038z5z6esgn94v`, `dispatchNumber=20260504001`, `status=DISPATCHED`
+- 計画書: `docs/plans/dispatch-floating-prevention.md`
+- 引き継ぎノート: `docs/handover/2026-05-04-dispatch-floating-prevention.md`
+
+#### I-1. 戻るボタンブロック（8 項目）
+
+転記元: 計画書 §7.1 (L812-821)
+
+- [ ] I-1.1 DispatchClient: 出動押下後の戻るボタンブロック
+  - **手順**: 出動押下 → 画面ヘッダーまたは UI の戻るボタンを押下
+  - **期待結果**: 「進行中の出動があります」モーダルが表示され、ホームに戻れない
+  - **関連ファイル**: `components/dispatch/DispatchClient.tsx`
+
+- [ ] I-1.2 DispatchClient: 現着押下後の戻るボタンブロック
+  - **手順**: 現着押下 → 戻るボタン
+  - **期待結果**: モーダル表示、ホームに戻れない
+  - **関連ファイル**: `components/dispatch/DispatchClient.tsx`
+
+- [ ] I-1.3 DispatchClient: 搬送開始押下後の戻るボタンブロック
+  - **手順**: 搬送開始押下 → 戻るボタン
+  - **期待結果**: モーダル表示、ホームに戻れない
+  - **関連ファイル**: `components/dispatch/DispatchClient.tsx`
+
+- [ ] I-1.4 DispatchClient: 完了（onsite）押下後の戻るボタンブロック
+  - **手順**: onsite 完了押下 → 戻るボタン
+  - **期待結果**: モーダル表示、ホームに戻れない
+  - **関連ファイル**: `components/dispatch/DispatchClient.tsx`
+
+- [ ] I-1.5 SecondaryDispatchClient: 各 step での戻るボタンブロック
+  - **手順**: 2 次搬送の各 step（出動 / 現着 / 搬送開始 / 帰社）で戻るボタン
+  - **期待結果**: 全 step でモーダル表示、ホームに戻れない
+  - **関連ファイル**: `components/dispatch/SecondaryDispatchClient.tsx`
+
+- [ ] I-1.6 ReportOnsiteClient: 報告作成中（dispatch active）に戻るボタン
+  - **手順**: 報告画面（onsite）で入力中に画面下部の戻るボタン
+  - **期待結果**: モーダル表示、ホームに戻れない（ヘッダーのホームボタンは I-8.1 で別検証）
+  - **関連ファイル**: `components/dispatch/ReportOnsiteClient.tsx`
+
+- [ ] I-1.7 ReportTransportClient: 報告作成中に戻るボタン
+  - **手順**: 報告画面（transport）で入力中に画面下部の戻るボタン
+  - **期待結果**: モーダル表示、ホームに戻れない（ヘッダーのホームボタンは I-8.2 で別検証）
+  - **関連ファイル**: `components/dispatch/ReportTransportClient.tsx`
+
+- [ ] I-1.8 RecordClient: 既存モーダル + 進行中ガードの統合動作
+  - **手順**: 出動記録画面で入力中に戻るボタン
+  - **期待結果**: 既存の下書きモーダル（「保存して戻る」「保存せず戻る」）と進行中ガードが両立し、誤遷移しない
+  - **関連ファイル**: `components/dispatch/RecordClient.tsx`
+
+#### I-2. ブラウザバック・履歴 API（4 項目）
+
+転記元: 計画書 §7.2 (L823-828)
+
+- [ ] I-2.1 Android Chrome: 出動中にスワイプバック
+  - **手順**: 出動中の画面で Android Chrome のスワイプバックジェスチャ
+  - **期待結果**: ブロックされる（戻るボタンと同じモーダル）
+  - **関連ファイル**: `components/dispatch/DispatchClient.tsx`（`popstate` / `beforeunload`）
+
+- [ ] I-2.2 Desktop Chrome: 出動中にブラウザ戻るボタン
+  - **手順**: 出動中に Chrome の戻るボタン押下
+  - **期待結果**: ブロックされる
+  - **関連ファイル**: `components/dispatch/DispatchClient.tsx`
+
+- [ ] I-2.3 [未確認] iOS Safari: 出動中にスワイプバック
+  - **手順**: iOS Safari でスワイプバック
+  - **期待結果**: ブロックされる
+  - **関連ファイル**: `components/dispatch/DispatchClient.tsx`
+  - **既知**: iOS Safari の history API 制約あり（計画書 §7.2 11 番）
+
+- [ ] I-2.4 Desktop Chrome: 出動中にタブ閉じ
+  - **手順**: 出動中にタブの × ボタン
+  - **期待結果**: `beforeunload` 警告ダイアログが表示される
+  - **関連ファイル**: `components/dispatch/DispatchClient.tsx`
+
+#### I-3. 案件キャンセル（4 項目）
+
+転記元: 計画書 §7.3 (L830-835)
+
+- [ ] I-3.1 DispatchClient: 出動押下 → キャンセル → ホーム遷移
+  - **手順**: 出動押下 → キャンセルボタン押下 → 確認モーダルで OK
+  - **期待結果**: `status=CANCELLED` に更新、ホーム遷移、進行中バナー消える
+  - **関連ファイル**: `components/dispatch/DispatchClient.tsx`, `app/api/dispatches/[id]/cancel/route.ts`
+
+- [ ] I-3.2 5 画面それぞれでキャンセル動作
+  - **手順**: DispatchClient の各 step（出動 / 現着 / 搬送開始 / 完了 / 振替）でキャンセル
+  - **期待結果**: いずれも `CANCELLED` に更新、ホーム遷移
+  - **関連ファイル**: `components/dispatch/DispatchClient.tsx`
+
+- [ ] I-3.3 隊員ロールの他人案件: cancel API 直接呼び出しで 403/404
+  - **手順**: 隊員アカウントから他人の `dispatchId` に対し cancel API を直接 POST
+  - **期待結果**: 403 または 404
+  - **関連ファイル**: `app/api/dispatches/[id]/cancel/route.ts`
+
+- [ ] I-3.4 管理者ロール: 他人案件もキャンセル可能
+  - **手順**: 管理者アカウントから他人の `dispatchId` にキャンセル
+  - **期待結果**: 200, `status=CANCELLED`
+  - **関連ファイル**: `app/api/dispatches/[id]/cancel/route.ts`
+
+#### I-4. 再ログイン時の復帰（3 項目）
+
+転記元: 計画書 §7.4 (L837-841)
+
+- [ ] I-4.1 別タブでログアウト → 再ログイン → 進行中バナー
+  - **手順**: 出動中に別タブで `/api/auth/signout` → 同タブで再ログイン → ホーム画面
+  - **期待結果**: ホームに進行中バナー表示、クリックで出動画面に復帰
+  - **関連ファイル**: `app/page.tsx`, ホーム画面の進行中バナー描画箇所
+
+- [ ] I-4.2 別端末でログイン → 進行中バナー
+  - **手順**: PC A で出動中、PC B で同アカウントログイン
+  - **期待結果**: PC B でも進行中バナー表示、出動画面復帰可能
+  - **関連ファイル**: `app/page.tsx`
+
+- [ ] I-4.3 [未確認] オフライン時のバナー挙動
+  - **手順**: オフラインで再ログイン
+  - **期待結果**: 進行中バナーが表示される（SW キャッシュ経由）
+  - **既知**: 計画書 §6.5 実装次第。要追加調査
+
+#### I-5. 採番の堅牢性（2 項目）
+
+転記元: 計画書 §7.5 (L843-846)
+
+- [ ] I-5.1 同日内 001 / 002 作成 → 002 キャンセル → 003 作成
+  - **手順**: 同日内に 2 件作成、2 件目をキャンセル、3 件目を新規作成
+  - **期待結果**: 003 番号で衝突せず作成（最大値 + 1 方式の新採番）
+  - **関連ファイル**: 採番ロジック（`lib/dispatch/` 配下、`Dispatch.dispatchNumber` 生成箇所）
+
+- [ ] I-5.2 同日内 001 作成 → キャンセル → 002 作成
+  - **手順**: 1 件作成 → キャンセル → 2 件目作成
+  - **期待結果**: ユニーク制約違反なし、002 で作成成功
+  - **関連ファイル**: 同上
+
+#### I-6. 多重出動防止（3 項目）
+
+転記元: 計画書 §7.6 (L848-852)
+
+- [ ] I-6.1 ホーム画面で active バナー表示中: アシスタンスボタングレーアウト
+  - **手順**: 出動中状態で別タブからホームを開く
+  - **期待結果**: アシスタンスボタンが押下不可（disabled / グレー表示）
+  - **関連ファイル**: `app/page.tsx`, ホーム画面のアシスタンスボタン
+
+- [ ] I-6.2 休憩ボタン非表示確認
+  - **手順**: active バナー表示中のホーム画面
+  - **期待結果**: 休憩ボタンが非表示
+  - **関連ファイル**: `app/page.tsx`
+
+- [ ] I-6.3 [未確認] URL 直打ち `/dispatch?assistanceId=...` の動作
+  - **手順**: active バナー表示中に URL 直打ちで `/dispatch?assistanceId=...` へ遷移
+  - **期待結果**: 多重出動防止が効く（404 / リダイレクト）
+  - **既知**: 計画書 §6.7 実装次第。サーバ側 409 ガードは別タスク（残課題 #6）
+
+#### I-7. 既存機能の非破壊確認（3 項目）
+
+転記元: 計画書 §7.7 (L854-858)
+
+- [ ] I-7.1 振替完了後の自動遷移
+  - **手順**: 振替フローを実行し、転送先からの完了通知をシミュレート
+  - **期待結果**: 振替完了後 3 秒で自動的にホームへ遷移
+  - **関連ファイル**: `components/dispatch/DispatchClient.tsx` L368-393（振替ポーリング）
+  - **関連検証**: I-8.4 の cleanup と同時に確認すること
+
+- [ ] I-7.2 報告兼請求項目の保存後遷移
+  - **手順**: 報告画面で全項目入力 → 保存ボタン押下
+  - **期待結果**: 保存後にホーム or 次画面へ正常遷移
+  - **関連ファイル**: `components/dispatch/ReportOnsiteClient.tsx`, `components/dispatch/ReportTransportClient.tsx`
+
+- [ ] I-7.3 RecordClient の下書きモーダル「保存して戻る」「保存せず戻る」
+  - **手順**: 出動記録で入力中に戻るボタン → モーダルで両ボタン動作確認
+  - **期待結果**: 「保存して戻る」で下書き保存 + ホーム、「保存せず戻る」でそのままホーム
+  - **関連ファイル**: `components/dispatch/RecordClient.tsx`
+
+#### I-8. Phase 7 改訂スコープ追加検証（4 項目）
+
+実装根拠: コミット `fe73de7`（Phase 7 改訂スコープ A + C）
+
+- [ ] I-8.1 [C-1] ReportOnsiteClient ヘッダーホームボタン: auto-save + 入力値保持
+  - **手順**: 報告画面（onsite）で部分入力 → ヘッダーのホーム（家アイコン）ボタン押下
+  - **期待結果**: `handleSave(true)` が走り、下書き保存後にホーム遷移。再度開くと入力値が復元される
+  - **関連ファイル**: `components/dispatch/ReportOnsiteClient.tsx` L408-417（`onClick` を `router.push('/')` から `() => { void handleSave(true) }` に変更）
+  - **失敗時**: 旧実装（`router.push('/')` 直接呼び）に戻ると入力値が失われる
+  - **既知**: `disabled={loading}` により保存中の二重押下は防止される
+
+- [ ] I-8.2 [C-2] ReportTransportClient ヘッダーホームボタン: auto-save + 入力値保持
+  - **手順**: 報告画面（transport）で部分入力 → ヘッダーのホームボタン押下
+  - **期待結果**: `handleSave(true)` が走り、下書き保存後にホーム遷移。再表示で入力値復元
+  - **関連ファイル**: `components/dispatch/ReportTransportClient.tsx` L571-580
+  - **失敗時**: 入力値喪失（旧実装の挙動）
+
+- [ ] I-8.3 [A-2] 保存後 `dispatch.isDraft=true` 維持（assert 誤発火なし）
+  - **手順**: 報告（onsite / transport）および記録（record）の各画面で正常保存を実行
+  - **期待結果**: `dispatch.isDraft=true` のまま維持され、assert（`console.error` / `alert`）が一切発火しない
+  - **関連ファイル**:
+    - `components/dispatch/ReportOnsiteClient.tsx` L334-356
+    - `components/dispatch/ReportTransportClient.tsx` L498-520
+    - `components/dispatch/RecordClient.tsx` L365-387
+  - **失敗時**: `alert('保存後の状態が想定外です。ホームに戻れません。サポートに連絡してください。')` が表示された場合、PATCH 経路で `isDraft=false` に書き換わっているバグ。`isDraft` を更新している箇所を grep で全件洗い出すこと
+  - **既知**: SW 楽観的レスポンス（`X-SW-Offline: 1` ヘッダ）時は assert を skip する設計。`dispatch.isDraft` の更新責任は DispatchClient L953（出動記録ボタン）と SecondaryDispatchClient L454（2 次搬送帰社）に集約済み（コミット `9259cb6`）
+
+- [ ] I-8.4 [A-1] 振替完了ポーリング cleanup（アンマウント時の `router.push` 抑止）
+  - **手順**: 振替フローで `transferPending=true` の状態を作る → 別ページに遷移して DispatchClient をアンマウント → 以後 30 秒以上待つ
+  - **期待結果**: アンマウント後に `router.push('/')` が走らない（cleanup で `clearTimeout`）
+  - **関連ファイル**: `components/dispatch/DispatchClient.tsx` L368-393
+  - **失敗時**: コンソールに React の「router.push called after unmount」警告、または意図しないホーム遷移
+  - **既知**: 関連テスト `__tests__/components/dispatch/DispatchClient.transfer-cleanup.test.tsx` で自動検証済み
+
+---
+
 ## 5. 推奨検証順序
 
 依存関係から、以下の順での実施を推奨する：
