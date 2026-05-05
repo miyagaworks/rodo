@@ -306,7 +306,6 @@
 >   if (
 >     status === 'DISPATCHED' ||
 >     status === 'ONSITE' ||
->     status === 'WORKING' ||
 >     status === 'TRANSPORTING'
 >   ) return true
 >   if (status === 'COMPLETED' && returnTime === null) return true
@@ -322,6 +321,10 @@
 >
 > 追加された真値条件:
 > - **新規**: (`COMPLETED` || `RETURNED`) && `returnTime !== null` && `isDraft === false`（帰社後・書類作成未着手）
+>
+> **WORKING の扱い（2026-05-05 ユーザー確認確定）**
+>
+> WORKING は `lib/admin/status-derivation.ts` L15 で「schema にだけ存在するデッドコード」と明記されており、DB に書き込まれない予備値である。「作業中」UI ラベルは `ONSITE` + step=2 で実現されているため、WORKING を新シグネチャに含めない方針で確定。将来 WORKING を実装する設計変更が入った時点で改めてガード対象判定を見直す。
 
 **呼び出し側の影響箇所（要修正）**
 
@@ -359,9 +362,9 @@
 #### A) `lib/dispatch/active-status.ts` シグネチャ拡張
 
 1. 関数シグネチャを `(status, returnTime)` → `(status, returnTime, isDraft)` に変更
-2. WORKING を真値条件に追加（GET /active と一致させるため要否を再確認 [未確認]：handover §K.2 では「WORKING を含まない（GET /active と一致）」とされており、新仕様で WORKING の扱いをユーザー確認）
+2. WORKING は真値条件に追加しない（**2026-05-05 ユーザー確認確定** / `lib/admin/status-derivation.ts` L15「schema にだけ存在するデッドコード」のため対象外。「作業中」UI ラベルは `ONSITE` + step=2 で実現済みのため既存ガードでカバー済み）
 3. 帰社後 `isDraft === false` 条件を追加
-4. JSDoc 更新（旧仕様の WORKING 排除コメントは削除/更新）
+4. JSDoc 更新（旧仕様の WORKING 排除コメントは**維持する**。WORKING を含めない方針が **2026-05-05 ユーザー確認**で確定したため、排除理由を新仕様準拠の表現に更新するのみ）
 5. 旧シグネチャの呼び出し箇所をコンパイル時に検出させる（型エラーで漏れ防止）
 
 #### B) `components/dispatch/DispatchClient.tsx` L1544 出動記録ボタン onClick 改修
@@ -432,7 +435,7 @@
 1. `__tests__/lib/dispatch/active-status.test.ts`:
    - 帰社後 `isDraft === false` で true
    - 帰社後 `isDraft === true` で false
-   - WORKING の扱い（要ユーザー確認）
+   - WORKING を渡したら false を返すこと（WORKING 不採用方針のリグレッション検出用 / **2026-05-05 ユーザー確認確定**）
 2. `__tests__/components/dispatch/DispatchClient.test.tsx`:
    - 出動記録ボタンクリック → PATCH 呼び出し
    - PATCH 成功 → router.push
@@ -474,7 +477,7 @@
 | GET /api/dispatches/active の where 句との乖離 | 関数判定と DB クエリが食い違うとバナー誤表示 | 同じ Phase 内で両者を同時更新・テストで一致確認 |
 | isDraft 更新の race condition | 出動記録ボタン連打で多重 PATCH | ボタン disabled 制御 + サーバ側で冪等処理（同じ値なら no-op） |
 | 既存案件の `isDraft` デフォルト値 | 既存データは `isDraft: false`（schema default）。帰社済みの過去案件で active バナーが復活する懸念 | マイグレーションで「帰社済み（returnTime IS NOT NULL）かつ書類作成済み」の案件を `isDraft: true` にバックフィル。要否は Phase 5.5 着手時にデータ確認 |
-| WORKING ステータスの扱い | 旧 `isActiveDispatchStatus` は WORKING を含まなかった（handover §K.2 設計判断）。新仕様で WORKING を含めるかユーザー確認が必要 | Phase 5.5 着手前にユーザー確認 → 確認結果を本セクションに追記 |
+| WORKING ステータスの扱い | 旧 `isActiveDispatchStatus` は WORKING を含まなかった（handover §K.2 設計判断）。新仕様で WORKING を含めるかユーザー確認が必要 | **対応不要（含めないことで確定 / 2026-05-05 ユーザー確認確定）**。WORKING は `lib/admin/status-derivation.ts` L15 で「schema にだけ存在するデッドコード」と明記、DB に書き込まれない予備値のため新シグネチャ対象外 |
 
 **後続実装タスクへの引き継ぎ要約（A〜D）**
 
@@ -517,7 +520,7 @@
 
 【リスク監視】
   - 既存案件のバックフィル要否
-  - WORKING ステータスの扱い（着手前にユーザー確認）
+  - WORKING ステータスは含めず確定（2026-05-05 ユーザー確認確定 / schema デッドコードのため対象外）
   - GET /active where 句と関数判定の整合性
 ```
 

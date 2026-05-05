@@ -245,7 +245,6 @@ rodo `AGENTS.md` 準拠:
 >   if (
 >     status === 'DISPATCHED' ||
 >     status === 'ONSITE' ||
->     status === 'WORKING' ||
 >     status === 'TRANSPORTING'
 >   ) return true
 >   if (status === 'COMPLETED' && returnTime === null) return true
@@ -262,6 +261,10 @@ rodo `AGENTS.md` 準拠:
 > **追加された真値条件**
 > - **新規**: (`COMPLETED` || `RETURNED`) && `returnTime !== null` && `isDraft === false`（帰社後・書類作成未着手）
 >
+> **WORKING の扱い（2026-05-05 ユーザー確認確定）**
+>
+> WORKING は `lib/admin/status-derivation.ts` L15 で「schema にだけ存在するデッドコード」と明記されており、DB に書き込まれない予備値である。「作業中」UI ラベルは `ONSITE` + step=2 で実現されているため、WORKING を新シグネチャに含めない方針で確定。将来 WORKING を実装する設計変更が入った時点で改めてガード対象判定を見直す。
+>
 > **呼び出し側の影響箇所（Phase 5.5 で改修）**
 >
 > | ファイル | 修正内容 |
@@ -275,7 +278,7 @@ rodo `AGENTS.md` 準拠:
 > | `components/HomeClient.tsx` | `ActiveDispatchBanner` の表示条件で `isDraft` を考慮 |
 > | `components/ProcessingBar.tsx` | active 判定で `isDraft` を考慮（必要に応じて）[未確認] |
 >
-> **注意**: K.2 で「`isActiveDispatchStatus` は WORKING を含まない」と確定した設計判断は、新仕様で WORKING 真値化に再検討される（計画書 Phase 5.5 リスク表参照）。Phase 5.5 着手前にユーザー確認すること。
+> **注意**: K.2 で「`isActiveDispatchStatus` は WORKING を含まない」と確定した設計判断は、新仕様でも維持される。**2026-05-05 ユーザー確認確定**: WORKING は `lib/admin/status-derivation.ts` L15 で「schema にだけ存在するデッドコード」と明記、DB に書き込まれない予備値のため新シグネチャに含めない方針で確定（「作業中」UI ラベルは `ONSITE` + step=2 で実現済み・既存ガードでカバー済み）。将来 WORKING を実装する設計変更が入った時点で改めてガード対象判定を見直す。
 
 ### K.3 Phase 3 着手前の注意点（次セッション初動）
 
