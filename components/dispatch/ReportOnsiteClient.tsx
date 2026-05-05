@@ -257,13 +257,16 @@ export default function ReportOnsiteClient({ dispatch, report, userName }: Props
   }
 
   // ── ペイロード ──
-  const buildDispatchPayload = (isDraft: boolean) => ({
+  // dispatch.isDraft は出動記録ボタン押下（DispatchClient.handleClickRecord）と
+  // 2 次搬送帰社時（SecondaryDispatchClient L454）でのみ更新される。
+  // Report 系の handleSave からは isDraft を送らないことで、Phase 5.5 の
+  // active 判定との整合性を維持する。
+  const buildDispatchPayload = () => ({
     dispatchTime: dispatchTime?.toISOString() ?? null,
     arrivalTime: arrivalTime?.toISOString() ?? null,
     completionTime: completionTime?.toISOString() ?? null,
     returnTime: returnTime?.toISOString() ?? null,
     vehicleId: vehicleId,
-    isDraft,
   })
 
   const buildReportPayload = (isDraft: boolean) => ({
@@ -290,7 +293,7 @@ export default function ReportOnsiteClient({ dispatch, report, userName }: Props
 
   useEffect(() => {
     saveFormData({
-      dispatch: buildDispatchPayload(true),
+      dispatch: buildDispatchPayload(),
       report: buildReportPayload(true),
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -311,7 +314,7 @@ export default function ReportOnsiteClient({ dispatch, report, userName }: Props
       const dispatchRes = await offlineFetch(`/api/dispatches/${dispatch.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(buildDispatchPayload(isDraft)),
+        body: JSON.stringify(buildDispatchPayload()),
         offlineActionType: 'dispatch_update',
         offlineDispatchId: dispatch.id,
       })
