@@ -596,25 +596,39 @@
 
 ### Phase 7: その他のホーム遷移6件への対策
 
-**目的**: ヘッダー戻るボタン以外のホーム遷移経路にも進行中ガードを適用する。
+> ⚠️ **計画書改訂（2026-05-05 / Super による Edit）**: 本 Phase の対象 6 件のうち #5 / #6 は **2026-05-05 のコミット `c7a60ce` のリファクタにより既に削除済み**。RecordClient のホーム戻りモーダルは廃止され、ヘッダーのホームボタン onClick (L414-435) に auto-save を直接埋め込む方式に置換された。下記表の #5 / #6 行は履歴保持のため削除せず取り消し線付きで残す。実装対象は **#1 / #2 / #3 / #4 の 4 件のみ**。
 
-**対象 6 件（調査レポート §2 から抽出）**
+**対象 6 件（調査レポート §2 から抽出）→ 実装対象は #1〜#4 の 4 件**
 
-| # | 画面 | 場所 | 行 | 実装 |
+| # | 画面 | 場所 | 行（現状） | 実装 |
 |---|---|---|---|---|
-| 1 | DispatchClient | 振替完了後 | L343 | `setTimeout(() => router.push('/'), 3000)` |
+| 1 | DispatchClient | 振替完了後 | L378 | `setTimeout(() => router.push('/'), 3000)` |
 | 2 | ReportOnsiteClient | 完了/下書き保存後 | L335 | `window.location.href = '/'` |
 | 3 | ReportTransportClient | 完了/下書き保存後 | L498 | `window.location.href = '/'` |
-| 4 | RecordClient | 下書き保存後 | L370 | `window.location.href = '/'` |
-| 5 | RecordClient | モーダル「下書き保存して戻る」 | L1041 | `router.push('/')` |
-| 6 | RecordClient | モーダル「保存せずに戻る」 | L1059 | `router.push('/')` |
+| 4 | RecordClient | 下書き保存後 | L369 | `window.location.href = '/'` |
+| ~~5~~ | ~~RecordClient~~ | ~~モーダル「下書き保存して戻る」~~ | ~~旧 L1041~~ | **削除済み（c7a60ce / 2026-05-05）**。代替: ヘッダー L414-435 に auto-save 統合 |
+| ~~6~~ | ~~RecordClient~~ | ~~モーダル「保存せずに戻る」~~ | ~~旧 L1059~~ | **削除済み（c7a60ce / 2026-05-05）**。代替: 同上（保存して戻る一択に整理） |
 
 **実装手順**
 
 1. **#1 振替完了後**: `setTimeout` 内で `inProgress` を再評価。振替完了 = TRANSFERRED 状態なので `inProgress=false` のはず（mapStatusToSubPhase で TRANSFERRED は active 外）。実装上は素通しで OK。**ただし `setTimeout` 中に隊員が画面を閉じても `setTimeout` は cleanup されないと暴走する**ため、useEffect の return cleanup で `clearTimeout` 必須。
 2. **#2 / #3 / #4 完了/下書き保存後**: 保存成功時は status が COMPLETED/RETURNED 等で active 系を抜けているはず。`window.location.href = '/'` の前に `inProgress` を再評価し、active なら遷移を抑止（=保存後の状態が想定外＝バックエンド/UI 同期のサイレント故障）。サイレント故障防止のため、saving に成功しても status が想定通りでなければ遷移せずエラー表示。
-3. **#5 RecordClient「下書き保存して戻る」**: PATCH 成功後 `router.push('/')`。dispatch.status は変わらない（draft フラグ更新のみ）。**この経路は本来「進行中だが下書きとして保存して戻る」業務フローなので、進行中ガードを通すと操作不能になる**。RecordClient は出動記録画面 = status は COMPLETED 以降のはず。「進行中（active）」判定では false になるはずだが、要動作確認。
-4. **#6 RecordClient「保存せずに戻る」**: 同上。
+3. ~~**#5 RecordClient「下書き保存して戻る」**~~: 削除済み（c7a60ce）。
+4. ~~**#6 RecordClient「保存せずに戻る」**~~: 削除済み（c7a60ce）。
+
+**追加対象（2026-05-05 改訂スコープ C / ヘッダーホームボタン統一）**
+
+書類作成 3 画面のヘッダー左上「ホームに戻る」ボタンの実装が分裂しているのを統一する。
+
+| 画面 | 行 | 現状 | 改修方針 |
+|---|---|---|---|
+| RecordClient | L414-435 | `offlineFetch PATCH ... isDraft=true` → `router.push('/')` で auto-save あり | **基準実装（変更なし）** |
+| ReportOnsiteClient | L387 | `onClick={() => router.push('/')}`（保存処理なし） | RecordClient L414-435 と同等の auto-save に統一 |
+| ReportTransportClient | L550 | `onClick={() => router.push('/')}`（保存処理なし） | 同上 |
+
+理由: 報告/請求画面で隊員が入力途中の値があるままヘッダーホームを押すと値が喪失する事故リスクがある。RecordClient で既に対策済みの auto-save 方式を 2 画面にも展開する。実装は `buildDispatchPayload(true)` + `buildReportPayload(true)`（両方）を PATCH/POST 送信してから `router.push('/')` する形。
+
+> ⚠️ ただしスコープ A の #2 / #3 の assert 仕様と密接に関わる（保存後の `dispatch.isDraft` 期待値が同一論点）。**着手前に「Phase 5.5 補強（buildDispatchPayload からの isDraft 引数分離）」が必要かを確定させること**。詳細は本ファイル §9.0 補足（次セッション追記予定）または引継ぎノートを参照。
 
 **設計上の判断**
 
@@ -877,6 +891,40 @@
 
 - §6.4 のとおり、新ビルド配信時に古い SW がキャッシュした HTML を使い続けないか
 - 別タスクで動作確認
+
+### 8.7 書類作成画面のブラウザバック禁止（PWA 運用対応）
+
+**背景**: 2026-05-05 ユーザー実機検証中に発見。書類作成 3 画面
+（RecordClient / ReportOnsiteClient / ReportTransportClient）でブラウザバックを
+押すと DispatchClient（前画面）に戻れてしまい、隊員が誤って前回のアシスタンス
+情報を引きずったまま操作する事故リスクがある。PWA 運用前提のため、Android の
+戻るボタン・スワイプバック対策が必須。
+
+**対象**: 書類作成 3 画面すべて
+- `components/dispatch/RecordClient.tsx`
+- `components/dispatch/ReportOnsiteClient.tsx`
+- `components/dispatch/ReportTransportClient.tsx`
+
+**方針**: popstate ガード新設 + 専用モーダル通知。ホームボタン経由は既存挙動維持
+
+**想定実装**:
+- `hooks/useDocumentBackGuard.ts` 新設（マウント時 pushState で仮想エントリ、
+  popstate で再 pushState + モーダル表示）
+- `components/dispatch/DocumentBackGuardModal.tsx` 新設（文言:
+  「ホームに戻るには画面上のホームボタンを使ってください」）
+- 書類作成 3 画面でフック呼び出し
+- 単体・統合テスト追加
+
+**想定所要時間**: 約 2.5 時間
+
+**着手条件**: 本タスク Phase 8 完了後（独立タスクとして起票）
+
+**§9.0-A との関係**: §9.0-A は「戻るボタン押下時のガード対象外」を確定したもの
+で、本課題（ブラウザバック・スワイプバック禁止）とは別軸。両立する。
+
+**Phase 6 実機検証時の扱い**: O-5 c では「書類作成画面の戻るボタンでホームに
+戻れる」のみを検証対象とする。書類作成画面でのブラウザバック挙動は本派生課題
+として別タスク化済みのため、Phase 6 PASS 判定に含めない。
 
 ---
 
