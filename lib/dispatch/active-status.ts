@@ -10,9 +10,12 @@
  *   クライアントから直接 import 可能。`mapStatusToSubPhase` はそのまま再エクスポートする。
  * - `isActiveDispatchStatus` は `app/api/dispatches/active/route.ts` (Phase 1) と
  *   完全一致させる。判定ズレはバナー表示と DB 状態の乖離を生むため致命的。
- * - WORKING ステータスは Phase 1 cancel route では CANCELLABLE に含むが、
- *   `GET /api/dispatches/active` の判定には含まない（schema にだけ存在するデッドコード扱い）。
- *   本関数は **GET /active と一致させる**（= WORKING は false）。
+ * - WORKING ステータスは新シグネチャ（2026-05-05）でも真値条件に**含めない**。
+ *   `lib/admin/status-derivation.ts` L15 で「schema にだけ存在するデッドコード」と
+ *   明記されており、DB に書き込まれない予備値である。「作業中」UI ラベルは
+ *   `ONSITE` + step=2 で実現されているため、既存ガードでカバー済み。
+ *   将来 WORKING を実装する設計変更が入った時点で改めて判定を見直す。
+ *   （2026-05-05 ユーザー確認確定）
  */
 
 import type { DispatchStatus } from '@prisma/client'
@@ -28,15 +31,23 @@ export {
  * 真値となる条件:
  *   - status が DISPATCHED / ONSITE / TRANSPORTING のいずれか
  *   - もしくは status === 'COMPLETED' && returnTime === null（帰社中）
+ *   - もしくは (status === 'COMPLETED' || status === 'RETURNED') &&
+ *     returnTime !== null && isDraft === false
+ *     （帰社後・書類作成未着手 / 2026-05-05 ユーザー確定）
  *
  * `app/api/dispatches/active/route.ts` の where 句と完全に一致する。
  *
- * @param status   Dispatch.status の値（enum / string どちらでも可）
+ * WORKING は真値条件に含めない（schema 上のデッドコードのため / 上記モジュール
+ * コメント参照）。
+ *
+ * @param status     Dispatch.status の値（enum / string どちらでも可）
  * @param returnTime 帰社時刻。null = 未帰社
+ * @param isDraft    Dispatch.isDraft の値。出動記録ボタン押下後は true。
  */
 export function isActiveDispatchStatus(
   status: DispatchStatus | string,
   returnTime: Date | null,
+  isDraft: boolean,
 ): boolean {
   if (
     status === 'DISPATCHED' ||
@@ -46,6 +57,14 @@ export function isActiveDispatchStatus(
     return true
   }
   if (status === 'COMPLETED' && returnTime === null) {
+    return true
+  }
+  // 新規（2026-05-05）: 帰社後でも出動記録ボタン未押下なら active
+  if (
+    (status === 'COMPLETED' || status === 'RETURNED') &&
+    returnTime !== null &&
+    isDraft === false
+  ) {
     return true
   }
   return false

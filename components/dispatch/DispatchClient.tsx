@@ -44,6 +44,11 @@ interface SerializedDispatch {
   transferredToDispatchNumber: string | null
   transferredFromUserName: string | null
   vehicleId: string | null
+  /**
+   * 書類作成中フラグ（2026-05-05 仕様変更）。
+   * 出動記録ボタン押下時に true をセット。帰社後でも false の間は active 継続でガード。
+   */
+  isDraft: boolean
 }
 
 interface DispatchClientProps {
@@ -311,15 +316,22 @@ export default function DispatchClient({
   const isTransferred = initialDispatch?.status === 'TRANSFERRED'
   const isTransferredIn = !!initialDispatch?.transferredFromId
 
-  // ── 進行中（active）ガード（Phase 3）──
-  // 根拠: getInitialStep（L60-69）により帰社後は onsite=4 / transport=5。
+  // ── 進行中（active）ガード（Phase 3 / Phase 5.5 拡張）──
+  // 根拠: getInitialStep（L63-72）により帰社後は onsite=4 / transport=5。
   //   step 0 は未出動。step 1〜帰社直前が「現場対応中」= active。
   //   isActiveDispatchStatus を使わない理由: 新規出動シナリオでは initialDispatch=null のため
   //   サーバ status を持たない。step ベースが両シナリオを一意にカバーする。
+  //
+  // Phase 5.5（2026-05-05 ユーザー確定）:
+  //   帰社後（step=4 onsite / step=5 transport）でも `isDraft === false` の間は
+  //   「書類作成画面に未着手」とみなしガード継続する。出動記録ボタン押下で
+  //   PATCH /api/dispatches/[id] により isDraft=true となった時点でガード解除。
+  const [isDraft, setIsDraft] = useState<boolean>(initialDispatch?.isDraft ?? false)
+  const finalStep = mode === 'transport' ? 5 : 4
   const inProgress =
     dispatchId !== null &&
     step >= 1 &&
-    step < (mode === 'transport' ? 5 : 4)
+    (step < finalStep || (step >= finalStep && isDraft === false))
 
   const [showGuardModal, setShowGuardModal] = useState(false)
   const { safeNavigateHome } = useDispatchInProgressGuard({
@@ -908,6 +920,52 @@ export default function DispatchClient({
 
   // 出動記録へボタンの有効条件: 帰社済み
   const recordReady = mode === 'transport' ? step >= 5 : step >= 4
+
+  // 出動記録ボタン押下中（PATCH 中の連打防止）
+  const [recordSubmitting, setRecordSubmitting] = useState(false)
+
+  /**
+   * 出動記録ボタン onClick（Phase 5.5 / 2026-05-05 ユーザー確定）。
+   *
+   * PATCH /api/dispatches/[id] で `isDraft: true` を送信し、成功時のみ
+   * `/dispatch/[id]/record` へ遷移する。これにより active 判定（GET /active /
+   * isActiveDispatchStatus）が「帰社後 isDraft=false → active」から
+   * 「isDraft=true → 非 active」に切り替わり、書類作成画面でホームに戻れる
+   * ようになる。
+   *
+   * AGENTS.md「サイレント故障チェック」準拠:
+   *   - 楽観的更新は行わない（offlineFetch ではなく素の `fetch` を使用）
+   *   - res.ok 必須チェック → 失敗なら遷移せず alert
+   *   - catch 句でユーザー通知（alert）
+   *   - 連打防止: PATCH 中は disabled / setRecordSubmitting で多重起動を防ぐ
+   *
+   * オフライン時: SW フォールバック等で res.ok=false / catch のいずれかに落ちる。
+   *   isDraft 更新を保留したまま遷移する（楽観的更新）と、ホームに戻った後の
+   *   バナー表示と DB 状態が乖離するため不採用。オフラインなら alert で再操作を促す。
+   */
+  const handleClickRecord = useCallback(async () => {
+    if (!recordReady || !dispatchId || recordSubmitting) return
+    setRecordSubmitting(true)
+    try {
+      const res = await fetch(`/api/dispatches/${dispatchId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isDraft: true }),
+      })
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string }
+        alert(body?.error ?? '書類作成への遷移に失敗しました')
+        return
+      }
+      // PATCH 成功 → ローカル isDraft 反映 → ガード解除 → 遷移
+      setIsDraft(true)
+      router.push(`/dispatch/${dispatchId}/record`)
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '書類作成への遷移に失敗しました')
+    } finally {
+      setRecordSubmitting(false)
+    }
+  }, [dispatchId, recordReady, recordSubmitting, router])
 
   // ── Render ──
 
@@ -1541,14 +1599,14 @@ export default function DispatchClient({
         {dispatchId && (
           <div ref={recordBtnRef}>
             <button
-              onClick={recordReady ? () => router.push(`/dispatch/${dispatchId}/record`) : undefined}
-              disabled={!recordReady}
+              onClick={recordReady ? handleClickRecord : undefined}
+              disabled={!recordReady || recordSubmitting}
               className="w-full flex items-center justify-center gap-3 rounded-lg py-5 font-bold text-2xl transition-opacity"
               style={{
                 backgroundColor: '#D7AF70',
                 color: '#1C2948',
-                opacity: recordReady ? 1 : 0.35,
-                cursor: recordReady ? 'pointer' : 'not-allowed',
+                opacity: recordReady && !recordSubmitting ? 1 : 0.35,
+                cursor: recordReady && !recordSubmitting ? 'pointer' : 'not-allowed',
               }}
             >
               <span>出動記録へ</span>

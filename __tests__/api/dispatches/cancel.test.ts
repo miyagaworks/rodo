@@ -3,11 +3,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 /**
  * POST /api/dispatches/[id]/cancel
  *
- * 「出動中の浮き案件防止」Phase 1 で新設された案件キャンセル専用ルートのテスト。
+ * 「出動中の浮き案件防止」Phase 1 で新設された案件キャンセル専用ルートのテスト
+ * （Phase 5.5 / 2026-05-05 仕様変更で帰社後 && isDraft===false もキャンセル可に拡張）。
  *
  * 検証範囲:
  *  - 認証 / 認可（隊員 vs ADMIN）
  *  - キャンセル可能な状態と不可能な状態の 409 ガード
+ *  - Phase 5.5 拡張: 帰社後 isDraft=false でキャンセル成功 / isDraft=true で 409 + 専用メッセージ
  *  - 存在しない案件の 404
  *  - 楽観的ロック例外時の 404
  */
@@ -51,6 +53,7 @@ function makeParams(id = 'abc') {
 describe('POST /api/dispatches/[id]/cancel', () => {
   const userId = 'u-self'
   const tenantId = 't1'
+  const RETURN_DATE = new Date('2026-05-04T10:00:00Z')
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -88,6 +91,7 @@ describe('POST /api/dispatches/[id]/cancel', () => {
       userId: 'someone-else',
       status: 'DISPATCHED',
       returnTime: null,
+      isDraft: false,
     })
 
     const res = await POST(makeRequest(), makeParams())
@@ -108,6 +112,7 @@ describe('POST /api/dispatches/[id]/cancel', () => {
       userId: 'someone-else',
       status: 'DISPATCHED',
       returnTime: null,
+      isDraft: false,
     })
     mockedUpdate.mockResolvedValueOnce({ id: 'abc', status: 'CANCELLED' })
 
@@ -128,6 +133,7 @@ describe('POST /api/dispatches/[id]/cancel', () => {
       userId,
       status: 'DISPATCHED',
       returnTime: null,
+      isDraft: false,
     })
     mockedUpdate.mockResolvedValueOnce({ id: 'abc', status: 'CANCELLED' })
 
@@ -154,6 +160,7 @@ describe('POST /api/dispatches/[id]/cancel', () => {
       userId,
       status,
       returnTime: null,
+      isDraft: false,
     })
     mockedUpdate.mockResolvedValueOnce({ id: 'abc', status: 'CANCELLED' })
 
@@ -168,6 +175,7 @@ describe('POST /api/dispatches/[id]/cancel', () => {
       userId,
       status: 'COMPLETED',
       returnTime: null,
+      isDraft: false,
     })
     mockedUpdate.mockResolvedValueOnce({ id: 'abc', status: 'CANCELLED' })
 
@@ -178,43 +186,101 @@ describe('POST /api/dispatches/[id]/cancel', () => {
     expect(body.dispatch.status).toBe('CANCELLED')
   })
 
-  it('COMPLETED && returnTime IS NOT NULL（帰社済み）は 409', async () => {
+  // Phase 5.5 拡張（2026-05-05）
+  it('COMPLETED && returnTime IS NOT NULL && isDraft === false（帰社後・書類未着手）はキャンセル可能', async () => {
     mockedFindUnique.mockResolvedValueOnce({
       id: 'abc',
       userId,
       status: 'COMPLETED',
-      returnTime: new Date('2026-05-04T10:00:00Z'),
+      returnTime: RETURN_DATE,
+      isDraft: false,
     })
+    mockedUpdate.mockResolvedValueOnce({ id: 'abc', status: 'CANCELLED' })
 
     const res = await POST(makeRequest(), makeParams())
 
-    expect(res.status).toBe(409)
+    expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body).toEqual({ error: 'キャンセルできない状態です' })
-    expect(mockedUpdate).not.toHaveBeenCalled()
+    expect(body.dispatch.status).toBe('CANCELLED')
+    expect(mockedUpdate).toHaveBeenCalledTimes(1)
   })
 
-  it.each([
-    ['STANDBY'],
-    ['RETURNED'],
-    ['STORED'],
-    ['CANCELLED'],
-    ['TRANSFERRED'],
-  ])('%s 状態の案件は 409', async (status) => {
+  it('RETURNED && returnTime IS NOT NULL && isDraft === false（帰社後・書類未着手）はキャンセル可能', async () => {
     mockedFindUnique.mockResolvedValueOnce({
       id: 'abc',
       userId,
-      status,
-      returnTime: null,
+      status: 'RETURNED',
+      returnTime: RETURN_DATE,
+      isDraft: false,
+    })
+    mockedUpdate.mockResolvedValueOnce({ id: 'abc', status: 'CANCELLED' })
+
+    const res = await POST(makeRequest(), makeParams())
+
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.dispatch.status).toBe('CANCELLED')
+  })
+
+  it('COMPLETED && isDraft === true（書類作成中）は 409 + 専用メッセージ', async () => {
+    mockedFindUnique.mockResolvedValueOnce({
+      id: 'abc',
+      userId,
+      status: 'COMPLETED',
+      returnTime: RETURN_DATE,
+      isDraft: true,
     })
 
     const res = await POST(makeRequest(), makeParams())
 
     expect(res.status).toBe(409)
     const body = await res.json()
-    expect(body).toEqual({ error: 'キャンセルできない状態です' })
+    expect(body).toEqual({
+      error:
+        '書類作成中の案件はキャンセルできません。書類作成画面から操作してください',
+    })
     expect(mockedUpdate).not.toHaveBeenCalled()
   })
+
+  it('RETURNED && isDraft === true（書類作成中）は 409 + 専用メッセージ', async () => {
+    mockedFindUnique.mockResolvedValueOnce({
+      id: 'abc',
+      userId,
+      status: 'RETURNED',
+      returnTime: RETURN_DATE,
+      isDraft: true,
+    })
+
+    const res = await POST(makeRequest(), makeParams())
+
+    expect(res.status).toBe(409)
+    const body = await res.json()
+    expect(body).toEqual({
+      error:
+        '書類作成中の案件はキャンセルできません。書類作成画面から操作してください',
+    })
+    expect(mockedUpdate).not.toHaveBeenCalled()
+  })
+
+  it.each([['STANDBY'], ['STORED'], ['CANCELLED'], ['TRANSFERRED']])(
+    '%s 状態の案件は 409（汎用メッセージ）',
+    async (status) => {
+      mockedFindUnique.mockResolvedValueOnce({
+        id: 'abc',
+        userId,
+        status,
+        returnTime: null,
+        isDraft: false,
+      })
+
+      const res = await POST(makeRequest(), makeParams())
+
+      expect(res.status).toBe(409)
+      const body = await res.json()
+      expect(body).toEqual({ error: 'キャンセルできない状態です' })
+      expect(mockedUpdate).not.toHaveBeenCalled()
+    },
+  )
 
   it('Prisma P2025（更新時にレコード消失）は 404 にマッピングされる', async () => {
     mockedFindUnique.mockResolvedValueOnce({
@@ -222,6 +288,7 @@ describe('POST /api/dispatches/[id]/cancel', () => {
       userId,
       status: 'DISPATCHED',
       returnTime: null,
+      isDraft: false,
     })
     const prismaErr = new Prisma.PrismaClientKnownRequestError(
       'Record not found',
@@ -244,6 +311,7 @@ describe('POST /api/dispatches/[id]/cancel', () => {
       userId,
       status: 'DISPATCHED',
       returnTime: null,
+      isDraft: false,
     })
     mockedUpdate.mockRejectedValueOnce(new Error('DB failure'))
 

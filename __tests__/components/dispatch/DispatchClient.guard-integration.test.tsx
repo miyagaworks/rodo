@@ -100,6 +100,7 @@ const ACTIVE_DISPATCH = {
   transferredToDispatchNumber: null,
   transferredFromUserName: null,
   vehicleId: null,
+  isDraft: false,
 }
 
 describe('DispatchClient — 進行中ガードの popstate→モーダル表示 結合', () => {

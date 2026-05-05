@@ -58,6 +58,7 @@ export default async function DispatchPage({ params }: Props) {
     transferredToDispatchNumber: dispatch.transferredTo?.dispatchNumber ?? null,
     transferredFromUserName: dispatch.transferredFrom?.user?.name ?? null,
     vehicleId: dispatch.vehicleId,
+    isDraft: dispatch.isDraft,
   }
 
   return (

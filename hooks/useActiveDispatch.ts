@@ -28,6 +28,12 @@ export interface ActiveDispatchPayload {
   returnTime: string | null
   /** 'ONSITE' | 'TRANSPORT' */
   type: string
+  /**
+   * 書類作成中フラグ（2026-05-05 仕様変更）。
+   * true = 出動記録ボタン押下済み（書類作成画面で操作中）。
+   * 帰社後 active 判定の DB / 関数判定で使用される。
+   */
+  isDraft: boolean
   /** status / returnTime から導出されたサブフェーズ。判定不能なら null */
   subPhase: DispatchSubPhase | null
   assistance: { name: string }
