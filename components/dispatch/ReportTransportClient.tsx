@@ -498,6 +498,27 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
       if (!reportRes.ok) throw new Error('報告の保存に失敗しました')
 
       await clearDraft()
+
+      // Phase 7 改訂スコープ A-2b: 想定外状態の assert（サイレント故障防止 / AGENTS.md 準拠）
+      // dispatch.isDraft は出動記録ボタン押下時に true がセットされ、Phase 5.5 補強により
+      // 報告画面の handleSave からは更新されない。書類画面に到達した時点で true のはずなので、
+      // 保存後レスポンスで false が返ってきたら異常（経路バグ / レース）として遷移停止する。
+      const isOptimistic = dispatchRes.headers.get('X-SW-Offline') === '1'
+      if (!isOptimistic) {
+        const updatedDispatch = (await dispatchRes.clone().json().catch(() => null)) as
+          | { isDraft?: boolean }
+          | null
+        if (updatedDispatch && updatedDispatch.isDraft !== true) {
+          console.error('[ReportTransportClient.handleSave] Unexpected dispatch.isDraft after save', {
+            dispatchId: dispatch.id,
+            expected: true,
+            actual: updatedDispatch.isDraft,
+          })
+          alert('保存後の状態が想定外です。ホームに戻れません。サポートに連絡してください。')
+          return
+        }
+      }
+
       window.location.href = '/'
     } catch (e) {
       console.error(e)
@@ -550,9 +571,10 @@ export default function ReportTransportClient({ dispatch, report, userName, seco
         {/* 1行目: ホーム / タイトル / バッジ / 日付 */}
         <div className="flex items-center gap-2 mb-2.5">
           <button
-            onClick={() => router.push('/')}
+            onClick={() => { void handleSave(true) }}
+            disabled={loading}
             aria-label="ホームに戻る"
-            className="inline-flex items-center justify-center p-2 rounded-md active:opacity-70"
+            className="inline-flex items-center justify-center p-2 rounded-md active:opacity-70 disabled:opacity-50"
             style={{ backgroundColor: '#71A9F7', color: 'white' }}
           >
             <TiHome className="w-4 h-4" />

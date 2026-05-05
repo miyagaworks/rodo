@@ -365,6 +365,27 @@ export default function RecordClient({ dispatch, userName, report }: RecordClien
       })
       if (!res.ok) throw new Error('下書きの保存に失敗しました')
       await clearDraft()
+
+      // Phase 7 改訂スコープ A-2c: 想定外状態の assert（サイレント故障防止 / AGENTS.md 準拠）
+      // dispatch.isDraft は出動記録ボタン押下時に true がセットされ、Phase 5.5 補強により
+      // 本経路でも buildPayload(true) で isDraft=true を維持する。保存後レスポンスで
+      // false が返ってきたら異常（経路バグ / レース）として遷移停止する。
+      const isOptimistic = res.headers.get('X-SW-Offline') === '1'
+      if (!isOptimistic) {
+        const updatedDispatch = (await res.clone().json().catch(() => null)) as
+          | { isDraft?: boolean }
+          | null
+        if (updatedDispatch && updatedDispatch.isDraft !== true) {
+          console.error('[RecordClient.handleDraftSave] Unexpected dispatch.isDraft after save', {
+            dispatchId: dispatch.id,
+            expected: true,
+            actual: updatedDispatch.isDraft,
+          })
+          alert('保存後の状態が想定外です。ホームに戻れません。サポートに連絡してください。')
+          return
+        }
+      }
+
       // ルーターキャッシュをクリアして処理バーを確実に更新する
       window.location.href = '/'
     } catch (e) {

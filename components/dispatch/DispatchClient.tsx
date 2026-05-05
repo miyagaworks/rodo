@@ -367,6 +367,7 @@ export default function DispatchClient({
   // 振替完了ポーリング（30秒間隔、PENDING 時のみ）
   useEffect(() => {
     if (!transferPending || !dispatchId) return
+    let redirectTimeoutId: ReturnType<typeof setTimeout> | null = null
     const poll = setInterval(async () => {
       try {
         const res = await fetch(`/api/dispatches/${dispatchId}`)
@@ -375,11 +376,18 @@ export default function DispatchClient({
         if (data.status === 'TRANSFERRED') {
           setTransferCompleted(true)
           clearInterval(poll)
-          setTimeout(() => router.push('/'), 3000)
+          // Phase 7 改訂スコープ A-1: アンマウント時の暴走防止のため timeout id を保持し
+          // cleanup で clearTimeout する。コンポーネント破棄後の router.push を防ぐ。
+          redirectTimeoutId = setTimeout(() => router.push('/'), 3000)
         }
       } catch { /* ignore */ }
     }, 30000)
-    return () => clearInterval(poll)
+    return () => {
+      clearInterval(poll)
+      if (redirectTimeoutId !== null) {
+        clearTimeout(redirectTimeoutId)
+      }
+    }
   }, [transferPending, dispatchId, router])
 
   // ── 写真（Phase 10） ──
