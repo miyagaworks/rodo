@@ -235,14 +235,124 @@ d8d853a docs(handover): add PR #10 review results and 5 follow-up tasks (E.8-E.1
 - dev サーバ PID 14767 は Mac mini 再起動で消える前提。再起動後は `cd ~/Projects/rodo/app && PORT=3100 npm run dev`
 - ブランチ: `feature/dispatch-floating-prevention-phase8b`、最新コミットは push 完了後に確認
 
-### J-5. 再起動後の Super 起動プロンプト
+### J-5. 再起動後の Super 起動プロンプト（旧版・参考）
 
-新セッション冒頭に以下をコピペすれば、本セッションの続きから再開可能:
+旧プロンプト（再起動直後セッションで使用済み・履歴）:
 
 ```
 ~/Projects/rodo/app/docs/handover/2026-05-06-d10-secondary-plan-handover.md
 を読んで把握してください。完了したら「引き継ぎ把握完了」と返してください。
 §J（特に J-3）に本セッション後半の状態が追記されています。
 タスクB（案A 採用済み）の修正CC プロンプト設計から再開します。
+モデルは全 CC で Opus を使用してください。
+```
+
+### J-6. 2026-05-06 セッション最終後半の追加作業（コミット bbe36bc 〜 99d549f）
+
+#### J-6-a. タスクB（案A）実装完了
+
+| コミット | 内容 |
+|---|---|
+| `bbe36bc` | fix(admin/dispatches): include scheduledSecondaryAt in date range filter |
+
+- `app/api/admin/dispatches/route.ts` の期間フィルタを `where.OR = [{ dispatchTime }, { scheduledSecondaryAt }]` に拡張
+- `__tests__/api/admin/dispatches.test.ts` の既存「期間フィルタ」テストを OR 構造に書き換え
+- 新規テスト 2 件追加（scheduledSecondaryAt のみ一致 / dispatchTime のみ一致）
+- vitest 16 PASS / 1 既知 FAIL（§E-3 既知）、tsc / build PASS
+
+#### J-6-b. 案件編集ページ廃止 → 報告ページ統合（ユーザー要望 2026-05-06）
+
+ユーザー要望: 「案件編集ページの内容は報告/請求ページの全項目を入れたい」
+→ Super 提案: 報告ページ UI を管理者画面でも流用する案を採用（重複 UI 解消）
+
+| コミット | 内容 |
+|---|---|
+| `3e291f7` | refactor(admin/table): redirect dispatch links to existing report page |
+| `99d549f` | refactor(admin): remove deprecated dispatch edit page and form |
+
+- `DispatchTable.tsx` の案件番号リンク・編集ボタン両方を `/dispatch/[id]/report` に変更
+- `app/admin/dispatches/[id]/page.tsx` 削除
+- `components/admin/DispatchEditForm.tsx` 削除（620 行）
+- `__tests__/components/admin/DispatchEditForm.test.tsx` 削除（7 テスト）
+- 認可改修不要（report ページは tenantId スコープで管理者は他案件アクセス可）
+- API ルート（PATCH 系・billing）は ScheduledSecondaryEditor / 請求ボタンが現役で使用中のため残置
+
+#### J-6-c. ドキュメント反映
+
+| コミット | 内容 |
+|---|---|
+| `bc64420` | docs(smoke-test): mark D-10 to D-20 as verified |
+
+- D-10 〜 D-20 の 11 項目を verified に変更（ユーザー実機確認済み）
+
+## §K. 次セッションで対応する残課題
+
+### K-1. 🟢低: smoke-test-checklist.md の旧手順記述更新
+
+- 内容: D-23 等の `/admin/dispatches/[id]` 経由の編集手順記載を `/dispatch/[id]/report` 導線に書き換え
+- 関連: J-6-b（編集ページ廃止）の追従
+- 規模: 小（docs のみ、実機影響なし）
+- 依存: なし
+
+### K-2. 🟢低: DispatchCalendar.tsx L10-32 の古い設計議論コメント整理
+
+- 内容: 過去の設計選択肢議論が含まれる長大コメント（L10-32）を、現状実装に即した簡潔な説明に書き換え
+- 関連: J-6-b（編集ページ廃止後、`/admin/dispatches/[id]` 言及がさらに無意味化）
+- 規模: 小（コメントのみ）
+- 依存: なし
+
+### K-3. 🟢低: §E-3 既存失敗テスト 2 件の追従修正
+
+- `__tests__/lib/offline-fetch.test.ts` 「オンライン POST で 5xx」（事前から失敗、原因未特定）
+- `__tests__/api/admin/dispatches.test.ts` 「status=stored フィルタ」（コミット a000374 で `isDraft=false` 制約が外れたためテスト期待値が古い）
+- 規模: 中（offline-fetch は要調査、status=stored は単純な期待値修正）
+- 依存: なし
+
+### K-4. 🟢低: §J-3 補助 UX バッジ実装
+
+- 内容: テーブル日付フィルタ OR 拡張により「5/7 で絞ったのに dispatchTime=5/6 の行が並ぶ」UX 違和感が残る
+- 解決案: 行に「2次予定 5/7」のような補助バッジを表示し、なぜヒットしたかを可視化
+- 規模: 中（DispatchTable.tsx + テスト）
+- 依存: J-6-a 完了が前提（完了済）
+
+### K-5. 🟡中: §E-1 Phase 8b スモークテスト カテゴリI 残項目
+
+- 場所: `docs/smoke-test-checklist.md` カテゴリI（L753 〜）
+- 残: I-1.2 〜 I-9.1 の 31 項目
+- 完了済: I-1.1
+- 各項目は実機（ブラウザ）操作で確認 → ユーザーが結果を Super に報告 → チェックリスト反映
+- 規模: 大（実機検証 31 項目）
+- 依存: なし（本筋タスク）
+
+### K-6. 🟡中: §E-2 scheduledSecondaryAt クリア運用
+
+- 内容: 子（`isSecondaryTransport=true`）が完了したら親の `scheduledSecondaryAt` を NULL に戻す業務フロー追加
+- 必要性: 完了済 2 次搬送の親レコードに `scheduledSecondaryAt` が残ると、カレンダーに「2予」が誤表示される
+- 規模: 中（業務仕様確認 + 実装）
+- 依存: 業務仕様判断が必要（ユーザー確認）
+- 関連ファイル候補（要調査）: 2 次搬送完了処理（report API or PATCH dispatch route）
+
+### K-7. 🟢低: §E-6 未追跡ファイル 3 件の扱い判断
+
+- `docs/handover/2026-05-02-break-instant-end-fix.md`
+- `scripts/check-admin-state.ts`
+- `scripts/list-unfinished-breaks.ts`
+- 中身確認 → コミット or 削除を判断
+- 規模: 小（ファイル中身確認 + 判断のみ）
+- 依存: なし
+
+### K-8. 次セッション開始時の Super 起動プロンプト
+
+新セッション冒頭に以下をコピペ:
+
+```
+~/Projects/rodo/app/docs/handover/2026-05-06-d10-secondary-plan-handover.md
+を読んで把握してください。完了したら「引き継ぎ把握完了」と返してください。
+
+§K（残課題一覧）に次セッションで進めたいタスクが整理されています。
+§K-1 〜 K-7 の各項目について「優先度・所要時間目安・依存関係」を踏まえ、
+どのタスクから着手するのが効率的か Super として方針提案してください。
+私（ユーザー）は提案を見て「OK / 待って / 変えて」で選びます。
+
 モデルは全 CC で Opus を使用してください。
 ```
