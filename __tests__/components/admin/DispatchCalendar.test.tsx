@@ -38,6 +38,8 @@ interface CalendarPrimary {
   dispatchTime?: string | null
   /** 下書きフラグ。指定なしは false。 */
   isDraft?: boolean
+  /** 二次搬送予定日時。'2 次予定' 行のソートキー。指定なしは null。 */
+  scheduledSecondaryAt?: string | null
 }
 
 function plate(region = '練馬'): CalendarPrimary['plate'] {
@@ -56,10 +58,12 @@ function buildDays(
   month: number,
   injectPrimary: Record<string, CalendarPrimary[]> = {},
   injectSecondary: Record<string, number | CalendarPrimary[]> = {},
+  injectSecondaryPlan: Record<string, CalendarPrimary[]> = {},
 ): Array<{
   date: string
   primaryDispatches: CalendarPrimary[]
   secondaryDispatches: CalendarPrimary[]
+  secondaryPlanDispatches: CalendarPrimary[]
 }> {
   const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate()
   const arr = []
@@ -73,6 +77,7 @@ function buildDays(
       dispatchTime:
         p.dispatchTime ??
         `${date}T0${Math.min(9, i)}:00:00.000Z`,
+      scheduledSecondaryAt: p.scheduledSecondaryAt ?? null,
     }))
     const sec = injectSecondary[date]
     let secondaries: CalendarPrimary[]
@@ -85,6 +90,7 @@ function buildDays(
         dispatchTime:
           p.dispatchTime ??
           `${date}T1${Math.min(9, 2 + i)}:00:00.000Z`,
+        scheduledSecondaryAt: p.scheduledSecondaryAt ?? null,
       }))
     } else {
       const n = typeof sec === 'number' ? sec : 0
@@ -94,12 +100,25 @@ function buildDays(
         type: 'TRANSPORT' as const,
         isDraft: false,
         dispatchTime: `${date}T${String(12 + i).padStart(2, '0')}:00:00.000Z`,
+        scheduledSecondaryAt: null,
       }))
     }
+    // secondaryPlan: 既定で 18:i0 開始（primary/secondary より後ろに見える時刻）
+    const secondaryPlans = (injectSecondaryPlan[date] ?? []).map((p, i) => ({
+      ...p,
+      type: p.type ?? ('TRANSPORT' as const),
+      isDraft: p.isDraft ?? false,
+      // 既定の dispatchTime は null（実施前なので NULL でも構わない）
+      dispatchTime: p.dispatchTime ?? null,
+      scheduledSecondaryAt:
+        p.scheduledSecondaryAt ??
+        `${date}T${String(18 + i).padStart(2, '0')}:00:00.000Z`,
+    }))
     arr.push({
       date,
       primaryDispatches: primaries,
       secondaryDispatches: secondaries,
+      secondaryPlanDispatches: secondaryPlans,
     })
   }
   return arr
@@ -110,6 +129,7 @@ function mockCalendarOnce(
   month: number,
   injectPrimary: Record<string, CalendarPrimary[]> = {},
   injectSecondary: Record<string, number | CalendarPrimary[]> = {},
+  injectSecondaryPlan: Record<string, CalendarPrimary[]> = {},
 ) {
   mockFetch.mockResolvedValueOnce({
     ok: true,
@@ -117,7 +137,13 @@ function mockCalendarOnce(
       Promise.resolve({
         year,
         month,
-        days: buildDays(year, month, injectPrimary, injectSecondary),
+        days: buildDays(
+          year,
+          month,
+          injectPrimary,
+          injectSecondary,
+          injectSecondaryPlan,
+        ),
       }),
   })
 }
@@ -713,6 +739,418 @@ describe('DispatchCalendar', () => {
     expect(
       target!.querySelector('[data-testid="calendar-cell-sp-badge-draft"]'),
     ).toBeNull()
+  })
+
+  // ====================================================================
+  // 「2予」バッジ（2 次搬送予定 = scheduledSecondaryAt ベース）のテスト
+  // ====================================================================
+
+  it('PC: 「2予」行は kind=secondaryPlan / ラベル「2予」/ 背景 #71a9f7 でレンダされ、scheduledSecondaryAt 順に並ぶ', async () => {
+    const date = '2026-04-15'
+    const primaries: CalendarPrimary[] = [
+      // 1 次 (現場) 朝
+      {
+        dispatchNumber: 'P-MORNING-ONSITE',
+        plate: plate(),
+        type: 'ONSITE',
+        dispatchTime: `${date}T01:00:00.000Z`,
+      },
+    ]
+    const plans: CalendarPrimary[] = [
+      {
+        dispatchNumber: 'PLAN-LATE',
+        plate: plate('品川'),
+        type: 'TRANSPORT',
+        dispatchTime: null,
+        scheduledSecondaryAt: `${date}T12:00:00.000Z`,
+      },
+      {
+        dispatchNumber: 'PLAN-EARLY',
+        plate: plate('横浜'),
+        type: 'TRANSPORT',
+        dispatchTime: null,
+        scheduledSecondaryAt: `${date}T05:00:00.000Z`,
+      },
+    ]
+    mockCalendarOnce(2026, 4, { [date]: primaries }, {}, { [date]: plans })
+    wrap(<DispatchCalendar />)
+    await waitFor(() => {
+      expect(screen.getByTestId('calendar-grid')).toBeTruthy()
+    })
+
+    const cell = document.querySelector(
+      `[data-testid="calendar-cell"][data-date="${date}"]`,
+    ) as HTMLElement
+    expect(cell).toBeTruthy()
+    const items = cell.querySelectorAll('[data-testid="calendar-dispatch"]')
+    // 1 次 1 件 + 2 予 2 件 = 3 件
+    expect(items).toHaveLength(3)
+    // 順序: 01:00 ONSITE → 05:00 PLAN-EARLY → 12:00 PLAN-LATE
+    expect(items[0].textContent).toContain('P-MORNING-ONSITE')
+    expect(items[1].textContent).toContain('PLAN-EARLY')
+    expect(items[2].textContent).toContain('PLAN-LATE')
+
+    const badges = cell.querySelectorAll(
+      '[data-testid="calendar-row-kind-badge"]',
+    )
+    expect(badges).toHaveLength(3)
+    expect(badges[0].getAttribute('data-kind')).toBe('onsite')
+    expect(badges[1].getAttribute('data-kind')).toBe('secondaryPlan')
+    expect(badges[1].textContent).toBe('2予')
+    expect(badges[2].getAttribute('data-kind')).toBe('secondaryPlan')
+    expect(badges[2].textContent).toBe('2予')
+    // 背景色 #71a9f7 → rgb(113, 169, 247)
+    expect((badges[1] as HTMLElement).style.backgroundColor).toMatch(
+      /rgb\(113,\s*169,\s*247\)/,
+    )
+  })
+
+  it('SP: 「2予 N」バッジは isDraft 不問で全件カウントされ、下書きは「2予」優先のため「下書」には加算されない', async () => {
+    const date = '2026-04-16'
+    const plans: CalendarPrimary[] = [
+      { dispatchNumber: 'PLAN-1', plate: plate(), isDraft: false },
+      { dispatchNumber: 'PLAN-2', plate: plate(), isDraft: false },
+      // 2 次予定は下書きより優先表示のため、isDraft=true でも「2予」にカウントされる
+      // （保管案件 status=STORED + isDraft=true 運用フローで予定日を視認するため）
+      { dispatchNumber: 'PLAN-3', plate: plate(), isDraft: true },
+    ]
+    mockCalendarOnce(2026, 4, {}, {}, { [date]: plans })
+    wrap(<DispatchCalendar />)
+    await waitFor(() => {
+      expect(screen.getByTestId('calendar-grid')).toBeTruthy()
+    })
+
+    const summaries = screen.getAllByTestId('calendar-cell-sp-summary')
+    const target = summaries.find(
+      (el) =>
+        el.closest('[data-date]')?.getAttribute('data-date') === date,
+    )
+    expect(target).toBeTruthy()
+    // 2 予は全件カウント（isDraft 不問）
+    expect(target!.textContent).toContain('2予 3')
+    // 1 次・2 次に下書きはなく、2 予下書きは「下書」にカウントされないため下書バッジは出ない
+    expect(
+      target!.querySelector('[data-testid="calendar-cell-sp-badge-draft"]'),
+    ).toBeNull()
+    // 確定 1 次 0 件 → 「現場」「搬送」バッジは出ない
+    expect(
+      target!.querySelector('[data-testid="calendar-cell-sp-badge-onsite"]'),
+    ).toBeNull()
+    expect(
+      target!.querySelector('[data-testid="calendar-cell-sp-badge-transport"]'),
+    ).toBeNull()
+    // 「2予」バッジの背景色 #71a9f7
+    const planBadge = target!.querySelector(
+      '[data-testid="calendar-cell-sp-badge-secondary-plan"]',
+    ) as HTMLElement
+    expect(planBadge).toBeTruthy()
+    expect(planBadge.style.backgroundColor).toMatch(/rgb\(113,\s*169,\s*247\)/)
+  })
+
+  it('PC: isDraft=true の 2 次予定行は「2予」バッジで表示される（「下書」にならない）', async () => {
+    const date = '2026-04-20'
+    // 1 次の確定案件（並びの起点）
+    const primaries: CalendarPrimary[] = [
+      {
+        dispatchNumber: 'P-CONFIRMED',
+        plate: plate(),
+        type: 'ONSITE',
+        isDraft: false,
+        dispatchTime: `${date}T01:00:00.000Z`,
+      },
+    ]
+    // 保管案件: status=STORED + isDraft=true で 2 次予定が登録された行
+    const plans: CalendarPrimary[] = [
+      {
+        dispatchNumber: 'PLAN-DRAFT',
+        plate: plate('品川'),
+        type: 'TRANSPORT',
+        isDraft: true,
+        dispatchTime: null,
+        scheduledSecondaryAt: `${date}T05:00:00.000Z`,
+      },
+      {
+        dispatchNumber: 'PLAN-CONFIRMED',
+        plate: plate('横浜'),
+        type: 'TRANSPORT',
+        isDraft: false,
+        dispatchTime: null,
+        scheduledSecondaryAt: `${date}T10:00:00.000Z`,
+      },
+    ]
+    mockCalendarOnce(2026, 4, { [date]: primaries }, {}, { [date]: plans })
+    wrap(<DispatchCalendar />)
+    await waitFor(() => {
+      expect(screen.getByTestId('calendar-grid')).toBeTruthy()
+    })
+
+    const cell = document.querySelector(
+      `[data-testid="calendar-cell"][data-date="${date}"]`,
+    ) as HTMLElement
+    expect(cell).toBeTruthy()
+    const items = cell.querySelectorAll('[data-testid="calendar-dispatch"]')
+    // 1 次 1 件 + 2 予 2 件 = 3 件
+    expect(items).toHaveLength(3)
+    expect(items[0].textContent).toContain('P-CONFIRMED')
+    expect(items[1].textContent).toContain('PLAN-DRAFT')
+    expect(items[2].textContent).toContain('PLAN-CONFIRMED')
+
+    const badges = cell.querySelectorAll(
+      '[data-testid="calendar-row-kind-badge"]',
+    )
+    expect(badges).toHaveLength(3)
+    expect(badges[0].getAttribute('data-kind')).toBe('onsite')
+    // isDraft=true の 2 次予定は「下書」ではなく「2予」になる
+    expect(badges[1].getAttribute('data-kind')).toBe('secondaryPlan')
+    expect(badges[1].textContent).toBe('2予')
+    expect(badges[2].getAttribute('data-kind')).toBe('secondaryPlan')
+    expect(badges[2].textContent).toBe('2予')
+
+    // モーダル展開でも「2予」バッジが維持される
+    const detailButton = cell.querySelector(
+      '[data-testid="calendar-cell-pc-detail-button"]',
+    ) as HTMLElement
+    expect(detailButton).toBeTruthy()
+    fireEvent.click(detailButton)
+    await waitFor(() => {
+      expect(screen.getByTestId('calendar-modal')).toBeTruthy()
+    })
+    const modalEl = screen.getByTestId('calendar-modal')
+    const modalBadges = modalEl.querySelectorAll(
+      '[data-testid="calendar-row-kind-badge"]',
+    )
+    expect(modalBadges).toHaveLength(3)
+    expect(modalBadges[1].getAttribute('data-kind')).toBe('secondaryPlan')
+    expect(modalBadges[1].textContent).toBe('2予')
+    expect(modalBadges[2].getAttribute('data-kind')).toBe('secondaryPlan')
+  })
+
+  it('PC: isDraft=true + 1 次は引き続き「下書」バッジ（2 次予定の優先化は 1 次に影響しない）', async () => {
+    const date = '2026-04-21'
+    const primaries: CalendarPrimary[] = [
+      {
+        dispatchNumber: 'P-DRAFT-ONSITE',
+        plate: plate(),
+        type: 'ONSITE',
+        isDraft: true,
+        dispatchTime: `${date}T01:00:00.000Z`,
+      },
+      {
+        dispatchNumber: 'P-DRAFT-TRANSPORT',
+        plate: plate('品川'),
+        type: 'TRANSPORT',
+        isDraft: true,
+        dispatchTime: `${date}T02:00:00.000Z`,
+      },
+    ]
+    // 比較用: 同日に 2 次予定（下書き）も置き、こちらだけ「2予」になることを確認
+    const plans: CalendarPrimary[] = [
+      {
+        dispatchNumber: 'PLAN-DRAFT',
+        plate: plate('横浜'),
+        type: 'TRANSPORT',
+        isDraft: true,
+        dispatchTime: null,
+        scheduledSecondaryAt: `${date}T03:00:00.000Z`,
+      },
+    ]
+    mockCalendarOnce(2026, 4, { [date]: primaries }, {}, { [date]: plans })
+    wrap(<DispatchCalendar />)
+    await waitFor(() => {
+      expect(screen.getByTestId('calendar-grid')).toBeTruthy()
+    })
+
+    const cell = document.querySelector(
+      `[data-testid="calendar-cell"][data-date="${date}"]`,
+    ) as HTMLElement
+    const badges = cell.querySelectorAll(
+      '[data-testid="calendar-row-kind-badge"]',
+    )
+    expect(badges).toHaveLength(3)
+    // 1 次の下書きは「下書」（既存仕様維持）
+    expect(badges[0].getAttribute('data-kind')).toBe('draft')
+    expect(badges[1].getAttribute('data-kind')).toBe('draft')
+    // 2 次予定の下書きは「2予」優先
+    expect(badges[2].getAttribute('data-kind')).toBe('secondaryPlan')
+  })
+
+  it('SP: isDraft=true の 2 次予定は secondaryPlanCount にカウントされ、draftCount には含まれない（1 次・2 次の下書きとは独立）', async () => {
+    const date = '2026-04-24'
+    // 1 次に下書きを混在 → こちらは「下書」にカウント
+    const primaries: CalendarPrimary[] = [
+      { dispatchNumber: 'P1', plate: plate(), type: 'ONSITE', isDraft: false },
+      { dispatchNumber: 'P2', plate: plate(), type: 'ONSITE', isDraft: true },
+    ]
+    // 2 次（実施済）に下書きを混在 → こちらも「下書」にカウント
+    const secondaries: CalendarPrimary[] = [
+      {
+        dispatchNumber: 'S1',
+        plate: plate(),
+        type: 'TRANSPORT',
+        isDraft: true,
+      },
+    ]
+    // 2 次予定に下書きを混在 → 「2予」にカウント（「下書」には加算しない）
+    const plans: CalendarPrimary[] = [
+      { dispatchNumber: 'PLAN-1', plate: plate(), isDraft: false },
+      { dispatchNumber: 'PLAN-2', plate: plate(), isDraft: true },
+      { dispatchNumber: 'PLAN-3', plate: plate(), isDraft: true },
+    ]
+    mockCalendarOnce(
+      2026,
+      4,
+      { [date]: primaries },
+      { [date]: secondaries },
+      { [date]: plans },
+    )
+    wrap(<DispatchCalendar />)
+    await waitFor(() => {
+      expect(screen.getByTestId('calendar-grid')).toBeTruthy()
+    })
+
+    const summaries = screen.getAllByTestId('calendar-cell-sp-summary')
+    const target = summaries.find(
+      (el) =>
+        el.closest('[data-date]')?.getAttribute('data-date') === date,
+    )
+    expect(target).toBeTruthy()
+    // 現場 1（P1）/ 搬送 0 / 2次 0（S1 は下書き）/ 2予 3（PLAN-1〜3 全件）/ 下書 2（P2 と S1）
+    expect(target!.textContent).toContain('現場 1')
+    expect(target!.textContent).toContain('2予 3')
+    expect(target!.textContent).toContain('下書 2')
+    // 確定 transport 0 → 「搬送」バッジは出ない
+    expect(
+      target!.querySelector('[data-testid="calendar-cell-sp-badge-transport"]'),
+    ).toBeNull()
+    // 確定 2 次 0 → 「2次」バッジは出ない
+    expect(
+      target!.querySelector('[data-testid="calendar-cell-sp-badge-secondary"]'),
+    ).toBeNull()
+  })
+
+  it('SP: 2 予 0 件の日には「2予」バッジが出ない', async () => {
+    const date = '2026-04-17'
+    mockCalendarOnce(
+      2026,
+      4,
+      {
+        [date]: [{ dispatchNumber: 'P1', plate: plate(), type: 'ONSITE' }],
+      },
+      {},
+      {},
+    )
+    wrap(<DispatchCalendar />)
+    await waitFor(() => {
+      expect(screen.getByTestId('calendar-grid')).toBeTruthy()
+    })
+    const summaries = screen.getAllByTestId('calendar-cell-sp-summary')
+    const target = summaries.find(
+      (el) =>
+        el.closest('[data-date]')?.getAttribute('data-date') === date,
+    )
+    expect(target).toBeTruthy()
+    expect(
+      target!.querySelector(
+        '[data-testid="calendar-cell-sp-badge-secondary-plan"]',
+      ),
+    ).toBeNull()
+  })
+
+  it('モーダル展開: 1 次 + 2 次 + 2 予 が時刻 ASC で統合表示される', async () => {
+    const date = '2026-04-18'
+    const primaries: CalendarPrimary[] = [
+      {
+        dispatchNumber: 'P-EARLY',
+        plate: plate(),
+        type: 'ONSITE',
+        dispatchTime: `${date}T01:00:00.000Z`,
+      },
+    ]
+    const secondaries: CalendarPrimary[] = [
+      {
+        dispatchNumber: 'S-MID',
+        plate: plate('品川'),
+        type: 'TRANSPORT',
+        dispatchTime: `${date}T08:00:00.000Z`,
+      },
+    ]
+    const plans: CalendarPrimary[] = [
+      {
+        dispatchNumber: 'PLAN-NOON',
+        plate: plate('横浜'),
+        type: 'TRANSPORT',
+        dispatchTime: null,
+        scheduledSecondaryAt: `${date}T05:00:00.000Z`,
+      },
+    ]
+    mockCalendarOnce(
+      2026,
+      4,
+      { [date]: primaries },
+      { [date]: secondaries },
+      { [date]: plans },
+    )
+    wrap(<DispatchCalendar />)
+    await waitFor(() => {
+      expect(screen.getByTestId('calendar-grid')).toBeTruthy()
+    })
+
+    const cell = document.querySelector(
+      `[data-testid="calendar-cell"][data-date="${date}"]`,
+    ) as HTMLElement
+    const detailButton = cell.querySelector(
+      '[data-testid="calendar-cell-pc-detail-button"]',
+    ) as HTMLElement
+    expect(detailButton).toBeTruthy()
+    expect(detailButton.textContent).toContain('3件')
+    fireEvent.click(detailButton)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('calendar-modal')).toBeTruthy()
+    })
+
+    const modalEl = screen.getByTestId('calendar-modal')
+    const kindBadges = modalEl.querySelectorAll(
+      '[data-testid="calendar-row-kind-badge"]',
+    )
+    expect(kindBadges).toHaveLength(3)
+    // 順序: 01:00 P-EARLY(現場) → 05:00 PLAN-NOON(2予) → 08:00 S-MID(2次)
+    expect(kindBadges[0].getAttribute('data-kind')).toBe('onsite')
+    expect(kindBadges[1].getAttribute('data-kind')).toBe('secondaryPlan')
+    expect(kindBadges[2].getAttribute('data-kind')).toBe('secondary')
+
+    const rows = modalEl.querySelectorAll(
+      '[data-testid="calendar-modal-row"]',
+    )
+    expect(rows[0].textContent).toContain('P-EARLY')
+    expect(rows[1].textContent).toContain('PLAN-NOON')
+    expect(rows[2].textContent).toContain('S-MID')
+  })
+
+  it('PC: 1 次・2 次が 0 件でも 2 予のみある日には詳細ボタンが出る（モーダルで 2 予が確認できる）', async () => {
+    const date = '2026-04-19'
+    const plans: CalendarPrimary[] = [
+      {
+        dispatchNumber: 'PLAN-ONLY',
+        plate: plate(),
+        type: 'TRANSPORT',
+        scheduledSecondaryAt: `${date}T03:00:00.000Z`,
+      },
+    ]
+    mockCalendarOnce(2026, 4, {}, {}, { [date]: plans })
+    wrap(<DispatchCalendar />)
+    await waitFor(() => {
+      expect(screen.getByTestId('calendar-grid')).toBeTruthy()
+    })
+
+    const cell = document.querySelector(
+      `[data-testid="calendar-cell"][data-date="${date}"]`,
+    ) as HTMLElement
+    const button = cell.querySelector(
+      '[data-testid="calendar-cell-pc-detail-button"]',
+    ) as HTMLElement
+    expect(button).toBeTruthy()
+    expect(button.textContent).toContain('1件')
   })
 
   it('「前月」クリックで 12 月をまたぐと year が前年に', async () => {

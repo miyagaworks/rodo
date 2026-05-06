@@ -38,6 +38,7 @@ interface RawDispatch {
   plateClass: string | null
   plateKana: string | null
   plateNumber: string | null
+  scheduledSecondaryAt?: Date | null
 }
 
 function makeRow(o: Partial<RawDispatch> & { dispatchNumber: string }): RawDispatch {
@@ -50,12 +51,17 @@ function makeRow(o: Partial<RawDispatch> & { dispatchNumber: string }): RawDispa
     plateKana: o.plateKana ?? 'あ',
     plateNumber: o.plateNumber ?? '1234',
     dispatchNumber: o.dispatchNumber,
+    scheduledSecondaryAt: o.scheduledSecondaryAt ?? null,
   }
 }
 
 describe('GET /api/admin/calendar', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // 既定のフォールバック: mockResolvedValueOnce で明示されていない呼び出しは [] を返す。
+    // route 側は primary / secondary / secondaryPlan の 3 クエリを発行するため、
+    // 既存テスト（2 回しか mockResolvedValueOnce していないもの）の 3 番目を吸収する。
+    mockedFindMany.mockResolvedValue([])
   })
 
   it('未認証は 401', async () => {
@@ -129,6 +135,7 @@ describe('GET /api/admin/calendar', () => {
       type: 'ONSITE',
       dispatchTime: '2026-04-15T03:00:00.000Z',
       isDraft: false,
+      scheduledSecondaryAt: null,
     })
   })
 
@@ -258,6 +265,7 @@ describe('GET /api/admin/calendar', () => {
       type: 'TRANSPORT',
       dispatchTime: '2026-04-12T01:00:00.000Z',
       isDraft: false,
+      scheduledSecondaryAt: null,
     })
     expect(day12.secondaryDispatches[1]).toEqual({
       dispatchNumber: '20260412-S02',
@@ -265,6 +273,7 @@ describe('GET /api/admin/calendar', () => {
       type: 'ONSITE',
       dispatchTime: '2026-04-12T05:00:00.000Z',
       isDraft: false,
+      scheduledSecondaryAt: null,
     })
     expect(day20.secondaryDispatches).toHaveLength(1)
     expect(day20.secondaryDispatches[0].dispatchNumber).toBe('20260420-S01')
@@ -383,5 +392,142 @@ describe('GET /api/admin/calendar', () => {
     await GET(makeRequest('?year=2026&month=4'))
     const args = mockedFindMany.mock.calls[0][0]
     expect(args.orderBy).toEqual({ dispatchTime: 'asc' })
+  })
+
+  // ====================================================================
+  // 2 次搬送「予定」(scheduledSecondaryAt ベース) のテスト
+  // ====================================================================
+
+  it('secondaryPlan findMany: where に scheduledSecondaryAt 範囲・isSecondaryTransport=false・type 制約を持つ', async () => {
+    mockedAuth.mockResolvedValueOnce(adminSession())
+    mockedFindMany.mockResolvedValueOnce([])
+    mockedFindMany.mockResolvedValueOnce([])
+    mockedFindMany.mockResolvedValueOnce([])
+    await GET(makeRequest('?year=2026&month=4'))
+    expect(mockedFindMany.mock.calls).toHaveLength(3)
+    const args = mockedFindMany.mock.calls[2][0]
+    expect(args.where.tenantId).toBe('t1')
+    expect(args.where.scheduledSecondaryAt.gte).toBeInstanceOf(Date)
+    expect(args.where.scheduledSecondaryAt.lt).toBeInstanceOf(Date)
+    expect(args.where.isSecondaryTransport).toBe(false)
+    expect(args.where.type).toEqual({ in: ['ONSITE', 'TRANSPORT'] })
+    // 下書きを含めるため isDraft でフィルタしない
+    expect(args.where).not.toHaveProperty('isDraft')
+    // dispatchTime 範囲フィルタは付かない（実施前の予定なので dispatchTime が NULL でも対象）
+    expect(args.where).not.toHaveProperty('dispatchTime')
+  })
+
+  it('secondaryPlan findMany: orderBy が scheduledSecondaryAt ASC、select に scheduledSecondaryAt を含む', async () => {
+    mockedAuth.mockResolvedValueOnce(adminSession())
+    mockedFindMany.mockResolvedValueOnce([])
+    mockedFindMany.mockResolvedValueOnce([])
+    mockedFindMany.mockResolvedValueOnce([])
+    await GET(makeRequest('?year=2026&month=4'))
+    const args = mockedFindMany.mock.calls[2][0]
+    expect(args.orderBy).toEqual({ scheduledSecondaryAt: 'asc' })
+    expect(args.select).toEqual({
+      dispatchNumber: true,
+      dispatchTime: true,
+      type: true,
+      isDraft: true,
+      plateRegion: true,
+      plateClass: true,
+      plateKana: true,
+      plateNumber: true,
+      scheduledSecondaryAt: true,
+    })
+  })
+
+  it('secondaryPlan: scheduledSecondaryAt の JST 日付で集約され、secondaryPlanDispatches として返る', async () => {
+    mockedAuth.mockResolvedValueOnce(adminSession())
+    mockedFindMany.mockResolvedValueOnce([])
+    mockedFindMany.mockResolvedValueOnce([])
+    mockedFindMany.mockResolvedValueOnce([
+      makeRow({
+        dispatchNumber: '20260410-001',
+        // dispatchTime は別日（または NULL）でも、scheduledSecondaryAt の日に並ぶ
+        dispatchTime: new Date('2026-04-01T03:00:00Z'),
+        scheduledSecondaryAt: new Date('2026-04-18T02:00:00Z'),
+        type: 'ONSITE',
+      }),
+      // makeRow ではなく手書き: dispatchTime: null を ?? でデフォルトに置き換えられないように
+      {
+        dispatchNumber: '20260410-002',
+        dispatchTime: null,
+        scheduledSecondaryAt: new Date('2026-04-18T05:00:00Z'),
+        type: 'TRANSPORT',
+        isDraft: false,
+        plateRegion: '練馬',
+        plateClass: '500',
+        plateKana: 'あ',
+        plateNumber: '1234',
+      } as RawDispatch,
+      makeRow({
+        dispatchNumber: '20260410-003',
+        dispatchTime: new Date('2026-04-05T03:00:00Z'),
+        scheduledSecondaryAt: new Date('2026-04-25T07:00:00Z'),
+        type: 'ONSITE',
+        isDraft: true,
+      }),
+    ])
+    const res = await GET(makeRequest('?year=2026&month=4'))
+    const json = await res.json()
+
+    const day18 = json.days.find((d: { date: string }) => d.date === '2026-04-18')
+    expect(day18.secondaryPlanDispatches).toHaveLength(2)
+    expect(day18.secondaryPlanDispatches[0]).toEqual({
+      dispatchNumber: '20260410-001',
+      plate: { region: '練馬', class: '500', kana: 'あ', number: '1234' },
+      type: 'ONSITE',
+      dispatchTime: '2026-04-01T03:00:00.000Z',
+      isDraft: false,
+      scheduledSecondaryAt: '2026-04-18T02:00:00.000Z',
+    })
+    // dispatchTime が NULL でも返る
+    expect(day18.secondaryPlanDispatches[1].dispatchNumber).toBe('20260410-002')
+    expect(day18.secondaryPlanDispatches[1].dispatchTime).toBeNull()
+    expect(day18.secondaryPlanDispatches[1].scheduledSecondaryAt).toBe(
+      '2026-04-18T05:00:00.000Z',
+    )
+
+    // 下書きも含む
+    const day25 = json.days.find((d: { date: string }) => d.date === '2026-04-25')
+    expect(day25.secondaryPlanDispatches).toHaveLength(1)
+    expect(day25.secondaryPlanDispatches[0].isDraft).toBe(true)
+
+    // 該当しない日は空配列
+    const day1 = json.days.find((d: { date: string }) => d.date === '2026-04-01')
+    expect(day1.secondaryPlanDispatches).toEqual([])
+  })
+
+  it('secondaryPlan: scheduledSecondaryAt が NULL のレコードは集約から除外される', async () => {
+    mockedAuth.mockResolvedValueOnce(adminSession())
+    mockedFindMany.mockResolvedValueOnce([])
+    mockedFindMany.mockResolvedValueOnce([])
+    // findMany モックは where 条件を無視するので scheduledSecondaryAt: null を返しても OK
+    mockedFindMany.mockResolvedValueOnce([
+      makeRow({
+        dispatchNumber: '20260410-XYZ',
+        scheduledSecondaryAt: null,
+      }),
+    ])
+    const res = await GET(makeRequest('?year=2026&month=4'))
+    const json = await res.json()
+    json.days.forEach((d: { secondaryPlanDispatches: unknown[] }) => {
+      expect(d.secondaryPlanDispatches).toEqual([])
+    })
+  })
+
+  it('全日のレスポンスに secondaryPlanDispatches: [] が必ず含まれる', async () => {
+    mockedAuth.mockResolvedValueOnce(adminSession())
+    mockedFindMany.mockResolvedValueOnce([])
+    mockedFindMany.mockResolvedValueOnce([])
+    mockedFindMany.mockResolvedValueOnce([])
+    const res = await GET(makeRequest('?year=2026&month=4'))
+    const json = await res.json()
+    expect(json.days).toHaveLength(30)
+    json.days.forEach((d: { secondaryPlanDispatches: unknown[] }) => {
+      expect(Array.isArray(d.secondaryPlanDispatches)).toBe(true)
+    })
   })
 })

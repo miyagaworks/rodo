@@ -76,6 +76,9 @@ export default function ScheduledSecondaryEditor({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'dispatches'] })
+      // 案件管理カレンダーの「2予」バッジは scheduledSecondaryAt の変更で再集計される。
+      // ['admin', 'calendar', year, month] の prefix マッチで全月を invalidate。
+      queryClient.invalidateQueries({ queryKey: ['admin', 'calendar'] })
       onClose()
     },
     onError: (e: Error) => {

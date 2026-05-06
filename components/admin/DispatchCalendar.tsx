@@ -49,13 +49,21 @@ export interface CalendarPrimaryDispatch {
   dispatchTime: string | null
   /** 下書きフラグ。true の場合は行頭バッジを「下書」(グレー) に置換する。 */
   isDraft: boolean
+  /**
+   * 二次搬送予定日時の ISO 文字列。
+   * 「2予」バッジ行（kind='2次予定'）はこの値をソートキーとする。
+   * 1 次・2 次（実施済）行では null。
+   */
+  scheduledSecondaryAt?: string | null
 }
 
 export interface CalendarDay {
   date: string // YYYY-MM-DD
   primaryDispatches: CalendarPrimaryDispatch[]
-  /** その日の 2 次搬送（primary と同 shape。モーダルでは 2次バッジ付きで列挙） */
+  /** その日の 2 次搬送（実施済 = dispatchTime ベース。モーダルでは 2次バッジ付きで列挙） */
   secondaryDispatches: CalendarPrimaryDispatch[]
+  /** その日の 2 次搬送「予定」（scheduledSecondaryAt ベース。「2予」バッジで列挙） */
+  secondaryPlanDispatches?: CalendarPrimaryDispatch[]
 }
 
 export interface CalendarResponse {
@@ -79,18 +87,28 @@ function plateLabel(p: CalendarPlate | null): string {
 
 /**
  * 行頭バッジの種類。
- * - 'draft'     : 下書き案件（type/kind 問わず最優先）→ 「下書」/ 背景 #6b7280
- * - 'onsite'    : 確定 1 次 ONSITE → 「現場」/ 背景 #ea7600
- * - 'transport' : 確定 1 次 TRANSPORT → 「搬送」/ 背景 #4a90d9
- * - 'secondary' : 確定 2 次（type 不問）→ 「2次」/ 背景 #1C2948
+ * - 'secondaryPlan' : 2 次搬送「予定」（scheduledSecondaryAt ベース、未実施）→ 「2予」/ 背景 #71a9f7
+ *                     （isDraft より優先。scheduledSecondaryAt 由来の予定情報は
+ *                       1 次の isDraft フラグと別軸の業務情報のため）
+ * - 'draft'         : 下書き案件（1 次 / 2 次 で isDraft=true）→ 「下書」/ 背景 #6b7280
+ * - 'onsite'        : 確定 1 次 ONSITE → 「現場」/ 背景 #ea7600
+ * - 'transport'     : 確定 1 次 TRANSPORT → 「搬送」/ 背景 #4a90d9
+ * - 'secondary'     : 確定 2 次（実施済 = dispatchTime ベース、type 不問）→ 「2次」/ 背景 #1C2948
  */
-type RowKind = 'draft' | 'onsite' | 'transport' | 'secondary'
+type RowKind = 'draft' | 'onsite' | 'transport' | 'secondary' | 'secondaryPlan'
+
+/** 行が属するカテゴリ。'2次予定' は scheduledSecondaryAt ベースで予定日に表示される未実施 2 次。 */
+type RowCategory = '1次' | '2次' | '2次予定'
 
 function rowKindOf(row: {
-  kind: '1次' | '2次'
+  kind: RowCategory
   dispatch: CalendarPrimaryDispatch
 }): RowKind {
-  // 下書きは type/kind に関係なく最優先で「下書」バッジに置換する
+  // 2 次予定は下書きより優先（scheduledSecondaryAt 由来の予定情報は
+  // 1 次の isDraft フラグと別軸の情報。保管案件は status=STORED + isDraft=true で
+  // 運用されるため、ここで draft を優先すると「2予」が事実上表示されない）。
+  if (row.kind === '2次予定') return 'secondaryPlan'
+  // それ以外は下書き最優先（1 次・2 次の既存仕様継続）
   if (row.dispatch.isDraft) return 'draft'
   if (row.kind === '2次') return 'secondary'
   return row.dispatch.type === 'ONSITE' ? 'onsite' : 'transport'
@@ -104,6 +122,7 @@ const ROW_KIND_META: Record<
   onsite: { label: '現場', bg: '#ea7600' },
   transport: { label: '搬送', bg: '#4a90d9' },
   secondary: { label: '2次', bg: '#1C2948' },
+  secondaryPlan: { label: '2予', bg: '#71a9f7' },
 }
 
 function RowKindBadge({ kind }: { kind: RowKind }) {
@@ -120,20 +139,27 @@ function RowKindBadge({ kind }: { kind: RowKind }) {
   )
 }
 
-/** dispatchTime ASC で安定ソート（null は末尾）。 */
+/**
+ * 行の時刻 ASC で安定ソート（null は末尾）。
+ *
+ * - 1 次・2 次（実施済）: dispatchTime をキー
+ * - 2 次予定（未実施）: scheduledSecondaryAt をキー（その日の予定時刻に並べる）
+ */
 function combinedSort(rows: Array<{
-  kind: '1次' | '2次'
+  kind: RowCategory
   dispatch: CalendarPrimaryDispatch
-}>): Array<{ kind: '1次' | '2次'; dispatch: CalendarPrimaryDispatch }> {
-  return [...rows].sort((a, b) => {
-    const ta = a.dispatch.dispatchTime
-      ? Date.parse(a.dispatch.dispatchTime)
-      : Number.POSITIVE_INFINITY
-    const tb = b.dispatch.dispatchTime
-      ? Date.parse(b.dispatch.dispatchTime)
-      : Number.POSITIVE_INFINITY
-    return ta - tb
-  })
+}>): Array<{ kind: RowCategory; dispatch: CalendarPrimaryDispatch }> {
+  function sortKey(row: {
+    kind: RowCategory
+    dispatch: CalendarPrimaryDispatch
+  }): number {
+    const iso =
+      row.kind === '2次予定'
+        ? row.dispatch.scheduledSecondaryAt ?? null
+        : row.dispatch.dispatchTime
+    return iso ? Date.parse(iso) : Number.POSITIVE_INFINITY
+  }
+  return [...rows].sort((a, b) => sortKey(a) - sortKey(b))
 }
 
 /** 現在の JST 年月を返す。月は 1-12。 */
@@ -241,6 +267,13 @@ export default function DispatchCalendar({
     return m
   }, [data])
 
+  const secondaryPlanMap = useMemo<Map<string, CalendarPrimaryDispatch[]>>(() => {
+    const m = new Map<string, CalendarPrimaryDispatch[]>()
+    if (!data) return m
+    for (const d of data.days) m.set(d.date, d.secondaryPlanDispatches ?? [])
+    return m
+  }, [data])
+
   const goPrev = () => {
     setExpandedDate(null)
     if (month === 1) {
@@ -266,9 +299,9 @@ export default function DispatchCalendar({
     setExpandedDate(null)
   }
 
-  // モーダルに出す行：1次 + 2次 を統合し、dispatchTime ASC で並べ替えて kind バッジを付ける
+  // モーダルに出す行：1 次 + 2 次（実施済）+ 2 次予定 を統合し、時刻 ASC で並べ替えて kind バッジを付ける
   type ExpandedRow = {
-    kind: '1次' | '2次'
+    kind: RowCategory
     dispatch: CalendarPrimaryDispatch
   }
   const expandedRows: ExpandedRow[] = expandedDate
@@ -279,6 +312,10 @@ export default function DispatchCalendar({
         })),
         ...(secondaryMap.get(expandedDate) ?? []).map<ExpandedRow>((p) => ({
           kind: '2次',
+          dispatch: p,
+        })),
+        ...(secondaryPlanMap.get(expandedDate) ?? []).map<ExpandedRow>((p) => ({
+          kind: '2次予定',
           dispatch: p,
         })),
       ])
@@ -364,7 +401,10 @@ export default function DispatchCalendar({
               const isToday = date === today
               const dow = idx % 7
               const secondaryList = secondaryMap.get(date) ?? []
+              const secondaryPlanList = secondaryPlanMap.get(date) ?? []
               // SP 集計: 下書きは「現場 / 搬送 / 2次」の件数から除外し、別カウント。
+              // 「2予」は rowKindOf と同じ優先順位（2次予定 > 下書き）で
+              // isDraft 不問に全件カウントし、draftCount からは 2 次予定行を除外する。
               const onsiteCount = list.filter(
                 (p) => p.type === 'ONSITE' && !p.isDraft,
               ).length
@@ -374,6 +414,9 @@ export default function DispatchCalendar({
               const secondaryCount = secondaryList.filter(
                 (p) => !p.isDraft,
               ).length
+              // 2 次予定はバッジ優先順位上「下書」より上位のため、isDraft 不問で全件カウント
+              const secondaryPlanCount = secondaryPlanList.length
+              // draftCount は 1 次・2 次（実施済）の isDraft 件数のみ。2 次予定は除外。
               const draftCount =
                 list.filter((p) => p.isDraft).length +
                 secondaryList.filter((p) => p.isDraft).length
@@ -381,12 +424,17 @@ export default function DispatchCalendar({
                 onsiteCount > 0 ||
                 transportCount > 0 ||
                 secondaryCount > 0 ||
+                secondaryPlanCount > 0 ||
                 draftCount > 0
-              // PC セル用の統合行リスト（1次 + 2次 を dispatchTime ASC でソート）
+              // PC セル用の統合行リスト（1 次 + 2 次 + 2 次予定 を時刻 ASC でソート）
               const combinedList = combinedSort([
                 ...list.map((p) => ({ kind: '1次' as const, dispatch: p })),
                 ...secondaryList.map((p) => ({
                   kind: '2次' as const,
+                  dispatch: p,
+                })),
+                ...secondaryPlanList.map((p) => ({
+                  kind: '2次予定' as const,
                   dispatch: p,
                 })),
               ])
@@ -443,6 +491,15 @@ export default function DispatchCalendar({
                           data-testid="calendar-cell-sp-badge-secondary"
                         >
                           2次 {secondaryCount}
+                        </span>
+                      )}
+                      {secondaryPlanCount > 0 && (
+                        <span
+                          className="inline-flex h-5 w-full items-center justify-center whitespace-nowrap rounded text-center text-[10px] font-medium leading-none text-white"
+                          style={{ backgroundColor: '#71a9f7' }}
+                          data-testid="calendar-cell-sp-badge-secondary-plan"
+                        >
+                          2予 {secondaryPlanCount}
                         </span>
                       )}
                       {draftCount > 0 && (

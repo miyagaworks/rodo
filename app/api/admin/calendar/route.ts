@@ -16,8 +16,13 @@ import { prisma } from '@/lib/prisma'
  *     `isSecondaryTransport: false` を明示）
  *   - 下書き案件もカレンダーに表示。下書きは UI 側で「下書」バッジに置換し
  *     現場/搬送/2次バッジと視覚的に区別する（テーブルとの件数乖離を解消するため）
+ *   - 2 次搬送「予定」(scheduledSecondaryAt) を持つ 1 次案件を別クエリで集計し
+ *     `secondaryPlanDispatches` として返す。UI 側で「2予」バッジ（2 次完了の「2次」と
+ *     視覚的に区別）として表示する。下書きも含める。
  *
- * ソート: 各日内で dispatchTime ASC
+ * ソート:
+ *   - primary / secondary（実施済 2 次）: 各日内で dispatchTime ASC
+ *   - secondaryPlan（2 次予定）: 各日内で scheduledSecondaryAt ASC
  *
  * JST 境界: jstOffset = 9 * 60 * 60 * 1000。月初〜月末の UTC 範囲は前実装を踏襲。
  *
@@ -51,6 +56,12 @@ interface CalendarDispatch {
   dispatchTime: string | null
   /** 下書き状態。UI 側で「下書」バッジに置換するために必要。 */
   isDraft: boolean
+  /**
+   * 二次搬送予定日時の ISO 文字列。
+   * 「2予」バッジ行（secondaryPlanDispatches）はこの値をソートキーとする。
+   * primary / secondary（実施済 2 次）の dispatchTime ベースの行では null。
+   */
+  scheduledSecondaryAt: string | null
 }
 
 export async function GET(req: Request) {
@@ -125,6 +136,31 @@ export async function GET(req: Request) {
     },
   })
 
+  // 2 次搬送「予定」（同月内に scheduledSecondaryAt を持つ 1 次搬送案件）。
+  // dispatchTime ベースの secondary（実施済）と区別し、UI で「2予」バッジを表示する。
+  // 業務仕様: 下書きも含む（status フィルタは入れない。scheduledSecondaryAt の存在で判定）。
+  const secondaryPlanRows = await prisma.dispatch.findMany({
+    where: {
+      tenantId: session.user.tenantId,
+      scheduledSecondaryAt: { gte: startUtc, lt: endUtc },
+      // 2 次搬送そのものには scheduledSecondaryAt は付かない想定（親 = 1 次のみ）
+      isSecondaryTransport: false,
+      type: { in: ['ONSITE', 'TRANSPORT'] },
+    },
+    orderBy: { scheduledSecondaryAt: 'asc' },
+    select: {
+      dispatchNumber: true,
+      dispatchTime: true,
+      type: true,
+      isDraft: true,
+      plateRegion: true,
+      plateClass: true,
+      plateKana: true,
+      plateNumber: true,
+      scheduledSecondaryAt: true,
+    },
+  })
+
   function rowToCalendarDispatch(d: {
     dispatchNumber: string
     dispatchTime: Date | null
@@ -134,6 +170,7 @@ export async function GET(req: Request) {
     plateClass: string | null
     plateKana: string | null
     plateNumber: string | null
+    scheduledSecondaryAt?: Date | null
   }): CalendarDispatch {
     const plate: CalendarPlate | null =
       d.plateRegion && d.plateClass && d.plateKana && d.plateNumber
@@ -150,6 +187,9 @@ export async function GET(req: Request) {
       type: d.type,
       dispatchTime: d.dispatchTime ? d.dispatchTime.toISOString() : null,
       isDraft: d.isDraft,
+      scheduledSecondaryAt: d.scheduledSecondaryAt
+        ? d.scheduledSecondaryAt.toISOString()
+        : null,
     }
   }
 
@@ -195,6 +235,28 @@ export async function GET(req: Request) {
     secondaryByDate.set(key, list)
   }
 
+  // YYYY-MM-DD ごとに secondaryPlanDispatches を集約（キーは scheduledSecondaryAt の JST 日付）
+  const secondaryPlanByDate = new Map<string, CalendarDispatch[]>()
+  for (const d of secondaryPlanRows) {
+    if (!d.scheduledSecondaryAt) continue
+    const key = toJstDateString(d.scheduledSecondaryAt)
+    const list = secondaryPlanByDate.get(key) ?? []
+    list.push(
+      rowToCalendarDispatch({
+        dispatchNumber: d.dispatchNumber,
+        dispatchTime: d.dispatchTime,
+        type: d.type as 'ONSITE' | 'TRANSPORT',
+        isDraft: d.isDraft,
+        plateRegion: d.plateRegion,
+        plateClass: d.plateClass,
+        plateKana: d.plateKana,
+        plateNumber: d.plateNumber,
+        scheduledSecondaryAt: d.scheduledSecondaryAt,
+      }),
+    )
+    secondaryPlanByDate.set(key, list)
+  }
+
   // 月の全日を 1..lastDay 列挙
   const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate()
   const days = Array.from({ length: lastDay }, (_, i) => {
@@ -204,6 +266,7 @@ export async function GET(req: Request) {
       date,
       primaryDispatches: byDate.get(date) ?? [],
       secondaryDispatches: secondaryByDate.get(date) ?? [],
+      secondaryPlanDispatches: secondaryPlanByDate.get(date) ?? [],
     }
   })
 
