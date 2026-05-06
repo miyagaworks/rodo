@@ -481,61 +481,61 @@ npm run dev
   - **期待結果**: 5 状態分類（today / tomorrow / future / undecided / past）でグルーピング表示
   - **関連ファイル**: `StoredVehicleList.tsx`, `lib/admin/scheduled-secondary-sort.ts`
 
-- [ ] D-10 二次搬送予定日 編集
+- [x] D-10 二次搬送予定日 編集
   - **手順**: 保管車両の編集アイコン → ScheduledSecondaryEditor → 日時設定 → 保存
   - **期待結果**: `Dispatch.scheduledSecondaryAt` が更新（送信時 +09:00 付与で UTC 化）、再読込でも JST 表示が一致
   - **関連ファイル**: `ScheduledSecondaryEditor.tsx`, `app/api/admin/dispatches/[id]/route.ts`, `lib/validations/schemas/dispatch.ts` `adminUpdateDispatchSchema`
 
 #### D-3. 案件管理（Phase 4）
 
-- [ ] D-11 `/admin/dispatches` テーブル表示
+- [x] D-11 `/admin/dispatches` テーブル表示
   - **手順**: 「案件管理」タブ
   - **期待結果**: DispatchTable に案件リスト、ページング動作
   - **関連ファイル**: `app/admin/dispatches/page.tsx`, `DispatchTable.tsx`
 
-- [ ] D-12 フィルタ動作
+- [x] D-12 フィルタ動作
   - **手順**: status / 担当隊員 / アシスタンス / 期間で絞り込み
   - **期待結果**: `/api/admin/dispatches?...` のクエリパラメータが反映、結果が絞り込まれる
   - **関連ファイル**: `DispatchTableFilters.tsx`, `app/api/admin/dispatches/route.ts`
 
-- [ ] D-13 カレンダータブ表示（新仕様: 出動番号 + 車番）
+- [x] D-13 カレンダータブ表示（新仕様: 出動番号 + 車番）
   - **手順**: テーブル / カレンダー切替 → カレンダー
   - **期待結果**: 各日セルに `primaryDispatches` の出動番号 + 車番が表示
   - **関連ファイル**: `DispatchCalendar.tsx`, `app/api/admin/calendar/route.ts`（Phase 4 で Response 仕様変更）
 
-- [ ] D-14 カレンダー 月送り
+- [x] D-14 カレンダー 月送り
   - **手順**: 前月 / 翌月ボタン
   - **期待結果**: 月別 fetch、URL クエリ更新
 
-- [ ] D-15 案件編集画面
+- [x] D-15 案件編集画面
   - **手順**: `/admin/dispatches/[id]` → DispatchEditForm
   - **期待結果**: 既存値が JST datetime-local 形式で表示、編集 → 保存で PATCH `/api/admin/dispatches/[id]` 200
   - **関連ファイル**: `app/admin/dispatches/[id]/page.tsx`, `DispatchEditForm.tsx`
   - **失敗時**: ODO 範囲（0〜9_999_999 整数）、`adminUpdateDispatchSchema` のフィールド許可リスト確認
 
-- [ ] D-16 案件編集 → scheduledSecondaryAt
+- [x] D-16 案件編集 → scheduledSecondaryAt
   - **手順**: フォーム内の二次搬送予定日 datetime-local を変更 → 保存
   - **期待結果**: 200、DB に UTC で保存、再表示で JST 一致
   - **関連ファイル**: `DispatchEditForm.tsx`
 
-- [ ] D-17 請求済みマーキング
+- [x] D-17 請求済みマーキング
   - **手順**: 案件詳細から「請求済み」ボタン
   - **期待結果**: `Dispatch.billedAt` に現在時刻、再表示で「請求済み」表示
   - **関連ファイル**: `app/api/admin/dispatches/[id]/billing/route.ts`, `lib/validations/schemas/billing.ts`
 
 #### D-4. 設定（既存）
 
-- [ ] D-18 `/settings` 2 ペインレイアウト（PC）
+- [x] D-18 `/settings` 2 ペインレイアウト（PC）
   - **手順**: `/settings`（ADMIN）
   - **期待結果**: 左に項目 / 右に詳細の 2 ペイン構成
   - **関連ファイル**: `components/SettingsClient.tsx`
 
-- [ ] D-19 隊員管理（並べ替え）
+- [x] D-19 隊員管理（並べ替え）
   - **手順**: 隊員一覧を D&D で並べ替え
   - **期待結果**: `User.sortOrder` が更新、再読込でも維持
   - **関連ファイル**: `app/api/users/reorder/route.ts`, `app/api/users/route.ts`
 
-- [ ] D-20 車両マスタ管理
+- [x] D-20 車両マスタ管理
   - **手順**: 車両追加 / 編集 / 並べ替え
   - **期待結果**: `Vehicle` レコード CRUD 成功
   - **関連ファイル**: `app/api/settings/vehicles/**`, `prisma/schema.prisma` `Vehicle`
