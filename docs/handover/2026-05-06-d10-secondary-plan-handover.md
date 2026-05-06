@@ -168,3 +168,81 @@ a000374 fix(admin): include draft dispatches in stored list and today summary
 6a32966 Merge pull request #10 from miyagaworks/feature/p0-13-signature-blob
 d8d853a docs(handover): add PR #10 review results and 5 follow-up tasks (E.8-E.12)
 ```
+
+## §J. 2026-05-06 セッション後半の状態（タスクA・B 進捗）
+
+### J-1. 完了済み（push 済み）
+
+| コミット | 内容 |
+|---|---|
+| `dec97ac` | fix(admin/dashboard): include draft dispatches in overdue list — §C-4 持ち越しリスト isDraft フィルタ削除 |
+| `5cf4041` | feat(admin/table): add edit button and improve dispatch number link visibility — タスクA |
+
+### J-2. タスクA 完了内容（参考）
+
+- `components/admin/DispatchTable.tsx` のみ変更（4 箇所、+11/-4 行）
+- 案件番号 Link を `text-blue-600 hover:text-blue-800 hover:underline` に変更
+- 請求列に `<Link data-testid="dispatch-edit-link">編集</Link>` を追加（全行常時表示）
+- グリッド最終列の min-width を 180px → 240px に拡張（ヘッダ L278・行 L392 両方）
+- tsc / build / vitest 13/13 PASS、サイレント故障チェック該当なし
+
+### J-3. 進行中: タスクB（カレンダー「テーブルで詳細を見る」空表示問題）
+
+#### 不具合内容
+
+- カレンダー 5/7 セルの「2予 20260506001」（dispatchTime=2026-05-06, scheduledSecondaryAt=2026-05-07）
+- セル下部「N件 詳細を見る」 → 日付別出動一覧モーダル表示
+- モーダル内「テーブルで詳細を見る」クリック → from=to=2026-05-07 でテーブルフィルタ
+- 案件管理画面が「該当する案件はありません」と表示される
+
+#### 調査CC 報告サマリ（仮説: 真）
+
+- `app/api/admin/dispatches/route.ts` L57-71: `where.dispatchTime` のみで絞る（scheduledSecondaryAt は select のみ）
+- `app/api/admin/calendar/route.ts` L142-162, L239-258: secondaryPlanRows は scheduledSecondaryAt 由来で 5/7 セルに集約
+- `components/admin/DispatchCalendar.tsx` L429-441, L575: モーダル N件 = primary + secondary + secondaryPlan の和集合
+- 既存テスト（`__tests__/api/admin/dispatches.test.ts` L263-280）に scheduledSecondaryAt 考慮の日付フィルタテストは **なし**
+
+#### 業務仕様確定（2026-05-06 ユーザー確認）
+
+> 「カレンダー 5/7 セルから『テーブルで詳細を見る』を押した時、5/7 セルにバッジが出ていた案件だけを見たい」
+
+= カレンダーが 5/7 セルで集約している集合（dispatchTime=5/7 **OR** scheduledSecondaryAt=5/7）と完全一致するものをテーブルで見せる。
+
+採用案: **案A（テーブル日付フィルタを `dispatchTime` OR `scheduledSecondaryAt` の OR 条件に拡張）**
+
+#### 不採用案（記録）
+
+- 案B: カレンダーから親 dispatchTime（5/6）に飛ばす → UX のねじれ大（5/7 セルから飛んだのに 5/6 が出る）
+- 案C: 新フィルタ軸追加 → UI 拡張過剰
+- 案D1: `dateMatch=any` 切替パラメータ → API 仕様増過剰
+
+#### 次セッションで実施すること
+
+1. **Super 役割**: 案A の修正CC 用プロンプトを設計
+2. 修正対象: `app/api/admin/dispatches/route.ts` の where 句拡張
+   - 現状: `where.dispatchTime = { gte, lte }`
+   - 変更後: `where.OR = [{ dispatchTime: { gte, lte } }, { scheduledSecondaryAt: { gte, lte } }]`（範囲式は同じ）
+   - 既存の他 where 条件（status, userId 等）と OR が干渉しないよう、AND/OR の入れ子に注意
+3. テスト追加（`__tests__/api/admin/dispatches.test.ts`）:
+   - scheduledSecondaryAt のみ範囲一致でヒットすること
+   - dispatchTime のみ範囲一致でヒットすること
+   - 両方一致時に重複行が出ないこと（findMany の挙動として OR は自然に重複しないが念のため）
+4. UX 補助バッジ（行に「2次予定 5/7」表示）は **別タスク**として起票（今回スコープ外）
+
+### J-4. 別件メモ
+
+- 未追跡ファイル 3件（`docs/handover/2026-05-02-break-instant-end-fix.md` / `scripts/check-admin-state.ts` / `scripts/list-unfinished-breaks.ts`）は §E-6 で保留中
+- dev サーバ PID 14767 は Mac mini 再起動で消える前提。再起動後は `cd ~/Projects/rodo/app && PORT=3100 npm run dev`
+- ブランチ: `feature/dispatch-floating-prevention-phase8b`、最新コミットは push 完了後に確認
+
+### J-5. 再起動後の Super 起動プロンプト
+
+新セッション冒頭に以下をコピペすれば、本セッションの続きから再開可能:
+
+```
+~/Projects/rodo/app/docs/handover/2026-05-06-d10-secondary-plan-handover.md
+を読んで把握してください。完了したら「引き継ぎ把握完了」と返してください。
+§J（特に J-3）に本セッション後半の状態が追記されています。
+タスクB（案A 採用済み）の修正CC プロンプト設計から再開します。
+モデルは全 CC で Opus を使用してください。
+```
