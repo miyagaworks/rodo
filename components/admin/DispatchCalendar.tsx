@@ -13,22 +13,16 @@ import { BiSolidDetail } from 'react-icons/bi'
  *   - 日 月 火 水 木 金 土 のヘッダ + 6 週分のセル
  *   - 各セルに 1 次搬送（ONSITE / TRANSPORT）の「#出動番号 / 車番」を縦並び（最大 3 件）
  *   - 4 件以上ある日は 3 件 + 「+N 件」バッジ。バッジクリックで該当日のモーダル展開
- *   - 各案件行クリックで /admin/dispatches/[id] へ遷移（ただし API は id を返さないため
- *     dispatchNumber でフォールバックリンクを張る）
+ *   - 行頭バッジ: 1次/2次/2予/下書（rowKindOf による分類、
+ *     優先度: STORED+scheduledSecondaryAt > isDraft > status）
  *
- * 注: API レスポンス（§4.3）は `dispatchNumber` と `plate` のみ返す。dispatch 編集画面への
- * 遷移には id が必要だが、本仕様では dispatchNumber 経由のリンクは張らず、編集導線は
- * テーブルタブ側に閉じる。代わりに「案件管理ページ内のテーブルタブで該当日付フィルタを
- * 適用する遷移」も検討余地ありだが、本実装ではテーブル内 Link への置換が現実解。
- *
- * → 暫定: API レスポンスに id を含めず、行クリックではテーブルタブへの遷移リンクを
- *   `/admin/dispatches?from=YYYY-MM-DD&to=YYYY-MM-DD` として作る。タブ切替の URL 同期は
- *   未実装なので動作しないが、せめてリンク自体は張っておくのは過剰。本実装では行は
- *   div としてレンダリングし、編集遷移は伴わない（業務上カレンダーは「俯瞰」目的）。
- *
- *   ただし「+N 件」モーダル内では dispatchNumber でリンクは張らない（id が無いため）。
- *
- *   将来 API に id を追加する場合は本コンポーネント側を改修。
+ * 編集遷移について:
+ *   - カレンダーは「俯瞰」目的のため、各案件行は div でレンダリングし、行クリックで
+ *     編集ページへは遷移しない
+ *   - モーダル内「テーブルで詳細を見る」ボタンは onJumpToTable(date) コールバックで
+ *     親に通知し、親（CalendarTabs 等）がテーブルタブに切り替えて日付フィルタを適用する
+ *   - API レスポンスに dispatch id は含まれない（dispatchNumber のみ返却）。
+ *     将来 id 経由の直接遷移を実装する場合は API レスポンス拡張 + 本コンポーネント改修。
  */
 
 interface CalendarPlate {
