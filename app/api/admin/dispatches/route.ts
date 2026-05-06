@@ -54,19 +54,24 @@ export async function GET(req: Request) {
     tenantId: session.user.tenantId,
   }
 
-  // 期間フィルタ（dispatchTime ベース）
+  // 期間フィルタ（dispatchTime OR scheduledSecondaryAt）
+  // 業務仕様 2026-05-06（§C-2 / §J-3）: カレンダーが該当日セルに出している案件と
+  // 同一集合をテーブルでも返すため、両フィールドの OR で絞る。
   if (from || to) {
-    const dispatchTime: Prisma.DateTimeNullableFilter = {}
+    const range: Prisma.DateTimeNullableFilter = {}
     if (from) {
       const d = new Date(`${from}T00:00:00.000+09:00`)
-      if (!Number.isNaN(d.getTime())) dispatchTime.gte = d
+      if (!Number.isNaN(d.getTime())) range.gte = d
     }
     if (to) {
       const d = new Date(`${to}T23:59:59.999+09:00`)
-      if (!Number.isNaN(d.getTime())) dispatchTime.lte = d
+      if (!Number.isNaN(d.getTime())) range.lte = d
     }
-    if (dispatchTime.gte || dispatchTime.lte) {
-      where.dispatchTime = dispatchTime
+    if (range.gte || range.lte) {
+      where.OR = [
+        { dispatchTime: { ...range } },
+        { scheduledSecondaryAt: { ...range } },
+      ]
     }
   }
 

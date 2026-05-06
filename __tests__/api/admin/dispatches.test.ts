@@ -260,11 +260,17 @@ describe('GET /api/admin/dispatches', () => {
     expect(captured).toMatchObject({ userId: 'u9', assistanceId: 'a9', tenantId: 't1' })
   })
 
-  it('期間フィルタ from/to が dispatchTime の範囲条件として渡る', async () => {
+  it('期間フィルタ from/to が dispatchTime OR scheduledSecondaryAt の範囲条件として渡る', async () => {
+    // 業務仕様 2026-05-06（§C-2 / §J-3）: カレンダーが該当日セルに集約する集合と
+    // テーブルが返す集合を一致させるため、両フィールドの OR で絞る。
     mockedAuth.mockResolvedValueOnce(adminSession())
     const countMock = prisma.dispatch.count as unknown as ReturnType<typeof vi.fn>
     const findMock = prisma.dispatch.findMany as unknown as ReturnType<typeof vi.fn>
-    let captured: { dispatchTime?: { gte?: Date; lte?: Date } } | null = null
+    type RangeFilter = { gte?: Date; lte?: Date }
+    type OrCondition =
+      | { dispatchTime?: RangeFilter; scheduledSecondaryAt?: undefined }
+      | { scheduledSecondaryAt?: RangeFilter; dispatchTime?: undefined }
+    let captured: { OR?: OrCondition[] } | null = null
     countMock.mockImplementationOnce((args: { where: typeof captured }) => {
       captured = args.where
       return Promise.resolve(0)
@@ -275,9 +281,107 @@ describe('GET /api/admin/dispatches', () => {
     )
 
     await GET(makeRequest('?from=2026-04-01&to=2026-04-30'))
-    expect(captured?.dispatchTime).toBeDefined()
-    expect(captured?.dispatchTime?.gte).toBeInstanceOf(Date)
-    expect(captured?.dispatchTime?.lte).toBeInstanceOf(Date)
+
+    // OR 配列が組み立てられ、dispatchTime / scheduledSecondaryAt 両方を含む
+    expect(Array.isArray(captured?.OR)).toBe(true)
+    expect(captured?.OR).toHaveLength(2)
+
+    const dispatchTimeBranch = captured?.OR?.find(
+      (c): c is { dispatchTime: RangeFilter } => 'dispatchTime' in c && c.dispatchTime !== undefined,
+    )
+    const scheduledBranch = captured?.OR?.find(
+      (c): c is { scheduledSecondaryAt: RangeFilter } =>
+        'scheduledSecondaryAt' in c && c.scheduledSecondaryAt !== undefined,
+    )
+
+    expect(dispatchTimeBranch?.dispatchTime?.gte).toBeInstanceOf(Date)
+    expect(dispatchTimeBranch?.dispatchTime?.lte).toBeInstanceOf(Date)
+    expect(scheduledBranch?.scheduledSecondaryAt?.gte).toBeInstanceOf(Date)
+    expect(scheduledBranch?.scheduledSecondaryAt?.lte).toBeInstanceOf(Date)
+
+    // ルート直下の where.dispatchTime は二重指定になるため設定されない
+    expect((captured as unknown as { dispatchTime?: unknown })?.dispatchTime).toBeUndefined()
+  })
+
+  it('期間フィルタ: scheduledSecondaryAt のみ範囲一致のレコードも where.OR で拾える構造になっている', async () => {
+    // ケース: dispatchTime=2026-04-15（範囲外）、scheduledSecondaryAt=2026-05-07（範囲内）
+    // 実際の DB マッチングは Prisma の責任なので、ここでは「OR 構造が正しく構築されている」ことを検証する。
+    mockedAuth.mockResolvedValueOnce(adminSession())
+    const countMock = prisma.dispatch.count as unknown as ReturnType<typeof vi.fn>
+    const findMock = prisma.dispatch.findMany as unknown as ReturnType<typeof vi.fn>
+    type RangeFilter = { gte?: Date; lte?: Date }
+    let captured:
+      | {
+          OR?: Array<
+            { dispatchTime?: RangeFilter } | { scheduledSecondaryAt?: RangeFilter }
+          >
+        }
+      | null = null
+    countMock.mockImplementationOnce((args: { where: typeof captured }) => {
+      captured = args.where
+      return Promise.resolve(0)
+    })
+    findMock.mockImplementationOnce(() => Promise.resolve([]))
+    mockedTransaction.mockImplementationOnce(async (calls: Promise<unknown>[]) =>
+      Promise.all(calls),
+    )
+
+    await GET(makeRequest('?from=2026-05-07&to=2026-05-07'))
+
+    const scheduledBranch = captured?.OR?.find(
+      (c): c is { scheduledSecondaryAt: RangeFilter } =>
+        'scheduledSecondaryAt' in c &&
+        (c as { scheduledSecondaryAt?: RangeFilter }).scheduledSecondaryAt !== undefined,
+    )
+    expect(scheduledBranch).toBeDefined()
+    // 5/7 00:00 JST 以降、5/7 23:59:59.999 JST 以前
+    expect(scheduledBranch?.scheduledSecondaryAt?.gte).toBeInstanceOf(Date)
+    expect(scheduledBranch?.scheduledSecondaryAt?.lte).toBeInstanceOf(Date)
+    expect(scheduledBranch?.scheduledSecondaryAt?.gte?.toISOString()).toBe(
+      new Date('2026-05-07T00:00:00.000+09:00').toISOString(),
+    )
+    expect(scheduledBranch?.scheduledSecondaryAt?.lte?.toISOString()).toBe(
+      new Date('2026-05-07T23:59:59.999+09:00').toISOString(),
+    )
+  })
+
+  it('期間フィルタ: dispatchTime のみ範囲一致のレコードも where.OR で拾える構造になっている', async () => {
+    // ケース: dispatchTime=2026-05-07（範囲内）、scheduledSecondaryAt=null
+    // OR の dispatchTime ブランチが正しく構築されていれば DB が拾う。
+    mockedAuth.mockResolvedValueOnce(adminSession())
+    const countMock = prisma.dispatch.count as unknown as ReturnType<typeof vi.fn>
+    const findMock = prisma.dispatch.findMany as unknown as ReturnType<typeof vi.fn>
+    type RangeFilter = { gte?: Date; lte?: Date }
+    let captured:
+      | {
+          OR?: Array<
+            { dispatchTime?: RangeFilter } | { scheduledSecondaryAt?: RangeFilter }
+          >
+        }
+      | null = null
+    countMock.mockImplementationOnce((args: { where: typeof captured }) => {
+      captured = args.where
+      return Promise.resolve(0)
+    })
+    findMock.mockImplementationOnce(() => Promise.resolve([]))
+    mockedTransaction.mockImplementationOnce(async (calls: Promise<unknown>[]) =>
+      Promise.all(calls),
+    )
+
+    await GET(makeRequest('?from=2026-05-07&to=2026-05-07'))
+
+    const dispatchTimeBranch = captured?.OR?.find(
+      (c): c is { dispatchTime: RangeFilter } =>
+        'dispatchTime' in c &&
+        (c as { dispatchTime?: RangeFilter }).dispatchTime !== undefined,
+    )
+    expect(dispatchTimeBranch).toBeDefined()
+    expect(dispatchTimeBranch?.dispatchTime?.gte?.toISOString()).toBe(
+      new Date('2026-05-07T00:00:00.000+09:00').toISOString(),
+    )
+    expect(dispatchTimeBranch?.dispatchTime?.lte?.toISOString()).toBe(
+      new Date('2026-05-07T23:59:59.999+09:00').toISOString(),
+    )
   })
 
   it('ページング (skip/take) が反映される', async () => {
