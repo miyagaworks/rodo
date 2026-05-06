@@ -396,7 +396,7 @@ function DispatchRow({
         {/* 案件番号 + 持ち越しバッジ */}
         <span className="flex items-center gap-2 font-mono text-xs text-gray-700 sm:text-sm">
           <Link
-            href={`/admin/dispatches/${d.id}`}
+            href={`/dispatch/${d.id}/report`}
             className="text-blue-600 hover:text-blue-800 hover:underline"
             data-testid="dispatch-number-link"
           >
@@ -458,7 +458,7 @@ function DispatchRow({
         {/* 請求列 (暫定 UI: Phase 5 で billing 画面に置換予定) */}
         <span className="flex min-w-[240px] items-center justify-end gap-2 whitespace-nowrap">
           <Link
-            href={`/admin/dispatches/${d.id}`}
+            href={`/dispatch/${d.id}/report`}
             className="whitespace-nowrap rounded border border-gray-300 bg-white px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-100"
             data-testid="dispatch-edit-link"
           >
