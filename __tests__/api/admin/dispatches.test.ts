@@ -101,12 +101,12 @@ describe('GET /api/admin/dispatches', () => {
     expect(findWhere).toMatchObject({ tenantId: 't1', isDraft: true })
   })
 
-  it('status=unbilled フィルタ: billedAt=null', async () => {
+  it('status=unbilled フィルタ: billedAt=null のみ（業務仕様 2026-05-06 §C-4: isDraft フィルタなし）', async () => {
     mockedAuth.mockResolvedValueOnce(adminSession())
     const countMock = prisma.dispatch.count as unknown as ReturnType<typeof vi.fn>
     const findMock = prisma.dispatch.findMany as unknown as ReturnType<typeof vi.fn>
-    let captured: unknown = null
-    countMock.mockImplementationOnce((args: { where: unknown }) => {
+    let captured: { billedAt?: unknown; isDraft?: unknown } | null = null
+    countMock.mockImplementationOnce((args: { where: typeof captured }) => {
       captured = args.where
       return Promise.resolve(0)
     })
@@ -116,7 +116,64 @@ describe('GET /api/admin/dispatches', () => {
     )
 
     await GET(makeRequest('?status=unbilled'))
-    expect(captured).toMatchObject({ billedAt: null, isDraft: false })
+    expect(captured).toMatchObject({ billedAt: null })
+    // 下書き案件も持ち越しリストに含めるため、isDraft フィルタは付与されない
+    expect(captured?.isDraft).toBeUndefined()
+  })
+
+  it('status=unbilled フィルタ: 下書き案件 (isDraft=true) もレスポンスに含まれる', async () => {
+    mockedAuth.mockResolvedValueOnce(adminSession())
+    setupTxResolve(2, [
+      {
+        id: 'd-draft',
+        dispatchNumber: '20260505001',
+        dispatchTime: new Date('2026-05-05T01:00:00Z'),
+        status: 'COMPLETED',
+        isDraft: true,
+        billedAt: null,
+        scheduledSecondaryAt: null,
+        returnTime: new Date('2026-05-05T03:00:00Z'),
+        type: 'ONSITE',
+        customerName: '顧客 D',
+        plateRegion: null,
+        plateClass: null,
+        plateKana: null,
+        plateNumber: null,
+        user: { id: 'u1', name: '山田' },
+        assistance: { id: 'a1', name: 'PA', displayAbbreviation: 'PA' },
+        report: null,
+      },
+      {
+        id: 'd-final',
+        dispatchNumber: '20260505002',
+        dispatchTime: new Date('2026-05-05T02:00:00Z'),
+        status: 'COMPLETED',
+        isDraft: false,
+        billedAt: null,
+        scheduledSecondaryAt: null,
+        returnTime: new Date('2026-05-05T04:00:00Z'),
+        type: 'ONSITE',
+        customerName: '顧客 F',
+        plateRegion: null,
+        plateClass: null,
+        plateKana: null,
+        plateNumber: null,
+        user: { id: 'u1', name: '山田' },
+        assistance: { id: 'a1', name: 'PA', displayAbbreviation: 'PA' },
+        report: null,
+      },
+    ])
+
+    const res = await GET(makeRequest('?status=unbilled'))
+    const json = await res.json()
+    expect(json.dispatches).toHaveLength(2)
+    expect(json.dispatches.map((d: { id: string }) => d.id)).toEqual([
+      'd-draft',
+      'd-final',
+    ])
+    // 下書きフラグはレスポンスに保持される（表示側でバッジ色分けに使用）
+    expect(json.dispatches[0].isDraft).toBe(true)
+    expect(json.dispatches[1].isDraft).toBe(false)
   })
 
   it('status=stored フィルタ: status=STORED && isDraft=false', async () => {

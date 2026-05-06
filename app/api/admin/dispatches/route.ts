@@ -85,8 +85,10 @@ export async function GET(req: Request) {
       where.isDraft = false
       break
     case 'unbilled':
+      // 業務仕様 2026-05-06: 下書きの持ち越し案件もリストに含める（§C-4）
+      // 下書き = 完成させ忘れた案件であり、持ち越しリストで気づくべき対象。
+      // §C-1（保管案件）と同じ趣旨の追従。
       where.billedAt = null
-      where.isDraft = false
       break
     case 'billed':
       where.billedAt = { not: null }
