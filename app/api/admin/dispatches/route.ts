@@ -93,8 +93,8 @@ export async function GET(req: Request) {
       break
     case 'stored':
       // 保管中（二次搬送待ち）。Phase 3.5 で追加。
+      // 業務仕様 2026-05-06: 下書き保存中の保管案件も表示する（isDraft フィルタなし）
       where.status = 'STORED'
-      where.isDraft = false
       break
     case 'all':
     case null:

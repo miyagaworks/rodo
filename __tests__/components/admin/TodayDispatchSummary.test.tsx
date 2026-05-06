@@ -6,7 +6,7 @@
  *           + COMPLETED && returnTime === null（帰社中）
  * - 完了:   COMPLETED && returnTime !== null / RETURNED / STORED
  * - 未請求: billedAt === null（status 問わず）
- * - isDraft=true は全集合から除外
+ * - 業務仕様 2026-05-06: isDraft=true（下書き）も集計対象に含める
  *
  * useAdminDispatches フック自体をモックして、純粋に集計分岐の振る舞いを検証する。
  */
@@ -141,11 +141,11 @@ describe('TodayDispatchSummary 集計ロジック', () => {
     expect(readCount('完了')).toBe(2)
   })
 
-  it('case E: isDraft=true は全集合から除外（進行中・完了・未請求いずれにも入らない）', () => {
+  it('case E: 業務仕様 2026-05-06 - isDraft=true も status に応じて集計対象に含める', () => {
     const dispatches = [
-      // 進行中相当だが draft → 除外
+      // 進行中相当の draft → 進行中にカウント、未請求にもカウント
       makeDispatch({ id: 'e1', status: 'DISPATCHED', isDraft: true, billedAt: null }),
-      // 完了相当だが draft → 除外
+      // 完了相当の draft → 完了にカウント、未請求にもカウント
       makeDispatch({
         id: 'e2',
         status: 'COMPLETED',
@@ -162,9 +162,9 @@ describe('TodayDispatchSummary 集計ロジック', () => {
 
     render(<TodayDispatchSummary today="2026-05-02" />)
 
-    expect(readCount('進行中')).toBe(0)
-    expect(readCount('完了')).toBe(0)
-    expect(readCount('未請求')).toBe(0)
+    expect(readCount('進行中')).toBe(1)
+    expect(readCount('完了')).toBe(1)
+    expect(readCount('未請求')).toBe(2)
   })
 
   it('case F: billedAt=null は status を問わず未請求にカウント', () => {

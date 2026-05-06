@@ -17,7 +17,7 @@ import { useAdminDispatches } from '@/hooks/useAdminDispatches'
  *     - status === 'COMPLETED' && returnTime !== null（帰社済み）
  *     - もしくは status === 'RETURNED' / 'STORED'
  * - 未請求: billedAt が null（status 問わず）
- * - isDraft=true は全集合から除外
+ * - 業務仕様 2026-05-06: isDraft=true（下書き）も全集計対象に含める
  *
  * today の日付文字列は親コンポーネントから受け取る
  * （businessDayStartMinutes に基づいて計算済み）。
@@ -49,8 +49,6 @@ export default function TodayDispatchSummary({ today }: TodayDispatchSummaryProp
     let unbilled = 0
 
     for (const d of data.dispatches) {
-      if (d.isDraft) continue // 下書きは集計対象外
-
       if (ACTIVE_STATUSES.has(d.status)) {
         active++
       } else if (d.status === 'COMPLETED' && d.returnTime === null) {
