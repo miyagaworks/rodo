@@ -275,7 +275,7 @@ export default function DispatchTable({ filter, today }: DispatchTableProps) {
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           {/* ヘッダ行 (PC のみ。「搬送予定」列は常時表示。) */}
           <div
-            className="hidden sm:grid grid-cols-[180px_120px_120px_80px_100px_180px_minmax(180px,1fr)] gap-3 px-4 py-2 text-xs font-medium text-gray-500 border-b border-gray-100"
+            className="hidden sm:grid grid-cols-[180px_120px_120px_80px_100px_180px_minmax(240px,1fr)] gap-3 px-4 py-2 text-xs font-medium text-gray-500 border-b border-gray-100"
           >
             <span>案件番号</span>
             <span>日時</span>
@@ -389,7 +389,7 @@ function DispatchRow({
   return (
     <li className={rowClass}>
       <div
-        className="grid grid-cols-1 sm:grid-cols-[180px_120px_120px_80px_100px_180px_minmax(180px,1fr)] gap-2 sm:gap-3 px-4 py-3 text-sm hover:bg-gray-50 transition-colors"
+        className="grid grid-cols-1 sm:grid-cols-[180px_120px_120px_80px_100px_180px_minmax(240px,1fr)] gap-2 sm:gap-3 px-4 py-3 text-sm hover:bg-gray-50 transition-colors"
         data-testid="dispatch-row"
         data-overdue={isOverdue ? 'true' : 'false'}
       >
@@ -397,7 +397,7 @@ function DispatchRow({
         <span className="flex items-center gap-2 font-mono text-xs text-gray-700 sm:text-sm">
           <Link
             href={`/admin/dispatches/${d.id}`}
-            className="hover:underline"
+            className="text-blue-600 hover:text-blue-800 hover:underline"
             data-testid="dispatch-number-link"
           >
             {d.dispatchNumber}
@@ -456,7 +456,14 @@ function DispatchRow({
         </span>
 
         {/* 請求列 (暫定 UI: Phase 5 で billing 画面に置換予定) */}
-        <span className="flex min-w-[180px] items-center justify-end gap-2 whitespace-nowrap">
+        <span className="flex min-w-[240px] items-center justify-end gap-2 whitespace-nowrap">
+          <Link
+            href={`/admin/dispatches/${d.id}`}
+            className="whitespace-nowrap rounded border border-gray-300 bg-white px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-100"
+            data-testid="dispatch-edit-link"
+          >
+            編集
+          </Link>
           {billed ? (
             <>
               <span
