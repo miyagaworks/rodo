@@ -471,12 +471,12 @@ npm run dev
   - **期待結果**: 当日（業務日: `businessDayStartMinutes` 基準）の出動件数 / 完了件数等が表示
   - **関連ファイル**: `TodayDispatchSummary.tsx`, `lib/admin/business-day.ts`
 
-- [ ] D-08 持ち越し案件リスト（Overdue）
+- [x] D-08 持ち越し案件リスト（Overdue）
   - **手順**: 前日以前の未完了案件を作って `/admin/dashboard`
   - **期待結果**: OverdueDispatchList に表示
   - **関連ファイル**: `OverdueDispatchList.tsx`
 
-- [ ] D-09 保管車両リスト（StoredVehicleList）
+- [x] D-09 保管車両リスト（StoredVehicleList）
   - **手順**: status=STORED の Dispatch を作って表示
   - **期待結果**: 5 状態分類（today / tomorrow / future / undecided / past）でグルーピング表示
   - **関連ファイル**: `StoredVehicleList.tsx`, `lib/admin/scheduled-secondary-sort.ts`
@@ -763,7 +763,7 @@ npm run dev
 
 転記元: 計画書 §7.1 (L812-821)
 
-- [ ] I-1.1 DispatchClient: 出動押下後の戻るボタンブロック
+- [x] I-1.1 DispatchClient: 出動押下後の戻るボタンブロック
   - **手順**: 出動押下 → 画面ヘッダーまたは UI の戻るボタンを押下
   - **期待結果**: 「進行中の出動があります」モーダルが表示され、ホームに戻れない
   - **関連ファイル**: `components/dispatch/DispatchClient.tsx`
