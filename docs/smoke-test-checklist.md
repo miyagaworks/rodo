@@ -507,16 +507,18 @@ npm run dev
   - **手順**: 前月 / 翌月ボタン
   - **期待結果**: 月別 fetch、URL クエリ更新
 
-- [x] D-15 案件編集画面
-  - **手順**: `/admin/dispatches/[id]` → DispatchEditForm
-  - **期待結果**: 既存値が JST datetime-local 形式で表示、編集 → 保存で PATCH `/api/admin/dispatches/[id]` 200
-  - **関連ファイル**: `app/admin/dispatches/[id]/page.tsx`, `DispatchEditForm.tsx`
+- [x] D-15 案件編集画面（報告ページ統合後）
+  - **手順**: 案件管理 (`/admin/dispatches`) → 案件番号リンク or 編集ボタン → 報告ページ (`/dispatch/[id]/report`)
+  - **期待結果**: 報告ページに既存値（時刻 5 種・ODO 5 種・車両・距離・金額等）が表示、編集 → 保存で各種 API 200
+  - **関連ファイル**: `components/admin/DispatchTable.tsx`（案件番号リンク・編集ボタン）, `app/dispatch/[id]/report/page.tsx`, `components/dispatch/ReportOnsiteClient.tsx`, `components/dispatch/ReportTransportClient.tsx`
   - **失敗時**: ODO 範囲（0〜9_999_999 整数）、`adminUpdateDispatchSchema` のフィールド許可リスト確認
+  - **注記**: ナンバープレート・損保会社が未入力の Dispatch では `/dispatch/[id]/record` にリダイレクトされる事前ガードあり（`report/page.tsx` L41-43）。検証時は事前に出動記録を完了させること
+  - **2026-05-06 変更**: 旧 `/admin/dispatches/[id]` + DispatchEditForm は削除（コミット 99d549f）、リンクは `/dispatch/[id]/report` に統合（3e291f7）
 
-- [x] D-16 案件編集 → scheduledSecondaryAt
-  - **手順**: フォーム内の二次搬送予定日 datetime-local を変更 → 保存
-  - **期待結果**: 200、DB に UTC で保存、再表示で JST 一致
-  - **関連ファイル**: `DispatchEditForm.tsx`
+- [x] D-16 二次搬送予定日 編集（D-10 で代替検証）
+  - **2026-05-06 変更**: 旧 DispatchEditForm 廃止後、`scheduledSecondaryAt` の編集 UI は報告ページに存在せず、D-10（保管車両一覧の編集アイコン → ScheduledSecondaryEditor）に集約
+  - **本項目は D-10 と同手順のため、D-10 で代替検証**
+  - **関連ファイル**: D-10 を参照（`components/admin/ScheduledSecondaryEditor.tsx`, `app/api/admin/dispatches/[id]/route.ts`）
 
 - [x] D-17 請求済みマーキング
   - **手順**: 案件詳細から「請求済み」ボタン
