@@ -4,7 +4,11 @@
  * - 案件行レンダリング（基本列）
  * - 持ち越し赤バッジ表示（dispatchTime < today かつ billedAt=null）
  * - 請求トグルクリックで PATCH /api/admin/dispatches/[id]/billing が呼ばれる
- * - status=stored 時のみ「搬送予定」列が出現する
+ * - 「搬送予定」列はフィルタ問わず常時表示（status 不問）
+ * - 状態バッジ優先順位:
+ *   1) STORED + scheduledSecondaryAt あり → 「2次予定」（#71a9f7・白）
+ *   2) isDraft=true → 「下書き」
+ *   3) status に応じた既存ラベル
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -185,12 +189,81 @@ describe('DispatchTable', () => {
     expect(screen.getAllByText(/搬送予定/).length).toBeGreaterThan(0)
   })
 
-  it('status!=stored のとき「搬送予定」列は出現しない', async () => {
+  it('status フィルタなしでも「搬送予定」列が常時表示される', async () => {
     mockListOnce([makeItem({ id: 'd-1' })])
     wrap(<DispatchTable filter={{}} today="2026-04-28" />)
     await waitFor(() => {
       expect(screen.getByTestId('dispatch-row')).toBeTruthy()
     })
-    expect(screen.queryAllByText(/搬送予定/)).toHaveLength(0)
+    // ヘッダ「搬送予定」が表示される
+    expect(screen.getAllByText(/搬送予定/).length).toBeGreaterThan(0)
+  })
+
+  it('STORED + scheduledSecondaryAt あり + isDraft=false は「2次予定」バッジ + #71a9f7 背景', async () => {
+    mockListOnce([
+      makeItem({
+        id: 'd-secondary',
+        dispatchNumber: '20260427-101',
+        status: 'STORED',
+        isDraft: false,
+        scheduledSecondaryAt: '2026-04-29T05:00:00+09:00',
+      }),
+    ])
+    wrap(<DispatchTable filter={{ status: 'stored' }} today="2026-04-28" />)
+    const badge = await screen.findByTestId('status-badge')
+    expect(badge.textContent).toBe('2次予定')
+    expect(badge.getAttribute('data-secondary-plan')).toBe('true')
+    // inline style で #71a9f7
+    expect((badge as HTMLElement).style.backgroundColor).toMatch(
+      /rgb\(113,\s*169,\s*247\)|#71a9f7/i,
+    )
+  })
+
+  it('STORED + scheduledSecondaryAt あり + isDraft=true は「2次予定」バッジ（isDraft より優先）', async () => {
+    mockListOnce([
+      makeItem({
+        id: 'd-secondary-draft',
+        dispatchNumber: '20260427-102',
+        status: 'STORED',
+        isDraft: true,
+        scheduledSecondaryAt: '2026-04-29T05:00:00+09:00',
+      }),
+    ])
+    wrap(<DispatchTable filter={{ status: 'draft' }} today="2026-04-28" />)
+    const badge = await screen.findByTestId('status-badge')
+    expect(badge.textContent).toBe('2次予定')
+    expect(badge.getAttribute('data-secondary-plan')).toBe('true')
+  })
+
+  it('STORED + scheduledSecondaryAt=null + isDraft=false は「保管中」バッジ', async () => {
+    mockListOnce([
+      makeItem({
+        id: 'd-stored-only',
+        dispatchNumber: '20260427-103',
+        status: 'STORED',
+        isDraft: false,
+        scheduledSecondaryAt: null,
+      }),
+    ])
+    wrap(<DispatchTable filter={{ status: 'stored' }} today="2026-04-28" />)
+    const badge = await screen.findByTestId('status-badge')
+    expect(badge.textContent).toBe('保管中')
+    expect(badge.getAttribute('data-secondary-plan')).toBe('false')
+  })
+
+  it('STORED + scheduledSecondaryAt=null + isDraft=true は「下書き」バッジ', async () => {
+    mockListOnce([
+      makeItem({
+        id: 'd-stored-draft',
+        dispatchNumber: '20260427-104',
+        status: 'STORED',
+        isDraft: true,
+        scheduledSecondaryAt: null,
+      }),
+    ])
+    wrap(<DispatchTable filter={{ status: 'draft' }} today="2026-04-28" />)
+    const badge = await screen.findByTestId('status-badge')
+    expect(badge.textContent).toBe('下書き')
+    expect(badge.getAttribute('data-secondary-plan')).toBe('false')
   })
 })

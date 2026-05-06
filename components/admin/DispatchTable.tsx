@@ -13,9 +13,14 @@ import {
 /**
  * 案件管理テーブル (Phase 4-A)。
  *
- * 列: 案件番号 | 日時 | 隊員 | AS | 状態 | 請求
- *   - status=stored 時のみ「搬送予定」列を追加表示。
+ * 列: 案件番号 | 日時 | 隊員 | AS | 状態 | 搬送予定 | 請求
+ *   - 「搬送予定」列はフィルタ問わず常時表示。NULL は「—」表示。
  *
+ * - 状態バッジ優先順位:
+ *   1) 保管中 + scheduledSecondaryAt あり → 「2次予定」（#71a9f7・白）
+ *   2) isDraft=true → 「下書き」
+ *   3) status に応じた既存ラベル
+ *   ※ カレンダー側 RowKindBadge と優先順位を揃えている。
  * - 持ち越し強調: dispatchTime が today より前 かつ billedAt が null
  *   → 案件番号セル横に赤バッジ「持ち越し」+ 行背景 bg-red-50/40
  * - 請求トグル: PATCH /api/admin/dispatches/[id]/billing { billed: boolean }
@@ -76,7 +81,18 @@ function dispatchDateJst(iso: string | null): string | null {
   return `${y}-${m}-${day}`
 }
 
-function statusLabel(status: string, isDraft: boolean): string {
+/**
+ * 状態バッジのラベル。
+ * 優先順位: STORED+scheduledSecondaryAt > isDraft > status。
+ * カレンダー側 rowKindOf と同じ優先順位（2予 / secondaryPlan）に揃えている。
+ */
+function statusLabel(
+  status: string,
+  isDraft: boolean,
+  scheduledSecondaryAt: string | null,
+): string {
+  // 保管中で 2 次搬送予定がある場合は isDraft より優先。
+  if (status === 'STORED' && scheduledSecondaryAt) return '2次予定'
   if (isDraft) return '下書き'
   switch (status) {
     case 'STANDBY':
@@ -104,7 +120,20 @@ function statusLabel(status: string, isDraft: boolean): string {
   }
 }
 
-function statusBadgeClass(status: string, isDraft: boolean): string {
+/**
+ * 状態バッジのクラス。
+ * 「2次予定」のみ専用色（#71a9f7・白）が必要だが、Tailwind の任意色は inline style で
+ * 与える方針（カレンダー RowKindBadge と統一）。ここでは枠線・テキスト色のみ返す。
+ */
+function statusBadgeClass(
+  status: string,
+  isDraft: boolean,
+  scheduledSecondaryAt: string | null,
+): string {
+  // 「2次予定」: 背景は inline style で #71a9f7。ここでは枠線透明 + 白テキストのみ。
+  if (status === 'STORED' && scheduledSecondaryAt) {
+    return 'border-transparent text-white'
+  }
   if (isDraft) return 'bg-gray-100 text-gray-600 border-gray-200'
   switch (status) {
     case 'DISPATCHED':
@@ -223,7 +252,6 @@ export default function DispatchTable({ filter, today }: DispatchTableProps) {
   const dispatches = data?.dispatches ?? []
   const total = data?.total ?? 0
   const totalPages = total === 0 ? 1 : Math.ceil(total / PAGE_SIZE)
-  const showScheduledColumn = filter.status === 'stored'
 
   return (
     <section data-testid="dispatch-table">
@@ -245,20 +273,16 @@ export default function DispatchTable({ filter, today }: DispatchTableProps) {
 
       {data && dispatches.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-          {/* ヘッダ行 (PC のみ) */}
+          {/* ヘッダ行 (PC のみ。「搬送予定」列は常時表示。) */}
           <div
-            className={`hidden sm:grid ${
-              showScheduledColumn
-                ? 'grid-cols-[180px_120px_120px_80px_100px_180px_minmax(180px,1fr)]'
-                : 'grid-cols-[180px_120px_120px_80px_100px_minmax(180px,1fr)]'
-            } gap-3 px-4 py-2 text-xs font-medium text-gray-500 border-b border-gray-100`}
+            className="hidden sm:grid grid-cols-[180px_120px_120px_80px_100px_180px_minmax(180px,1fr)] gap-3 px-4 py-2 text-xs font-medium text-gray-500 border-b border-gray-100"
           >
             <span>案件番号</span>
             <span>日時</span>
             <span>隊員</span>
             <span>AS</span>
             <span>状態</span>
-            {showScheduledColumn && <span>搬送予定</span>}
+            <span>搬送予定</span>
             <span className="text-right">請求</span>
           </div>
 
@@ -268,7 +292,6 @@ export default function DispatchTable({ filter, today }: DispatchTableProps) {
                 key={d.id}
                 dispatch={d}
                 today={today}
-                showScheduledColumn={showScheduledColumn}
                 onToggleBilling={(billed) =>
                   billingMutation.mutate({ id: d.id, billed })
                 }
@@ -340,7 +363,6 @@ export default function DispatchTable({ filter, today }: DispatchTableProps) {
 interface DispatchRowProps {
   dispatch: DispatchItem
   today: string
-  showScheduledColumn: boolean
   onToggleBilling: (billed: boolean) => void
   isPendingTarget: boolean
 }
@@ -348,7 +370,6 @@ interface DispatchRowProps {
 function DispatchRow({
   dispatch: d,
   today,
-  showScheduledColumn,
   onToggleBilling,
   isPendingTarget,
 }: DispatchRowProps) {
@@ -362,15 +383,13 @@ function DispatchRow({
 
   const rowClass = isOverdue ? 'bg-red-50/40' : ''
   const billed = !!d.billedAt
+  const isSecondaryPlan =
+    d.status === 'STORED' && !!d.scheduledSecondaryAt
 
   return (
     <li className={rowClass}>
       <div
-        className={`grid grid-cols-1 ${
-          showScheduledColumn
-            ? 'sm:grid-cols-[180px_120px_120px_80px_100px_180px_minmax(180px,1fr)]'
-            : 'sm:grid-cols-[180px_120px_120px_80px_100px_minmax(180px,1fr)]'
-        } gap-2 sm:gap-3 px-4 py-3 text-sm hover:bg-gray-50 transition-colors`}
+        className="grid grid-cols-1 sm:grid-cols-[180px_120px_120px_80px_100px_180px_minmax(180px,1fr)] gap-2 sm:gap-3 px-4 py-3 text-sm hover:bg-gray-50 transition-colors"
         data-testid="dispatch-row"
         data-overdue={isOverdue ? 'true' : 'false'}
       >
@@ -418,20 +437,23 @@ function DispatchRow({
             className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-medium ${statusBadgeClass(
               d.status,
               d.isDraft,
+              d.scheduledSecondaryAt,
             )}`}
+            style={
+              isSecondaryPlan ? { backgroundColor: '#71a9f7' } : undefined
+            }
             data-testid="status-badge"
+            data-secondary-plan={isSecondaryPlan ? 'true' : 'false'}
           >
-            {statusLabel(d.status, d.isDraft)}
+            {statusLabel(d.status, d.isDraft, d.scheduledSecondaryAt)}
           </span>
         </span>
 
-        {/* 搬送予定 (status=stored 時のみ) */}
-        {showScheduledColumn && (
-          <span className="text-xs sm:text-sm text-gray-700">
-            <span className="sm:hidden text-gray-500 mr-1">搬送予定:</span>
-            {formatScheduled(d.scheduledSecondaryAt)}
-          </span>
-        )}
+        {/* 搬送予定（常時表示。NULL は「—」） */}
+        <span className="text-xs sm:text-sm text-gray-700">
+          <span className="sm:hidden text-gray-500 mr-1">搬送予定:</span>
+          {formatScheduled(d.scheduledSecondaryAt)}
+        </span>
 
         {/* 請求列 (暫定 UI: Phase 5 で billing 画面に置換予定) */}
         <span className="flex min-w-[180px] items-center justify-end gap-2 whitespace-nowrap">
