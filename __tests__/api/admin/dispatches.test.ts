@@ -176,7 +176,7 @@ describe('GET /api/admin/dispatches', () => {
     expect(json.dispatches[1].isDraft).toBe(false)
   })
 
-  it('status=stored フィルタ: status=STORED && isDraft=false', async () => {
+  it('status=stored フィルタ: status=STORED のみ（業務仕様 2026-05-06 §C-1: 下書き保存中の保管案件も含める）', async () => {
     mockedAuth.mockResolvedValueOnce(adminSession())
     const countMock = prisma.dispatch.count as unknown as ReturnType<typeof vi.fn>
     const findMock = prisma.dispatch.findMany as unknown as ReturnType<typeof vi.fn>
@@ -192,7 +192,7 @@ describe('GET /api/admin/dispatches', () => {
 
     await GET(makeRequest('?status=stored'))
     expect(captured?.status).toBe('STORED')
-    expect(captured?.isDraft).toBe(false)
+    expect(captured?.isDraft).toBeUndefined()
   })
 
   it('レスポンスに scheduledSecondaryAt が含まれる', async () => {

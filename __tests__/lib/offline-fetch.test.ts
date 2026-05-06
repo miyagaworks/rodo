@@ -77,10 +77,31 @@ describe('offlineFetch', () => {
 
   // ── POST/PATCH オンライン 5xx ──
 
-  it('オンライン POST で 5xx → キューイングして楽観的レスポンスを返す', async () => {
+  it('オンライン POST で 5xx（X-SW-Offline ヘッダなし）→ そのままエラーレスポンスを返す（offlineActionType 設定済みでもキューイングしない）', async () => {
     setOnline(true)
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response('Server Error', { status: 500 }),
+    )
+
+    const res = await offlineFetch('/api/dispatches', {
+      method: 'POST',
+      body: JSON.stringify({ name: 'test' }),
+      offlineActionType: 'dispatch_create',
+      offlineDispatchId: 'disp-1',
+      offlineOptimisticData: { queued: true, id: 'temp' },
+    })
+
+    expect(res.status).toBe(500)
+    expect(mockAddPendingAction).not.toHaveBeenCalled()
+  })
+
+  it('オンライン POST で 503 + X-SW-Offline ヘッダ付き → SW フォールバック判定でキューイング+楽観レスポンス', async () => {
+    setOnline(true)
+    fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('Service Unavailable', {
+        status: 503,
+        headers: { 'X-SW-Offline': '1' },
+      }),
     )
 
     const res = await offlineFetch('/api/dispatches', {
